@@ -1,0 +1,10 @@
+{
+  "po_number": "PO-2026-1002",
+  "customer": "Northstar Distribution",
+  "currency": "VND",
+  "items": [
+    {"sku": "LAPTOP-A14", "quantity": 10, "unit_price": 17600000},
+    {"sku": "DOCK-USBC", "quantity": 15, "unit_price": 2800000},
+    {"sku": "HEADSET-PRO", "quantity": 8, "unit_price": 1450000}
+  ]
+}

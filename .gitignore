@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.py[cod]
+*.db
+runtime/
+dist/
+build/
+*.egg-info/
+*.pem
+*.key
+.terraform/
+terraform.tfstate*
+*.tfvars
+!*.tfvars.example

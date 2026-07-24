@@ -1,0 +1,66 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: orderflow-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/test.sh
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_PORT: ${{ secrets.EC2_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          install -d -m 0700 ~/.ssh
+          printf '%s\n' "${SSH_KEY}" > ~/.ssh/deploy_key
+          chmod 0600 ~/.ssh/deploy_key
+          port="${EC2_PORT:-22}"
+          ssh-keyscan -p "${port}" -H "${EC2_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Upload release
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_PORT: ${{ secrets.EC2_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          port="${EC2_PORT:-22}"
+          tar -czf /tmp/orderflow-release.tgz \
+            src tests examples workspace scripts pyproject.toml
+          scp -P "${port}" -i ~/.ssh/deploy_key \
+            /tmp/orderflow-release.tgz \
+            "${EC2_USER}@${EC2_HOST}:/tmp/orderflow-release.tgz"
+
+      - name: Activate release
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_PORT: ${{ secrets.EC2_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          port="${EC2_PORT:-22}"
+          ssh -p "${port}" -i ~/.ssh/deploy_key \
+            "${EC2_USER}@${EC2_HOST}" \
+            'release_dir=$(mktemp -d) && tar -xzf /tmp/orderflow-release.tgz -C "$release_dir" && bash "$release_dir/scripts/deploy-remote.sh" "$release_dir"'

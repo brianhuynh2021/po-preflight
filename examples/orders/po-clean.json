@@ -1,0 +1,9 @@
+{
+  "po_number": "PO-2026-1001",
+  "customer": "Acme Technology Ltd.",
+  "currency": "VND",
+  "items": [
+    {"sku": "LAPTOP-A14", "quantity": 5, "unit_price": 18500000},
+    {"sku": "MONITOR-27", "quantity": 5, "unit_price": 6200000}
+  ]
+}

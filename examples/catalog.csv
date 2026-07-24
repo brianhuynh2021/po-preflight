@@ -1,0 +1,6 @@
+sku,name,unit_price,stock,active
+LAPTOP-A14,A14 Business Laptop,18500000,25,true
+MONITOR-27,27-inch Monitor,6200000,12,true
+DOCK-USBC,USB-C Dock,2800000,8,true
+HEADSET-PRO,Professional Headset,1450000,0,true
+LEGACY-MOUSE,Legacy Wireless Mouse,450000,50,false
