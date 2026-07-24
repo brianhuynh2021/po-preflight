@@ -59,7 +59,19 @@ Slack/WebChat -> OpenClaw skill -> OrderFlow CLI
                                     `-- SQLite audit log
 ```
 
-See the [Product Requirements Document](docs/PRD.md), [product scope](docs/product-scope.md), and [security model](docs/security.md).
+See the [Product Requirements Document](docs/PRD.md), [architecture diagrams](docs/architecture.md), [UI specification](docs/ui-specification.md), [demo guide](docs/demo-guide.md), [product scope](docs/product-scope.md), and [security model](docs/security.md).
+
+## Local web prototype
+
+The customer-facing prototype lives in `apps/web` and uses realistic synthetic order data. It demonstrates the order queue, validation findings, approval actions, upload flow, and audit timeline without requiring access to the raw OpenClaw dashboard.
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+The terminal prints the local URL. Open it in a browser to run the interactive demo.
 
 ## CI/CD and AWS
 

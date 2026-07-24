@@ -7,6 +7,8 @@ __pycache__/
 runtime/
 dist/
 build/
+!apps/web/build/
+!apps/web/build/sites-vite-plugin.ts
 *.egg-info/
 *.pem
 *.key
