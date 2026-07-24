@@ -59,7 +59,7 @@ Slack/WebChat -> OpenClaw skill -> OrderFlow CLI
                                     `-- SQLite audit log
 ```
 
-See [product scope](docs/product-scope.md) and [security](docs/security.md).
+See the [Product Requirements Document](docs/PRD.md), [product scope](docs/product-scope.md), and [security model](docs/security.md).
 
 ## CI/CD and AWS
 
