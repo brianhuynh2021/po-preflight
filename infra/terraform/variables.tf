@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "project_name" {
   description = "Resource name prefix"
   type        = string
-  default     = "orderflow-ai"
+  default     = "po-preflight"
 }
 
 variable "instance_type" {

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from orderflow.models import Analysis, Finding, Order, Product
+from preflight.models import Analysis, Finding, Order, Product
 
 
 def analyze_order(

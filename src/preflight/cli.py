@@ -5,15 +5,15 @@ import json
 import sys
 from decimal import Decimal
 
-from orderflow.catalog import load_catalog
-from orderflow.parsers import OrderParseError, parse_order
-from orderflow.render import render_markdown
-from orderflow.rules import analyze_order
-from orderflow.store import AuditStore
+from preflight.catalog import load_catalog
+from preflight.parsers import OrderParseError, parse_order
+from preflight.render import render_markdown
+from preflight.rules import analyze_order
+from preflight.store import AuditStore
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="orderflow")
+    parser = argparse.ArgumentParser(prog="preflight")
     parser.add_argument("--catalog", required=True, help="Product catalog CSV")
     parser.add_argument("--db", required=True, help="SQLite audit database")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -72,6 +72,6 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps(store.history(args.po_number), ensure_ascii=False, indent=2))
                 return 0
     except (OrderParseError, ValueError, OSError) as exc:
-        print(f"orderflow: {exc}", file=sys.stderr)
+        print(f"preflight: {exc}", file=sys.stderr)
         return 1
     return 1

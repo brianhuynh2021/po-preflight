@@ -4,7 +4,7 @@ import csv
 from decimal import Decimal
 from pathlib import Path
 
-from orderflow.models import Product
+from preflight.models import Product
 
 
 def load_catalog(path: str | Path) -> dict[str, Product]:

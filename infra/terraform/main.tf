@@ -17,9 +17,9 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-resource "aws_security_group" "orderflow" {
+resource "aws_security_group" "preflight" {
   name        = "${var.project_name}-sg"
-  description = "Private OrderFlow host; SSH administration only"
+  description = "Private Preflight host; SSH administration only"
 
   ingress {
     description = "SSH from administrator CIDR"
@@ -42,11 +42,11 @@ resource "aws_security_group" "orderflow" {
   }
 }
 
-resource "aws_instance" "orderflow" {
+resource "aws_instance" "preflight" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
   key_name               = var.key_name
-  vpc_security_group_ids = [aws_security_group.orderflow.id]
+  vpc_security_group_ids = [aws_security_group.preflight.id]
 
   root_block_device {
     encrypted   = true

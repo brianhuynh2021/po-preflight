@@ -6,11 +6,11 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
-from orderflow.catalog import load_catalog
-from orderflow.models import LineItem, Order, Product
-from orderflow.parsers import OrderParseError, parse_order, parse_text
-from orderflow.rules import analyze_order
-from orderflow.store import AuditStore
+from preflight.catalog import load_catalog
+from preflight.models import LineItem, Order, Product
+from preflight.parsers import OrderParseError, parse_order, parse_text
+from preflight.rules import analyze_order
+from preflight.store import AuditStore
 
 
 class ParserTests(unittest.TestCase):

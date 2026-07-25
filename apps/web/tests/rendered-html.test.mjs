@@ -13,13 +13,13 @@ async function render() {
   );
 }
 
-test("renders the OrderFlow operations prototype", async () => {
+test("renders the Preflight operations prototype", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /OrderFlow AI — Purchase Order Operations/);
+  assert.match(html, /PO Preflight — Purchase Order Operations/);
   assert.match(html, /Purchase orders/);
   assert.match(html, /PO-10428/);
   assert.match(html, /Northstar Retail/);

@@ -1,14 +1,14 @@
-# OrderFlow AI Demo Guide
+# PO Preflight Demo Guide
 
 ## Demo objective
 
-Show how OrderFlow turns a customer purchase order into a validated, approval-ready record while keeping a human in control.
+Show how Preflight turns a customer purchase order into a validated, approval-ready record while keeping a human in control.
 
 ## Audience
 
 - Company leadership evaluating an internal automation initiative
 - Operations and sales managers who own order quality
-- Prospective customers evaluating OrderFlow as a product
+- Prospective customers evaluating Preflight as a product
 
 ## Recommended duration
 
@@ -22,7 +22,7 @@ Eight to ten minutes.
 
 ### 2. Open the operations queue
 
-Show the OrderFlow dashboard. Point out the orders requiring attention, average review time, and the mix of ready, review-required, and blocked orders.
+Show the Preflight dashboard. Point out the orders requiring attention, average review time, and the mix of ready, review-required, and blocked orders.
 
 ### 3. Open the exception order
 
@@ -43,11 +43,11 @@ Open `PO-10431`. Explain that an unknown SKU blocks approval rather than allowin
 
 ### 6. Show channel flexibility
 
-Explain that the same order and approval workflow can be presented in Slack. Slack is a convenient action surface; the OrderFlow service remains the source of truth.
+Explain that the same order and approval workflow can be presented in Slack. Slack is a convenient action surface; the Preflight service remains the source of truth.
 
 ### 7. Close with business value
 
-“OrderFlow reduces repetitive order checks, catches errors before ERP entry, shortens approval time, and creates evidence for every decision. The same configurable platform can start internally and later be sold to distributors and manufacturers.”
+“Preflight reduces repetitive order checks, catches errors before ERP entry, shortens approval time, and creates evidence for every decision. The same configurable platform can start internally and later be sold to distributors and manufacturers.”
 
 ## Demo data
 

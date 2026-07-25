@@ -1,6 +1,6 @@
-# OrderFlow Web Prototype
+# Preflight Web Prototype
 
-This application is the interactive customer-facing prototype for OrderFlow AI. It is intentionally backed by realistic synthetic data so the complete workflow can be demonstrated without customer credentials or an ERP connection.
+This application is the interactive customer-facing prototype for PO Preflight. It is intentionally backed by realistic synthetic data so the complete workflow can be demonstrated without customer credentials or an ERP connection.
 
 ## Demonstrated workflows
 
@@ -28,4 +28,4 @@ Open the local URL printed by the development server.
 npm test
 ```
 
-This prototype does not persist browser actions after a reload and does not call the production OrderFlow API. The production application will replace the synthetic in-memory data with authenticated API calls.
+This prototype does not persist browser actions after a reload and does not call the production Preflight API. The production application will replace the synthetic in-memory data with authenticated API calls.

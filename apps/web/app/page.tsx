@@ -1,5 +1,5 @@
-import OrderFlowPrototype from "./orderflow-prototype";
+import PreflightPrototype from "./preflight-prototype";
 
 export default function Home() {
-  return <OrderFlowPrototype />;
+  return <PreflightPrototype />;
 }

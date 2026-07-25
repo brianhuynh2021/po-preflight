@@ -1,8 +1,8 @@
-# OrderFlow AI Product Requirements Document
+# PO Preflight Product Requirements Document
 
 | Field | Value |
 |---|---|
-| Product | OrderFlow AI |
+| Product | PO Preflight |
 | Document status | Draft for management review |
 | Version | 0.1 |
 | Date | July 24, 2026 |
@@ -11,13 +11,13 @@
 
 ## 1. Executive summary
 
-OrderFlow AI is an AI-assisted purchase-order intake and validation product for small and midsize distributors, manufacturers, and service companies.
+PO Preflight is an AI-assisted purchase-order intake and validation product for small and midsize distributors, manufacturers, and service companies.
 
 The product converts purchase orders received as PDF, Excel, CSV, text, or structured files into normalized order data. It validates each order against the company's product catalog, pricing rules, inventory, product status, and duplicate-order history. It then routes exceptions to an authorized reviewer through Slack or a web dashboard and records a complete audit trail.
 
-OrderFlow AI does not autonomously approve orders or write to an ERP in the MVP. AI assists with document extraction and explanation; deterministic business rules make validation decisions; authorized employees retain control over approval and downstream actions.
+PO Preflight does not autonomously approve orders or write to an ERP in the MVP. AI assists with document extraction and explanation; deterministic business rules make validation decisions; authorized employees retain control over approval and downstream actions.
 
-The internal MVP will prove whether OrderFlow can reduce manual order pre-check time, catch commercial errors before ERP entry, and provide a reusable product foundation that can later be offered to external customers.
+The internal MVP will prove whether Preflight can reduce manual order pre-check time, catch commercial errors before ERP entry, and provide a reusable product foundation that can later be offered to external customers.
 
 ## 2. Business problem
 
@@ -42,7 +42,7 @@ Enable an operations employee to submit any supported purchase order and receive
 
 Long-term vision:
 
-> OrderFlow AI becomes the intelligent order-intake layer between customer documents and existing ERP systems.
+> PO Preflight becomes the intelligent order-intake layer between customer documents and existing ERP systems.
 
 ## 4. Product principles
 
@@ -144,17 +144,17 @@ Service companies that receive structured work orders, equipment requests, or pr
 ## 9. Core user journey
 
 1. An operations user uploads a purchase order through Slack or the web portal.
-2. OrderFlow stores the original file and creates an intake record.
+2. Preflight stores the original file and creates an intake record.
 3. The extraction layer produces structured header and line-item data.
 4. The user reviews and corrects extracted values if necessary.
 5. The rule engine evaluates the order against company data and policies.
-6. OrderFlow classifies the order as:
+6. Preflight classifies the order as:
    - `READY_FOR_APPROVAL`
    - `REVIEW_REQUIRED`
    - `BLOCKED`
 7. The product routes the order to the appropriate reviewer.
 8. The reviewer approves, rejects, or requests changes.
-9. OrderFlow records the decision, actor, timestamp, and note.
+9. Preflight records the decision, actor, timestamp, and note.
 10. In a future release, an approved order may be sent to an ERP through a controlled adapter.
 
 ## 10. Functional requirements
@@ -262,12 +262,12 @@ The web application shall provide:
 The product will use a monorepo with the following target structure:
 
 ```text
-orderflow-ai/
+po-preflight/
 |-- apps/
 |   |-- api/                  FastAPI application
 |   `-- web/                  Next.js dashboard
 |-- packages/
-|   |-- orderflow-core/       Python parser and rule engine
+|   |-- preflight-core/       Python parser and rule engine
 |   `-- contracts/            API and event schemas
 |-- integrations/
 |   |-- openclaw/             OpenClaw skill and tools
@@ -283,7 +283,7 @@ orderflow-ai/
 
 ### 12.1 Component responsibilities
 
-- **OrderFlow Core:** Parsing, normalization, validation, rendering, and deterministic domain logic.
+- **Preflight Core:** Parsing, normalization, validation, rendering, and deterministic domain logic.
 - **API:** Authentication, authorization, order lifecycle, persistence, and integration boundaries.
 - **Web:** Customer-facing order review and administration.
 - **OpenClaw:** Conversational orchestration, model access, scheduled work, and channel routing.
@@ -381,7 +381,7 @@ All business entities must be scoped to an organization to support future multi-
 The MVP is accepted when all of the following are demonstrated:
 
 1. A user submits a supported purchase-order file.
-2. OrderFlow extracts PO number, customer, currency, SKU, quantity, and unit price.
+2. Preflight extracts PO number, customer, currency, SKU, quantity, and unit price.
 3. The user can inspect extracted data.
 4. The system detects at least:
    - one price discrepancy,
@@ -416,7 +416,7 @@ Targets must be validated during the pilot rather than treated as guaranteed per
 - Produce a review-ready result within 60 seconds for normal text-based orders.
 - Record 100% of approval decisions with actor and timestamp.
 - Prevent 100% of unauthorized or unapproved ERP writes in the MVP.
-- Detect 100% of exact duplicate PO numbers already present in the OrderFlow database.
+- Detect 100% of exact duplicate PO numbers already present in the Preflight database.
 
 ## 19. Delivery plan
 
@@ -485,7 +485,7 @@ Targets must be validated during the pilot rather than treated as guaranteed per
 
 ## 21. Commercial packaging hypothesis
 
-OrderFlow should be sold as an operational outcome, not as an OpenClaw installation or generic AI assistant.
+Preflight should be sold as an operational outcome, not as an OpenClaw installation or generic AI assistant.
 
 Proposed positioning:
 
@@ -504,7 +504,7 @@ Commercial assumptions require customer interviews and should not be treated as 
 
 The management demo should take no more than five minutes:
 
-1. Open the OrderFlow dashboard.
+1. Open the Preflight dashboard.
 2. Upload synthetic PO `PO-2026-1002`.
 3. Show extracted customer, currency, SKUs, quantities, and prices.
 4. Show a 4.86% price discrepancy.
@@ -518,7 +518,7 @@ The management demo should take no more than five minutes:
 
 Management approval is requested for:
 
-1. The OrderFlow AI product direction.
+1. The PO Preflight product direction.
 2. The initial internal department and pilot users.
 3. Access to representative, sanitized purchase-order samples.
 4. Access to a non-production catalog and inventory export.

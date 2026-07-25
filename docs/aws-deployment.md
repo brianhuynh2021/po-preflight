@@ -3,7 +3,7 @@
 ## Recommended MVP topology
 
 - One Ubuntu EC2 instance runs OpenClaw Gateway continuously.
-- An encrypted EBS volume stores OpenClaw state and the OrderFlow audit database.
+- An encrypted EBS volume stores OpenClaw state and the Preflight audit database.
 - The security group exposes SSH only to an administrator CIDR.
 - Port 18789 remains private; administrators use SSH tunneling or Tailscale.
 - Claude and Slack APIs are outbound connections.

@@ -1,6 +1,6 @@
-# OrderFlow AI
+# PO Preflight
 
-OrderFlow AI ingests purchase orders from files, validates them with deterministic business rules, and delivers review-ready results through OpenClaw, WebChat, or Slack.
+PO Preflight ingests purchase orders from files, validates them with deterministic business rules, and delivers review-ready results through OpenClaw, WebChat, or Slack.
 
 ## MVP capabilities
 
@@ -20,10 +20,10 @@ OrderFlow AI ingests purchase orders from files, validates them with determinist
 Or run it directly:
 
 ```bash
-PYTHONPATH=src python3 -m orderflow \
+PYTHONPATH=src python3 -m preflight \
   --catalog examples/catalog.csv \
-  --db runtime/orderflow.db \
-  analyze examples/orders/po-price-and-stock.json
+  --db runtime/preflight.db \
+  analyze examples/orders/po-review.json
 ```
 
 ## Install into local OpenClaw
@@ -36,7 +36,7 @@ openclaw gateway restart
 Then open WebChat and send:
 
 ```text
-/orderflow analyze this purchase order
+/preflight analyze this purchase order
 ```
 
 ## PDF
@@ -52,7 +52,7 @@ Scanned PDFs require an OCR stage that is outside the current MVP. The MVP does 
 ## Architecture
 
 ```text
-Slack/WebChat -> OpenClaw skill -> OrderFlow CLI
+Slack/WebChat -> OpenClaw skill -> Preflight CLI
                                     |-- parser
                                     |-- catalog
                                     |-- rule engine

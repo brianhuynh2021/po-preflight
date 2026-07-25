@@ -137,7 +137,7 @@ function StatusBadge({ status }: { status: OrderStatus }) {
   return <span className={`status status-${status.toLowerCase().replaceAll(" ", "-")}`}>{status}</span>;
 }
 
-export default function OrderFlowPrototype() {
+export default function PreflightPrototype() {
   const [section, setSection] = useState<Section>("Orders");
   const [orders, setOrders] = useState(seedOrders);
   const [selectedId, setSelectedId] = useState("PO-10428");
@@ -188,7 +188,7 @@ export default function OrderFlowPrototype() {
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">O</span>
-          <span>OrderFlow</span>
+          <span>Preflight</span>
         </div>
         <div className="workspace-switcher">
           <span className="workspace-avatar">N</span>
@@ -218,7 +218,7 @@ export default function OrderFlowPrototype() {
 
       <main className="main">
         <header className="topbar">
-          <div className="mobile-brand"><span className="brand-mark">O</span><strong>OrderFlow</strong></div>
+          <div className="mobile-brand"><span className="brand-mark">O</span><strong>Preflight</strong></div>
           <div className="topbar-actions">
             <button className="icon-button" aria-label="Help">?</button>
             <button className="icon-button notification-button" aria-label="Notifications">♢<span /></button>
@@ -307,7 +307,7 @@ export default function OrderFlowPrototype() {
         {section === "Audit log" ? <AuditView /> : null}
       </main>
 
-      {uploadOpen ? <div className="modal-backdrop" role="presentation" onMouseDown={() => setUploadOpen(false)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="upload-title" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setUploadOpen(false)} aria-label="Close">×</button><div className="modal-icon">↑</div><h2 id="upload-title">Upload a purchase order</h2><p>OrderFlow will extract the order and run company validation rules. You will review the result before any approval.</p><label className="drop-zone"><input type="file" accept=".pdf,.csv,.json,.txt" onChange={(event) => { if (event.target.files?.length) { setUploadOpen(false); showToast(`${event.target.files[0].name} was added to the processing queue.`); } }} /><span className="upload-symbol">＋</span><strong>Drop a file here or choose a file</strong><small>PDF, CSV, JSON, or TXT · Maximum 20 MB</small></label><div className="modal-note"><span>i</span><p><strong>Human review is always required.</strong><br/>OrderFlow never creates an ERP order automatically in this prototype.</p></div></section></div> : null}
+      {uploadOpen ? <div className="modal-backdrop" role="presentation" onMouseDown={() => setUploadOpen(false)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="upload-title" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setUploadOpen(false)} aria-label="Close">×</button><div className="modal-icon">↑</div><h2 id="upload-title">Upload a purchase order</h2><p>Preflight will extract the order and run company validation rules. You will review the result before any approval.</p><label className="drop-zone"><input type="file" accept=".pdf,.csv,.json,.txt" onChange={(event) => { if (event.target.files?.length) { setUploadOpen(false); showToast(`${event.target.files[0].name} was added to the processing queue.`); } }} /><span className="upload-symbol">＋</span><strong>Drop a file here or choose a file</strong><small>PDF, CSV, JSON, or TXT · Maximum 20 MB</small></label><div className="modal-note"><span>i</span><p><strong>Human review is always required.</strong><br/>Preflight never creates an ERP order automatically in this prototype.</p></div></section></div> : null}
 
       {decisionOpen ? <div className="modal-backdrop" role="presentation" onMouseDown={() => setDecisionOpen(false)}><section className="modal decision-modal" role="dialog" aria-modal="true" aria-labelledby="decision-title" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setDecisionOpen(false)} aria-label="Close">×</button><span className="review-label">APPROVAL DECISION</span><h2 id="decision-title">Approve {selected.id}?</h2><p>This decision will be attributed to Maya Chen and added to the permanent audit history.</p>{selected.issues.length ? <div className="decision-warning"><strong>{selected.issues.length} validation findings acknowledged</strong><span>You are approving this order with documented exceptions.</span></div> : null}<label className="note-field"><span>Decision note {selected.issues.length ? "(required)" : "(optional)"}</span><textarea value={decisionNote} onChange={(event) => setDecisionNote(event.target.value)} placeholder="Explain the reason for this decision..." rows={4}/></label><div className="modal-actions"><button className="secondary-button" onClick={() => setDecisionOpen(false)}>Cancel</button><button className="approve-button" disabled={selected.issues.length > 0 && !decisionNote.trim()} onClick={approveSelected}>Confirm approval</button></div></section></div> : null}
 
@@ -329,5 +329,5 @@ function RulesView() {
 }
 
 function AuditView() {
-  return <div className="page simple-page"><div className="page-heading"><div><p className="eyebrow">GOVERNANCE</p><h1>Audit log</h1><p>Immutable evidence for extraction, validation, and human decisions.</p></div><button className="secondary-button">Export CSV</button></div><section className="content-card audit-card"><div className="panel-toolbar"><label className="search"><span>⌕</span><input placeholder="Search order, person, or event" /></label><select><option>All events</option><option>Human decisions</option><option>System events</option></select></div>{[{time:"10:43 AM",event:"Validation completed",actor:"OrderFlow Rules",order:"PO-10428",detail:"2 findings generated"},{time:"10:42 AM",event:"Order submitted",actor:"Olivia Park",order:"PO-10428",detail:"Web portal upload"},{time:"9:19 AM",event:"Order blocked",actor:"OrderFlow Rules",order:"PO-10431",detail:"Unknown SKU DSK-404"},{time:"Yesterday",event:"Order approved",actor:"Maya Chen",order:"PO-10417",detail:"No exceptions"}].map((item) => <div className="audit-row" key={`${item.order}-${item.event}`}><time>{item.time}</time><span className="audit-dot"/><div><strong>{item.event}</strong><small>{item.detail}</small></div><span>{item.actor}</span><b>{item.order}</b></div>)}</section></div>;
+  return <div className="page simple-page"><div className="page-heading"><div><p className="eyebrow">GOVERNANCE</p><h1>Audit log</h1><p>Immutable evidence for extraction, validation, and human decisions.</p></div><button className="secondary-button">Export CSV</button></div><section className="content-card audit-card"><div className="panel-toolbar"><label className="search"><span>⌕</span><input placeholder="Search order, person, or event" /></label><select><option>All events</option><option>Human decisions</option><option>System events</option></select></div>{[{time:"10:43 AM",event:"Validation completed",actor:"Preflight Rules",order:"PO-10428",detail:"2 findings generated"},{time:"10:42 AM",event:"Order submitted",actor:"Olivia Park",order:"PO-10428",detail:"Web portal upload"},{time:"9:19 AM",event:"Order blocked",actor:"Preflight Rules",order:"PO-10431",detail:"Unknown SKU DSK-404"},{time:"Yesterday",event:"Order approved",actor:"Maya Chen",order:"PO-10417",detail:"No exceptions"}].map((item) => <div className="audit-row" key={`${item.order}-${item.event}`}><time>{item.time}</time><span className="audit-dot"/><div><strong>{item.event}</strong><small>{item.detail}</small></div><span>{item.actor}</span><b>{item.order}</b></div>)}</section></div>;
 }

@@ -7,7 +7,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from orderflow.models import LineItem, Order
+from preflight.models import LineItem, Order
 
 
 class OrderParseError(ValueError):

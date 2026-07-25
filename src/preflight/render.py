@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from orderflow.models import Analysis
+from preflight.models import Analysis
 
 
 STATUS_LABELS = {
@@ -13,7 +13,7 @@ STATUS_LABELS = {
 def render_markdown(analysis: Analysis) -> str:
     order = analysis.order
     lines = [
-        f"# ORDERFLOW - {STATUS_LABELS.get(analysis.status, analysis.status.upper())}",
+        f"# PREFLIGHT - {STATUS_LABELS.get(analysis.status, analysis.status.upper())}",
         "",
         f"- PO: **{order.po_number}**",
         f"- Customer: **{order.customer}**",

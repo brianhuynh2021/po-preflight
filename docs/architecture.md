@@ -1,6 +1,6 @@
-# OrderFlow AI Architecture
+# PO Preflight Architecture
 
-This document describes the target architecture for the OrderFlow AI MVP and the path from a local demonstration to a secure AWS deployment.
+This document describes the target architecture for the PO Preflight MVP and the path from a local demonstration to a secure AWS deployment.
 
 ## 1. System context
 
@@ -10,8 +10,8 @@ flowchart LR
     Reviewer["Sales or Operations Manager"]
     Admin["System Administrator"]
     Slack["Slack"]
-    Web["OrderFlow Web Portal"]
-    OrderFlow["OrderFlow AI"]
+    Web["Preflight Web Portal"]
+    Preflight["PO Preflight"]
     Catalog["Product Catalog and Inventory"]
     ERP["ERP Adapter — Future Phase"]
 
@@ -19,14 +19,14 @@ flowchart LR
     Customer -->|Upload and review| Web
     Reviewer -->|Approve, reject, request changes| Slack
     Reviewer -->|Review exceptions| Web
-    Slack --> OrderFlow
-    Web --> OrderFlow
-    Admin -->|Configure rules and access| OrderFlow
-    Catalog -->|SKU, price, status, stock| OrderFlow
-    OrderFlow -.->|Approved orders only| ERP
+    Slack --> Preflight
+    Web --> Preflight
+    Admin -->|Configure rules and access| Preflight
+    Catalog -->|SKU, price, status, stock| Preflight
+    Preflight -.->|Approved orders only| ERP
 ```
 
-OrderFlow is the controlled intake layer between incoming purchase-order documents and downstream business systems. Slack and the web portal are interfaces to the same workflow and audit trail.
+Preflight is the controlled intake layer between incoming purchase-order documents and downstream business systems. Slack and the web portal are interfaces to the same workflow and audit trail.
 
 ## 2. Application containers
 
@@ -37,7 +37,7 @@ flowchart TB
         WebApp["Next.js Web Portal"]
     end
 
-    subgraph Platform["OrderFlow Platform"]
+    subgraph Platform["Preflight Platform"]
         API["FastAPI Application API"]
         Worker["Document Processing Worker"]
         Rules["Deterministic Rule Engine"]
@@ -79,7 +79,7 @@ flowchart TB
 | Slack application | Submit orders and act on exception notifications | Planned |
 | FastAPI application | Authentication, workflow state, business API, and integration boundary | Planned |
 | Document worker | Extraction, normalization, validation orchestration, and retries | Local core available |
-| OrderFlow core | Parsers, deterministic rules, reports, and audit decisions | Implemented |
+| Preflight core | Parsers, deterministic rules, reports, and audit decisions | Implemented |
 | OpenClaw | AI-assisted extraction, explanation, channel orchestration, and skills | Local skill implemented |
 | PostgreSQL | Durable orders, findings, decisions, rules, and tenant data | Planned; SQLite used locally |
 | S3 | Original documents and generated artifacts | Planned for AWS |
@@ -91,7 +91,7 @@ sequenceDiagram
     autonumber
     actor User as Operations User
     participant UI as Slack or Web Portal
-    participant API as OrderFlow API
+    participant API as Preflight API
     participant Store as Document Store
     participant Extract as Extraction Worker
     participant Rules as Rule Engine
@@ -149,7 +149,7 @@ flowchart TB
     Web --> ALB
 
     subgraph VPC["Private AWS VPC"]
-        ALB --> API["OrderFlow API Service"]
+        ALB --> API["Preflight API Service"]
         API --> Worker["Processing Worker"]
         API --> RDS[("Encrypted PostgreSQL")]
         Worker --> RDS
@@ -177,12 +177,12 @@ The first internal deployment may use one private EC2 instance for cost and spee
 ## 7. Monorepo target
 
 ```text
-orderflow-ai/
+po-preflight/
 ├── apps/
 │   ├── api/                 # FastAPI product API
 │   └── web/                 # Next.js customer portal and prototype
 ├── packages/
-│   ├── orderflow-core/      # Parsing and deterministic validation
+│   ├── preflight-core/      # Parsing and deterministic validation
 │   └── contracts/           # Shared API and event schemas
 ├── integrations/
 │   ├── openclaw/

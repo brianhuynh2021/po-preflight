@@ -3,7 +3,7 @@ requires = ["setuptools>=70"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "orderflow-ai"
+name = "po-preflight"
 version = "0.1.0"
 description = "Deterministic purchase-order intake and validation for OpenClaw"
 requires-python = ">=3.11"
@@ -13,7 +13,7 @@ dependencies = []
 pdf = ["pypdf>=5.0"]
 
 [project.scripts]
-orderflow = "orderflow.cli:main"
+preflight = "preflight.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

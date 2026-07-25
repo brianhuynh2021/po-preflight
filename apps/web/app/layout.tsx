@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OrderFlow AI — Purchase Order Operations",
+  title: "PO Preflight — Purchase Order Operations",
   description: "Validate purchase orders, resolve exceptions, and keep every decision auditable.",
 };
 

@@ -5,7 +5,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
-from orderflow.models import Analysis
+from preflight.models import Analysis
 
 
 SCHEMA = """

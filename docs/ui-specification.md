@@ -1,10 +1,10 @@
-# OrderFlow AI UI Specification
+# PO Preflight UI Specification
 
 This specification defines the initial customer-facing experience and can be used as the source for a future Figma design file.
 
 ## Product experience
 
-OrderFlow should feel like an operations workspace: calm, precise, trustworthy, and fast. It should not look like a generic AI chat application. Users work with orders, findings, decisions, and evidence; AI remains a supporting capability.
+Preflight should feel like an operations workspace: calm, precise, trustworthy, and fast. It should not look like a generic AI chat application. Users work with orders, findings, decisions, and evidence; AI remains a supporting capability.
 
 ## Information architecture
 
