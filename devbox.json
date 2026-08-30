@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetpack-io/devbox/0.13.0/.schema/devbox.schema.json",
+  "packages": [
+    "python@3.12",
+    "nodejs@22",
+    "sqlite"
+  ],
+  "shell": {
+    "init_hook": [
+      "echo '🚀 Chào mừng đến với môi trường phát triển PO Preflight (Devbox)!'",
+      "python3 -m venv .venv 2>/dev/null || true",
+      "[ -f .venv/bin/activate ] && source .venv/bin/activate",
+      "pip install -q -e . 2>/dev/null || true"
+    ],
+    "scripts": {
+      "dev": "npm run dev",
+      "demo": "./scripts/demo.sh",
+      "test": "PYTHONPATH=src python3 -m unittest discover -s tests",
+      "analyze": "PYTHONPATH=src python3 -m preflight --catalog examples/catalog.csv --db runtime/preflight.db analyze"
+    }
+  }
+}
