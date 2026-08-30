@@ -1,6 +1,8 @@
 # PO Preflight
 
-PO Preflight ingests purchase orders from files, validates them with deterministic business rules, and delivers review-ready results through OpenClaw, WebChat, or Slack.
+> 🇻🇳 **Tài liệu tiếng Việt đầy đủ:** Xem chi tiết kiến trúc Agentic AI, RAG và phê duyệt đa kênh tại [Mô tả dự án PO Preflight (Tiếng Việt)](docs/MO_TA_DU_AN.md).
+
+PO Preflight ingests purchase orders from files, validates them with deterministic business rules and intelligent RAG-assisted reasoning, and delivers review-ready results for instant approval through **Telegram, Zalo, Slack, WeChat, or WebChat**.
 
 ## MVP capabilities
 
