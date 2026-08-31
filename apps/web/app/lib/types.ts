@@ -122,3 +122,29 @@ export interface Product {
   stock: number;
   active: boolean;
 }
+
+// ------------------------------------------------------------- prototype UI
+
+/* UI-only types used by the prototype. Not part of the backend data contract —
+   they describe navigation and display-only surfaces. */
+
+/** Primary navigation / view switch in the prototype side bar. */
+export type Section = "Overview" | "Orders" | "Catalog" | "Rules" | "Audit log";
+
+/** A validation-rule control shown on the Rules screen. */
+export interface ValidationRule {
+  name: string;
+  description: string;
+  severity: "Block" | "Review";
+  owner: string;
+}
+
+export type ActivityEventType = "system" | "human";
+
+/** A single timeline entry on the Order Detail "Activity" panel. */
+export interface ActivityEvent {
+  title: string;
+  detail: string;
+  time: string;
+  type: ActivityEventType;
+}
