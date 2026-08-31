@@ -23,6 +23,14 @@
 - **Phê duyệt mọi lúc mọi nơi (Mobile-first Approval):** Quản lý có thể bấm nút **[Duyệt / Từ chối / Yêu cầu sửa]** ngay trên **Telegram, Zalo, Slack hoặc WeChat**.
 - **Nguyên tắc cốt lõi "Human-In-The-Loop":** AI chỉ đóng vai trò trợ lý tiền kiểm toán (preflight), **tuyệt đối không tự ý ghi vào ERP nếu chưa có xác nhận rõ ràng từ con người**.
 
+### 1.3. Triết lý Thiết kế AI-Native (Tinh thần Cursor trong Vận hành Đơn hàng)
+Hệ thống không đi theo lối mòn tự động hóa cứng nhắc cũ mà áp dụng 5 trụ cột trải nghiệm AI-Native đỉnh cao:
+1. **Minh bạch tuyệt đối — AI không phải hộp đen (High-Trust Grounding):** Mọi cảnh báo sai giá hay thiếu tồn kho đều chỉ rõ bằng chứng cụ thể (ví dụ: *Khách đặt 75.000đ vs Bảng giá Phụ lục 02 ký ngày 15/01/2026 là 72.000đ*).
+2. **Xử lý ngầm chủ động — Không bắt người dùng chờ (Proactive & Zero-Wait):** File PO gửi qua email/Zalo được hệ thống âm thầm bóc tách và đối soát ngầm trong nền. Khi mở app hay tin nhắn Zalo, kết quả đã được dọn sẵn tức thì.
+3. **Sửa lỗi không tốn sức — Chuyển từ Nhập liệu sang Xác nhận (Frictionless Correction):** 98% dữ liệu sạch được điền tự động. Với 2% dòng có vấn đề, AI đưa sẵn gợi ý chuẩn nhất kèm 1 nút bấm chấp nhận sửa đổi.
+4. **Hiểu sâu ngữ cảnh khách hàng (Context-Centric Reasoning):** Đơn hàng được soi xét trong toàn bộ bối cảnh riêng của khách hàng đó: lịch sử đơn cũ 6 tháng qua, hạn mức công nợ, chính sách chiết khấu riêng và thói quen gọi tên sản phẩm.
+5. **Khuếch đại năng lực con người — Người dùng luôn làm chủ (Human in the Driver's Seat):** AI làm toàn bộ việc nặng bới tìm lỗi sai, con người giữ quyền lực tối cao quyết định việc đồng bộ vào ERP.
+
 ---
 
 ## 2. KIẾN TRÚC TỔNG THỂ: KẾT HỢP MIT OUTER SYSTEM + STANFORD INNER LOOP

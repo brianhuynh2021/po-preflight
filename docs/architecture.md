@@ -28,6 +28,16 @@ flowchart LR
 
 Preflight is the controlled intake layer between incoming purchase-order documents and downstream business systems. Multi-channel bots (Telegram, Zalo, Slack, WeChat) and the web portal are interfaces to the same workflow and audit trail.
 
+### 1.1 AI-Native Design Philosophy (Adapted from the Cursor Mindset)
+
+Rather than rigid legacy automation, PO Preflight applies 5 core principles of modern AI-native systems to B2B order operations:
+
+1. **High-Trust Grounding Evidence:** AI is never a black box. Every validation finding provides explicit lineage and evidence (e.g., matching line 3 of the PO against Clause 2 of Customer Contract #2026-04).
+2. **Proactive Background Processing (Zero-Wait):** Documents sent via email, Zalo, or portal are ingested and analyzed asynchronously in the background. Reviewers see instant results without watching spinners.
+3. **Frictionless 1-Click Correction:** 98% of clean data is prepared automatically. For ambiguous lines, AI provides 1-click suggested corrections instead of forcing manual data re-entry.
+4. **Context-Centric Reasoning:** Orders are evaluated in the holistic context of customer historical orders, custom pricing agreements, and past nickname resolutions.
+5. **Human in Full Control:** AI acts as a tireless pre-flight co-pilot. Only an authenticated human decision triggers ERP synchronization.
+
 ## 2. Application containers
 
 ```mermaid

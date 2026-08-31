@@ -10,7 +10,7 @@ globs: apps/web/**/*.{ts,tsx,css,json,html}
 - **Styling:** Tailwind CSS, CSS Custom Properties for theme tokens
 - **Data Visualization:** ECharts, custom SVG/GeoJSON WorldMap
 
-## 2. Core UI Philosophy
+## 2. Core UI Philosophy (AI-Native & Frictionless)
 - This is an **Enterprise B2B Preflight & Operations Dashboard**, NOT a generic retail shopping cart.
 - **Statuses to use:** `Ready`, `Review required`, `Blocked`, `Approved`, `Changes requested`, `Rejected`.
 - **Colors:**
@@ -28,4 +28,4 @@ globs: apps/web/**/*.{ts,tsx,css,json,html}
 ## 3. Code Conventions
 - Keep components modular, accessible, and responsive.
 - Always handle loading, empty, and error states gracefully.
-- Refer to `docs/FE_BUSINESS_REQUIREMENTS_AND_TICKETS.md` for specifications.
+- Refer to `docs/FE_BUSINESS_REQUIREMENTS_AND_TICKETS.md` and `docs/FE_DATA_CONTRACT.md` for specifications.
