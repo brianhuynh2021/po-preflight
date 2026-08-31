@@ -16,3 +16,5 @@ build/
 terraform.tfstate*
 *.tfvars
 !*.tfvars.example
+# Ignore all node_modules
+**/node_modules/
