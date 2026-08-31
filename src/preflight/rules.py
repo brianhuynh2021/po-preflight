@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from preflight.models import Analysis, Finding, Order, Product
+from preflight.rag.matcher import HybridSKUMatcher
 
 
 def analyze_order(
@@ -13,6 +14,7 @@ def analyze_order(
     price_tolerance_percent: Decimal = Decimal("0"),
 ) -> Analysis:
     findings: list[Finding] = []
+    matcher = HybridSKUMatcher(catalog)
     if duplicate:
         findings.append(
             Finding(
@@ -25,14 +27,30 @@ def analyze_order(
     for item in order.items:
         product = catalog.get(item.sku)
         if product is None:
-            findings.append(
-                Finding(
-                    code="UNKNOWN_SKU",
-                    severity="error",
-                    sku=item.sku,
-                    message=f"SKU {item.sku} does not exist in the catalog.",
+            # Check Hybrid SKU Matcher for suggestions
+            resolution = matcher.resolve(item.sku, customer_id=order.customer)
+            if resolution.is_confident and resolution.matched_sku:
+                findings.append(
+                    Finding(
+                        code="UNKNOWN_SKU",
+                        severity="warning",
+                        sku=item.sku,
+                        message=(
+                            f"SKU '{item.sku}' not found in catalog. "
+                            f"AI suggested match: '{resolution.matched_sku}' ({resolution.name}) "
+                            f"with {resolution.confidence_score*100:.0f}% confidence [{resolution.tier_used.value}]."
+                        ),
+                    )
                 )
-            )
+            else:
+                findings.append(
+                    Finding(
+                        code="UNKNOWN_SKU",
+                        severity="error",
+                        sku=item.sku,
+                        message=f"SKU {item.sku} does not exist in the catalog.",
+                    )
+                )
             continue
         if not product.active:
             findings.append(
