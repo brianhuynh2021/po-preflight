@@ -1,31 +1,36 @@
-# Preflight Web Prototype
+# React + TypeScript + Vite
 
-This application is the interactive customer-facing prototype for PO Preflight. It is intentionally backed by realistic synthetic data so the complete workflow can be demonstrated without customer credentials or an ERP connection.
+This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
-## Demonstrated workflows
+Currently, two official plugins are available:
 
-- Operations overview and attention queue
-- Searchable purchase-order queue
-- Order header and normalized line-item review
-- Catalog, price, inventory, and unknown-SKU findings
-- Controlled approval with a required exception note
-- Change requests and blocked-order behavior
-- Upload interaction and processing confirmation
-- Catalog, validation-rule, and audit-log views
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-## Run locally
+## React Compiler
 
-```bash
-npm install
-npm run dev
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the Oxlint configuration
+
+If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+
+```json
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript", "oxc"],
+  "options": {
+    "typeAware": true
+  },
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+  }
+}
 ```
 
-Open the local URL printed by the development server.
+See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
 
-## Validate
+## Original template
 
-```bash
-npm test
-```
-
-This prototype does not persist browser actions after a reload and does not call the production Preflight API. The production application will replace the synthetic in-memory data with authenticated API calls.
+[Kimi dashboard Northwind](https://hp5tyypp32mtw.ok.kimi.link/)
