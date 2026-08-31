@@ -11,7 +11,7 @@ The MVP targets operations and sales-order teams at small and midsize distributo
 - Human-readable review output.
 - Explicit human decisions.
 - SQLite audit history.
-- OpenClaw WebChat and Slack as interaction surfaces.
+- Telegram, Zalo, Slack, and Web Portal as interaction surfaces.
 
 ## Out of scope for the MVP
 

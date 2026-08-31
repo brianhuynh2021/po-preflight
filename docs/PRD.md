@@ -270,7 +270,8 @@ po-preflight/
 |   |-- preflight-core/       Python parser and rule engine
 |   `-- contracts/            API and event schemas
 |-- integrations/
-|   |-- openclaw/             OpenClaw skill and tools
+|   |-- telegram/             Telegram bot service
+|   |-- zalo/                 Zalo OA service
 |   |-- slack/                Slack application
 |   `-- erp/                  Future ERP adapters
 |-- infra/
@@ -286,8 +287,8 @@ po-preflight/
 - **Preflight Core:** Parsing, normalization, validation, rendering, and deterministic domain logic.
 - **API:** Authentication, authorization, order lifecycle, persistence, and integration boundaries.
 - **Web:** Customer-facing order review and administration.
-- **OpenClaw:** Conversational orchestration, model access, scheduled work, and channel routing.
-- **Slack:** Submission, notification, and approval interaction surface.
+- **LangGraph Agent Engine:** AI-assisted extraction, hybrid SKU RAG, reflection, and channel orchestration.
+- **Messaging Integrations (Telegram / Zalo / Slack):** Submission, notification, and approval interaction surfaces.
 - **Database:** System of record for orders, findings, decisions, rules, and audit events.
 
 ### 12.2 Initial technology choices
@@ -295,9 +296,9 @@ po-preflight/
 - Python 3.11 or newer.
 - FastAPI for the application API.
 - PostgreSQL for production; SQLite for local development and the current prototype.
-- Next.js and TypeScript for the web dashboard.
-- OpenClaw for AI and messaging orchestration.
-- Slack Socket Mode for the local/internal MVP.
+- React 19, TypeScript, and Tailwind CSS for the web dashboard.
+- LangGraph for AI reasoning and orchestration.
+- Telegram, Zalo, and Slack for mobile and messaging approval.
 - Terraform for AWS infrastructure.
 - GitHub Actions for CI/CD.
 
@@ -359,7 +360,7 @@ All business entities must be scoped to an organization to support future multi-
 - **SEC-003:** Data shall be encrypted in transit and at rest.
 - **SEC-004:** Access shall follow least privilege.
 - **SEC-005:** Slack channels and users shall use explicit allowlists during the MVP.
-- **SEC-006:** The OpenClaw Gateway shall not be exposed publicly without authenticated transport.
+- **SEC-006:** The API Gateway shall not be exposed publicly without authenticated transport.
 - **SEC-007:** Uploaded files shall be scanned and processed in an isolated environment where possible.
 - **SEC-008:** Logs shall redact credentials and avoid unnecessary document content.
 - **SEC-009:** Organization data shall not cross tenant boundaries.
@@ -427,7 +428,7 @@ Targets must be validated during the pilot rather than treated as guaranteed per
 - Catalog and inventory validation.
 - Duplicate detection.
 - SQLite audit history.
-- OpenClaw skill.
+- CLI analyze and review commands.
 - Automated tests.
 - Initial CI/CD and Terraform files.
 
@@ -485,7 +486,7 @@ Targets must be validated during the pilot rather than treated as guaranteed per
 
 ## 21. Commercial packaging hypothesis
 
-Preflight should be sold as an operational outcome, not as an OpenClaw installation or generic AI assistant.
+Preflight should be sold as an operational outcome, not as a generic AI assistant.
 
 Proposed positioning:
 

@@ -192,9 +192,7 @@ Hệ thống cho phép gửi báo cáo phân tích và nhận lệnh phê duyệ
 - **Cơ chế:** Gửi tin nhắn tương tác qua Zalo OA OpenAPI hoặc Zalo Notification Service (ZNS) kèm Button Action Webhook.
 - **Ưu điểm tại Việt Nam:** Tiện lợi tối đa cho cấp quản lý sử dụng Zalo hàng ngày trên điện thoại.
 
-### 5.3. Slack
-- **Cơ chế:** Sử dụng Slack Block Kit với Interactive Components (`button`, `overflow menu`, `modal input` cho trường hợp cần nhập lý do từ chối).
-- **Tích hợp OpenClaw Skill:** Cho phép người dùng gõ lệnh `/preflight analyze` hoặc kéo thả file PO vào kênh chat.
+- **Tích hợp Slack App & Webhooks:** Cho phép gửi tin nhắn thông báo dạng Block Kit và nhận lệnh phê duyệt trực tiếp qua kênh chat.
 
 ### 5.4. WeChat (WeChat Work / Enterprise WeChat)
 - **Cơ chế:** Sử dụng WeChat Work Webhook Bot với định dạng `template_card` (Interactive Cards).
@@ -253,7 +251,7 @@ po-preflight/
 
 ## 8. LỘ TRÌNH TRIỂN KHAI (IMPLEMENTATION ROADMAP)
 
-- [x] **Giai đoạn 1 (MVP Hoàn thành):** Bộ đọc file thuần, Rule engine kiểm tra giá/tồn kho/trùng lặp, Audit log SQLite, OpenClaw skill, Web prototype.
+- [x] **Giai đoạn 1 (MVP Hoàn thành):** Bộ đọc file thuần, Rule engine kiểm tra giá/tồn kho/trùng lặp, Audit log SQLite, CLI analyze, Web prototype.
 - [ ] **Giai đoạn 2 (RAG & Tối ưu AI):**
   - Tích hợp ChromaDB / FAISS cho Vector Search SKU và Hợp đồng khách hàng.
   - Tích hợp Gemini Flash / Claude Haiku cho bóc tách tài liệu PDF/Ảnh scan phức tạp.

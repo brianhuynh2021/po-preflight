@@ -8,6 +8,4 @@ if [[ -z "${release_dir}" || ! -d "${release_dir}/src/preflight" ]]; then
 fi
 
 "${release_dir}/scripts/test.sh"
-"${release_dir}/scripts/install-openclaw.sh"
-openclaw gateway restart
-openclaw gateway probe
+echo "Deployment verification successful."

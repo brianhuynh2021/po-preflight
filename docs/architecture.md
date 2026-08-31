@@ -90,7 +90,7 @@ flowchart TB
 | FastAPI application | Authentication, workflow state, business API, and integration boundary | Planned |
 | Document worker | Extraction, normalization, validation orchestration, and retries | Local core available |
 | Preflight core | Parsers, deterministic rules, reports, and audit decisions | Implemented |
-| OpenClaw | AI-assisted extraction, explanation, channel orchestration, and skills | Local skill implemented |
+| LangGraph Agent Engine | AI-assisted extraction, hybrid SKU RAG, reflection, and channel orchestration | In progress |
 | PostgreSQL | Durable orders, findings, decisions, rules, and tenant data | Planned; SQLite used locally |
 | S3 | Original documents and generated artifacts | Planned for AWS |
 
@@ -195,7 +195,8 @@ po-preflight/
 │   ├── preflight-core/      # Parsing and deterministic validation
 │   └── contracts/           # Shared API and event schemas
 ├── integrations/
-│   ├── openclaw/
+│   ├── telegram/
+│   ├── zalo/
 │   ├── slack/
 │   └── erp/
 ├── infra/terraform/

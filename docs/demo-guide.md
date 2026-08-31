@@ -67,7 +67,7 @@ Explain that the same order and approval workflow can be presented in Slack. Sla
 
 ## Success criteria for the demo
 
-- A nontechnical viewer understands the workflow without seeing OpenClaw internals.
+- A nontechnical viewer understands the workflow clearly.
 - Every finding has a specific rule and evidence.
 - The reviewer can make a controlled decision in under one minute.
 - The audit timeline updates immediately after the decision.

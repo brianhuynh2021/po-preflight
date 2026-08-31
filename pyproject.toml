@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "po-preflight"
 version = "0.1.0"
-description = "Deterministic purchase-order intake and validation for OpenClaw"
+description = "Agentic purchase-order intake, validation, and multi-channel approval system"
 requires-python = ">=3.11"
 dependencies = []
 
