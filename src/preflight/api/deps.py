@@ -36,3 +36,7 @@ def get_audit_store() -> Generator[AuditStore, None, None]:
         yield store
     finally:
         store.close()
+
+
+get_store = get_audit_store
+
