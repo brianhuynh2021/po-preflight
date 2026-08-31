@@ -1,4 +1,4 @@
-# TÀI LIỆU ĐẶC TẢ NGHIỆP VỤ FRONTEND & DANH SÁCH TICKET TRIỂN KHAI (PO PREFLIGHT)
+# TÀI LIỆU ĐẶC TẢ NGHIỆP VỤ FRONTEND & DANH SÁCH TICKET TRIỂN KHAI TOÀN DIỆN (PO PREFLIGHT)
 
 > **Dành cho:** Đội ngũ phát triển Frontend (FE Team)  
 > **Dự án:** PO Preflight (Hệ thống AI Tiền kiểm toán & Phê duyệt Đơn hàng B2B)  
@@ -59,8 +59,6 @@
 
 ### 2.2. Danh mục 5 Mã lỗi Vi phạm (Validation Finding Codes)
 
-FE cần hiển thị các thẻ lỗi (Issue Card) dựa trên các mã lỗi trả về từ hệ thống:
-
 | Mã lỗi (`code`) | Mức độ (`severity`) | Tiêu đề lỗi hiển thị | Ý nghĩa & Bằng chứng cần hiển thị |
 | :--- | :--- | :--- | :--- |
 | `PRICE_MISMATCH` | `Warning` | Chênh lệch giá so với Catalog | Hiển thị: *Giá trên PO (vd: 17.6tr) vs Giá Catalog (vd: 18.5tr) - Lệch 4.86%*. |
@@ -71,181 +69,101 @@ FE cần hiển thị các thẻ lỗi (Issue Card) dựa trên các mã lỗi t
 
 ---
 
-## 3. ĐẶC TẢ CHI TIẾT TỪNG MÀN HÌNH (SCREEN SPECIFICATIONS)
+## 3. ĐẶC TẢ CHI TIẾT 10 MÀN HÌNH CỦA HỆ THỐNG HOÀN CHỈNH
 
 ### 🖥️ Màn hình 1: Dashboard (Bảng điều khiển Tổng quan Preflight)
-* **Vị trí file:** `apps/web/src/pages/Dashboard.tsx`
-* **Nhiệm vụ:** Hiển thị bức tranh toàn cảnh về tình hình xử lý đơn PO trong ngày/tháng.
-* **Các thành phần cần có:**
-  1. **Hàng chỉ số KPI (KPI Cards):**
-     - *Cần xử lý (Needs Attention):* Tổng số đơn `Review required` + `Blocked`.
-     - *Sẵn sàng duyệt (Ready for Approval):* Số đơn `Ready`.
-     - *Đã duyệt hôm nay (Approved Today):* Số đơn `Approved`.
-     - *Thời gian duyệt trung bình (Avg Decision Time):* ví dụ: `5.8 phút`.
-  2. **Biểu đồ ECharts:**
-     - Biểu đồ phân bổ loại lỗi vi phạm (Price Mismatch, Stock Shortfall, Unknown SKU).
-     - Biểu đồ xu hướng xử lý đơn hàng theo tuần/tháng.
-  3. **Bản đồ WorldMap / Regional Map:** Hiển thị khối lượng đơn hàng phân bổ theo khu vực địa lý / chi nhánh khách hàng.
-  4. **Nút tác vụ nhanh:** `Upload Purchase Order` (mở modal tải file).
+* **Vị trí:** `apps/web/src/pages/Dashboard.tsx`
+* **KPIs:** *Needs Attention, Ready for Approval, Approved Today, Avg Decision Time*.
+* **Charts (ECharts):** Thống kê phân loại vi phạm và lưu lượng đơn theo thời gian.
+* **WorldMap:** Phân bổ đơn hàng theo khu vực địa lý / chi nhánh.
 
----
-
-### 🖥️ Màn hình 2: Danh sách Đơn hàng (Orders Queue Page)
-* **Vị trí file:** `apps/web/src/pages/Orders.tsx`
-* **Nhiệm vụ:** Hàng đợi đơn hàng giúp Sales Admin tìm kiếm, lọc và chọn đơn để duyệt.
-* **Cột của Bảng DataTable:**
-  1. **Mã PO (`id`):** vd `PO-10428` (click vào để mở Drawer / Chi tiết đơn).
-  2. **Khách hàng (`customer`):** Tên công ty đặt hàng + Avatar chữ cái đầu.
-  3. **File gốc (`source_file`):** vd `northstar-order.pdf` (có icon PDF/Excel).
-  4. **Tổng giá trị (`value`):** Định dạng tiền tệ VND / USD.
-  5. **Số lỗi vi phạm (`findings`):** Badge số lượng (vd: `2 findings` màu vàng/đỏ).
-  6. **Trạng thái (`status`):** Badge màu chuẩn `Ready / Review required / Blocked / Approved`.
-  7. **Người phụ trách (`owner`):** Tên nhân viên xử lý.
-* **Bộ lọc (Filter Toolbar):**
-  - Search Input: Tìm theo Mã PO hoặc Tên khách hàng.
-  - Segment Tabs: `All`, `Needs Attention` (gồm Review+Blocked), `Ready`, `Approved`.
-
----
+### 🖥️ Màn hình 2: Hàng đợi Đơn hàng (Orders Queue Page)
+* **Vị trí:** `apps/web/src/pages/Orders.tsx`
+* **Bảng DataTable:** Mã PO, Khách hàng, File gốc, Tổng tiền, Badge số lỗi Findings, Trạng thái rủi ro, Thao tác.
+* **Bộ lọc:** Search PO/Khách hàng + Tabs: `All`, `Needs Attention`, `Ready`, `Approved`.
 
 ### 🖥️ Màn hình 3: Chi tiết Đơn hàng & Đối chiếu Vi phạm (Order Detail & Review)
-* **Vị trí:** Drawer trượt từ bên phải hoặc Trang con `OrderDetail.tsx`.
-* **Nhiệm vụ:** Màn hình quan trọng nhất giúp Quản lý đối chiếu bằng chứng và ra quyết định.
-* **Giao diện chia làm 3 phần:**
-  1. **Header:** Mã PO, Tên khách hàng, Ngày gửi, Trạng thái hiện tại.
-  2. **Danh sách Cảnh báo Vi phạm (Validation Findings Panel):**
-     - Render từng thẻ Finding với màu sắc tương ứng (Vàng cho Warning, Đỏ cho Error).
-     - Hiển thị rõ: *Tiêu đề lỗi*, *Mô tả chi tiết*, *Bằng chứng đối chiếu (Evidence)*.
-  3. **Bảng chi tiết từng dòng hàng (Line Items Table):**
-     - Cột: `SKU`, `Tên sản phẩm`, `Số lượng đặt`, `Tồn kho khả dụng`, `Đơn giá trên PO`, `Đơn giá Catalog`, `Thành tiền`.
-     - Highlight màu đỏ/vàng ở các ô bị lệch giá hoặc thiếu kho.
-  4. **Thanh hành động Quyết định (Decision Action Bar):**
-     - Nút 🔵 **[Phê duyệt đơn (Approve Order)]**: Mở Modal nhập ghi chú xác nhận $\rightarrow$ Chuyển trạng thái sang `Approved`.
-     - Nút 🟠 **[Yêu cầu điều chỉnh (Request Changes)]**: Mở Modal nhập lý do gửi lại cho khách $\rightarrow$ Chuyển sang `Changes Requested`.
-     - Nút ❌ **[Từ chối đơn (Reject)]**: Chuyển sang `Rejected`.
-
----
+* **Vị trí:** Drawer / Trang con `OrderDetail.tsx`
+* **Nội dung:** Thông tin Header, Danh sách thẻ vi phạm Findings (có Evidence), Bảng Line Items so khớp giá và kho, Action Bar (**Approve**, **Request Changes**, **Reject**).
 
 ### 🖥️ Màn hình 4: Modal Upload Đơn hàng (Upload PO Modal)
-* **Vị trí component:** `apps/web/src/components/UploadModal.tsx`
-* **Nhiệm vụ:** Cho phép người dùng kéo thả file PO (PDF, Excel, Ảnh, JSON) vào hệ thống.
-* **Trạng thái tương tác:**
-  - Kéo thả file $\rightarrow$ Hiển thị thanh tiến trình bóc tách:
-    `Đang đọc tài liệu...` $\rightarrow$ `Kiểm tra quy tắc Catalog & Tồn kho...` $\rightarrow$ `Hoàn tất! Tìm thấy 2 cảnh báo`.
-  - Tự động thêm đơn mới vào đầu danh sách Orders.
+* **Vị trí:** `apps/web/src/components/UploadModal.tsx`
+* **Nội dung:** Kéo thả file PDF, Excel, Ảnh, JSON $\rightarrow$ Animation bóc tách $\rightarrow$ Thêm đơn mới vào đầu bảng.
+
+### 🖥️ Màn hình 5: Danh mục Sản phẩm & Bảng giá (Catalog & Stock)
+* **Vị trí:** `apps/web/src/pages/Products.tsx`
+* **Nội dung:** Mã SKU, Tên sản phẩm, Giá niêm yết, Tồn kho khả dụng, Trạng thái Active/Inactive.
+
+### 🖥️ Màn hình 6: Nhật ký Kiểm toán (Audit Trail Timeline)
+* **Vị trí:** `apps/web/src/pages/Reports.tsx` hoặc `AuditLog.tsx`
+* **Nội dung:** Dòng thời gian bất biến ghi nhận ai duyệt đơn nào, lúc mấy giờ, kèm ghi chú quyết định.
+
+### 🖥️ Màn hình 7: So sánh Trực quan File Gốc (Side-by-side Document Viewer)
+* **Vị trí:** `apps/web/src/components/DocumentSplitViewer.tsx`
+* **Nội dung:** Chế độ xem chia đôi (Split-view): Nửa bên trái là Viewer hiển thị file PDF/Ảnh gốc, nửa bên phải là form dữ liệu AI bóc tách để đối chiếu trực quan.
+
+### 🖥️ Màn hình 8: Cấu hình Luật Nghiệp vụ & Dung sai (Rules & Policy Engine Settings)
+* **Vị trí:** `apps/web/src/pages/RulesConfig.tsx`
+* **Nội dung:** Bật/tắt từng luật kiểm tra, chỉnh % dung sai giá cho phép, ngưỡng tự động duyệt đơn giá trị nhỏ, cửa sổ kiểm tra trùng mã đơn.
+
+### 🖥️ Màn hình 9: Cài đặt Kết nối Đa kênh (Multi-Channel Integration Settings)
+* **Vị trí:** `apps/web/src/pages/ChannelSettings.tsx`
+* **Nội dung:** Cấu hình Token Telegram Bot, Zalo OA OpenAPI Key, Slack Webhook URL, WeChat Work, phân luồng gửi thông báo duyệt theo giá trị đơn.
+
+### 🖥️ Màn hình 10: Quản lý Đồng bộ ERP & Xuất dữ liệu (ERP Sync & Export Center)
+* **Vị trí:** `apps/web/src/pages/ErpSync.tsx`
+* **Nội dung:** Bảng theo dõi trạng thái đồng bộ đơn sang ERP (Odoo, SAP, MISA), nút bấm Retry khi lỗi mạng, và công cụ xuất file Excel/CSV/JSON chuẩn ERP.
 
 ---
 
-### 🖥️ Màn hình 5: Danh mục Sản phẩm & Tồn kho (Products / Catalog Page)
-* **Vị trí file:** `apps/web/src/pages/Products.tsx`
-* **Nhiệm vụ:** Hiển thị danh mục sản phẩm dùng để đối soát.
-* **Cột:** `Mã SKU`, `Tên sản phẩm`, `Giá niêm yết (Catalog Price)`, `Số lượng tồn kho (Available Stock)`, `Trạng thái (Active / Inactive)`.
+## 4. DANH SÁCH 8 TICKET GITHUB CHO FRONTEND TEAM (BACKLOG)
+
+Dưới đây là 8 Ticket chi tiết từ giai đoạn Core MVP đến Enterprise:
 
 ---
 
-### 🖥️ Màn hình 6: Nhật ký Kiểm toán (Audit Log Timeline)
-* **Vị trí file:** `apps/web/src/pages/Reports.tsx` hoặc `AuditLog.tsx`
-* **Nhiệm vụ:** Hiển thị lịch sử minh bạch: Ai đã duyệt đơn nào, lúc mấy giờ, lý do ghi chú là gì.
+### 🎫 [FE-1] Issue #2: Core Data Models & Seed Data for PO Preflight Domain
+* **Mô tả:** Định nghĩa TypeScript types (`PurchaseOrder`, `LineItem`, `Finding`, `OrderStatus`) và cập nhật dữ liệu `seed.ts`.
+* **Ưu tiên:** `Highest` | **Trạng thái:** `Đã tạo trên GitHub`
 
 ---
 
-## 4. DANH SÁCH TICKET CÔNG VIỆC CHO FRONTEND (BACKLOG TICKETS)
-
-Dưới đây là danh sách Ticket được chia nhỏ, chuẩn định dạng để bạn copy tạo trên Jira / Trello / GitHub Issues:
-
----
-
-### 🎫 TICKET FE-01: Cập nhật Data Models & Types chuẩn nghiệp vụ PO Preflight
-* **Loại:** `Task` | **Độ ưu tiên:** `Highest`
-* **Mô tả:** Cập nhật lại các Interface/Type trong `apps/web/src/data/` để đúng với thực thể PO Preflight.
-* **Chi tiết công việc:**
-  - Định nghĩa Type:
-    ```typescript
-    export type OrderStatus = 'Ready' | 'Review required' | 'Blocked' | 'Approved' | 'Changes requested' | 'Rejected';
-    export type FindingSeverity = 'Warning' | 'Error';
-    export interface Finding {
-      code: 'PRICE_MISMATCH' | 'INSUFFICIENT_STOCK' | 'UNKNOWN_SKU' | 'INACTIVE_SKU' | 'DUPLICATE_PO';
-      severity: FindingSeverity;
-      title: string;
-      detail: string;
-      evidence: string;
-      sku?: string;
-    }
-    export interface LineItem {
-      sku: string;
-      product: string;
-      quantity: number;
-      available: number;
-      unitPrice: number;
-      catalogPrice: number;
-    }
-    export interface PurchaseOrder {
-      id: string;
-      customer: string;
-      submitted: string;
-      source_file: string;
-      value: number;
-      currency: string;
-      status: OrderStatus;
-      findings: Finding[];
-      lines: LineItem[];
-      owner: string;
-    }
-    ```
-  - Cập nhật dữ liệu mẫu `seed.ts` theo đúng cấu trúc trên.
+### 🎫 [FE-2] Issue #3: Rebuild Orders Queue with Risk Status & Findings Badges
+* **Mô tả:** Tái cấu trúc bảng `Orders.tsx` thành Bảng hàng đợi duyệt đơn PO (Mã PO, Khách hàng, File gốc, Badge lỗi, Trạng thái rủi ro, Bộ lọc).
+* **Ưu tiên:** `High` | **Trạng thái:** `Đã tạo trên GitHub`
 
 ---
 
-### 🎫 TICKET FE-02: Chuyển đổi trang `Orders.tsx` thành PO Approval Queue
-* **Loại:** `Feature` | **Độ ưu tiên:** `High`
-* **Mô tả:** Tái cấu trúc bảng `OrdersPage` để hiển thị hàng đợi đơn PO cần duyệt thay vì đơn hàng e-commerce bán lẻ.
-* **Chi tiết công việc:**
-  - Đổi các cột: `Mã PO`, `Khách hàng`, `Nguồn file`, `Tổng tiền`, `Số lỗi vi phạm (Findings badge)`, `Trạng thái rủi ro`, `Thao tác`.
-  - Thêm bộ lọc trạng thái: Tab `All`, `Needs Attention`, `Ready`, `Approved`.
-  - Click vào dòng sẽ mở Drawer / Modal xem chi tiết đơn PO.
+### 🎫 [FE-3] Issue #4: Build Order Detail Review Screen & Decision Actions (Approve/Reject)
+* **Mô tả:** Màn hình Chi tiết Đơn: danh sách thẻ lỗi Findings, bảng Line Items so khớp giá Catalog, Action Bar và Modal nhập lý do duyệt.
+* **Ưu tiên:** `High` | **Trạng thái:** `Đã tạo trên GitHub`
 
 ---
 
-### 🎫 TICKET FE-03: Xây dựng Component Chi tiết Đơn hàng & Đối chiếu Vi phạm (Order Review Drawer)
-* **Loại:** `Feature` | **Độ ưu tiên:** `High`
-* **Mô tả:** Tạo component xem chi tiết đơn PO, hiển thị danh sách thẻ vi phạm Findings và bảng đối chiếu line items.
-* **Chi tiết công việc:**
-  - Tạo Panel hiển thị các thẻ Finding (màu Amber cho Warning, Red cho Error kèm dòng Evidence).
-  - Tạo bảng Line Items highlight các ô sai giá và thiếu kho.
-  - Thêm nút thao tác: **Approve**, **Request Changes**, **Reject**.
+### 🎫 [FE-4] Issue #5: Update Dashboard Preflight Metrics & Build Upload PO Modal
+* **Mô tả:** Điều chỉnh KPI và biểu đồ ECharts trên Dashboard theo tiền kiểm; xây dựng Modal kéo thả Upload PO.
+* **Ưu tiên:** `Medium` | **Trạng thái:** `Đã tạo trên GitHub`
 
 ---
 
-### 🎫 TICKET FE-04: Xây dựng Modal Phê duyệt & Ghi nhận Quyết định (Decision Modal)
-* **Loại:** `Feature` | **Độ ưu tiên:** `High`
-* **Mô tả:** Khi bấm nút Approve hoặc Request Changes, hiển thị modal cho phép Quản lý nhập ghi chú quyết định (`decision_note`).
-* **Chi tiết công việc:**
-  - Form gồm: Textarea nhập lý do phê duyệt / yêu cầu điều chỉnh.
-  - Khi submit: Cập nhật trạng thái đơn sang `Approved` hoặc `Changes requested`, thêm một bản ghi vào dòng thời gian Audit Trail.
-  - Hiển thị Toast thông báo thành công.
+### 🎫 [FE-5] Issue #6: Build Side-by-Side Document Viewer for Visual Evidence Matching
+* **Mô tả:** Xây dựng chế độ xem chia đôi (Split-view) cho màn hình chi tiết đơn: nửa trái hiển thị PDF/Ảnh scan gốc, nửa phải hiển thị bảng bóc tách.
+* **Ưu tiên:** `Medium` | **Trạng thái:** `Đang tạo trên GitHub`
 
 ---
 
-### 🎫 TICKET FE-05: Xây dựng Modal Upload File PO (Kéo thả & Bóc tách)
-* **Loại:** `Feature` | **Độ ưu tiên:** `Medium`
-* **Mô tả:** Tạo nút `Upload purchase order` ở Topbar/Header để mở modal kéo thả file.
-* **Chi tiết công việc:**
-  - Hỗ trợ kéo thả các file `.pdf`, `.csv`, `.json`, `.xlsx`, `.png`, `.jpg`.
-  - Hiển thị hiệu ứng loading phân tích trong 1.5 giây $\rightarrow$ Tạo một đơn mới đưa vào hàng đợi `Orders`.
+### 🎫 [FE-6] Issue #7: Build Rules & Policy Engine Configuration Screen
+* **Mô tả:** Xây dựng màn hình cài đặt quy tắc tiền kiểm: điều chỉnh % dung sai giá lệch, bật/tắt luật kiểm tra tồn kho, cài ngưỡng tự động duyệt đơn nhỏ.
+* **Ưu tiên:** `Medium` | **Trạng thái:** `Đang tạo trên GitHub`
 
 ---
 
-### 🎫 TICKET FE-06: Điều chỉnh trang `Dashboard.tsx` theo số liệu Tiền kiểm
-* **Loại:** `Improvement` | **Độ ưu tiên:** `Medium`
-* **Mô tả:** Cập nhật các thẻ KPI và biểu đồ ECharts trên Dashboard phản ánh đúng số liệu tiền kiểm toán.
-* **Chi tiết công việc:**
-  - KPI 1: `Needs attention` (Đơn có lỗi cần xử lý).
-  - KPI 2: `Ready for approval` (Đơn chuẩn sạch sẵn sàng duyệt).
-  - KPI 3: `Approved today` (Đơn đã duyệt trong ngày).
-  - KPI 4: `Avg decision time` (Thời gian xử lý trung bình).
-  - Đổi biểu đồ tròn/cột thành thống kê tỷ lệ vi phạm theo mã lỗi (`Price Mismatch`, `Insufficient Stock`, `Unknown SKU`).
+### 🎫 [FE-7] Issue #8: Build Multi-Channel Integration & Notification Settings (Telegram/Zalo/Slack)
+* **Mô tả:** Xây dựng trang cài đặt kết nối Telegram Bot, Zalo OA, Slack Webhook và phân quyền nhận thông báo duyệt theo mức độ rủi ro.
+* **Ưu tiên:** `Low` | **Trạng thái:** `Đang tạo trên GitHub`
 
 ---
 
-### 🎫 TICKET FE-07: Cập nhật trang `Products.tsx` (Catalog) và `Reports.tsx` (Audit Trail)
-* **Loại:** `Improvement` | **Độ ưu tiên:** `Low`
-* **Mô tả:** Đảm bảo trang Catalog hiển thị đúng danh mục sản phẩm đối soát và trang Audit Trail hiển thị lịch sử phê duyệt minh bạch.
+### 🎫 [FE-8] Issue #9: Build ERP Synchronization Dashboard & Export Center
+* **Mô tả:** Xây dựng màn hình theo dõi trạng thái đồng bộ đơn sang ERP (SAP/Odoo), nút Retry khi lỗi kết nối và nút xuất file Excel/CSV/JSON.
+* **Ưu tiên:** `Low` | **Trạng thái:** `Đang tạo trên GitHub`
