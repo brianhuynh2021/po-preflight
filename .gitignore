@@ -16,3 +16,6 @@ build/
 terraform.tfstate*
 *.tfvars
 !*.tfvars.example
+.next/
+next-env.d.ts
+
