@@ -36,7 +36,7 @@ class AuditStore:
     def __init__(self, path: str | Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.connection = sqlite3.connect(self.path)
+        self.connection = sqlite3.connect(self.path, check_same_thread=False)
         self.connection.row_factory = sqlite3.Row
         self.connection.executescript(SCHEMA)
 
@@ -112,3 +112,94 @@ class AuditStore:
             )
         ]
         return {"analyses": analyses, "decisions": decisions}
+
+    def list_orders(
+        self,
+        status: str | None = None,
+        search: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        query = """
+            SELECT 
+                a.id,
+                a.po_number,
+                a.customer,
+                a.status,
+                a.total,
+                a.source_file,
+                a.order_json,
+                a.findings_json,
+                a.created_at,
+                (SELECT d.decision FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS latest_decision,
+                (SELECT d.actor FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS latest_actor,
+                (SELECT d.created_at FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS decided_at
+            FROM analyses a
+            WHERE 1=1
+        """
+        params: list[Any] = []
+        if status:
+            query += " AND a.status = ?"
+            params.append(status)
+        if search:
+            query += " AND (a.po_number LIKE ? OR a.customer LIKE ?)"
+            term = f"%{search}%"
+            params.extend([term, term])
+
+        query += " ORDER BY a.id DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        rows = self.connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_order(self, po_or_id: str | int) -> dict[str, Any] | None:
+        if isinstance(po_or_id, int) or str(po_or_id).isdigit():
+            row = self.connection.execute(
+                "SELECT * FROM analyses WHERE id = ? LIMIT 1", (int(po_or_id),)
+            ).fetchone()
+        else:
+            row = self.connection.execute(
+                "SELECT * FROM analyses WHERE po_number = ? ORDER BY id DESC LIMIT 1",
+                (str(po_or_id),),
+            ).fetchone()
+        if not row:
+            return None
+        data = dict(row)
+        data["decisions"] = [
+            dict(d)
+            for d in self.connection.execute(
+                "SELECT * FROM decisions WHERE po_number = ? ORDER BY id ASC",
+                (data["po_number"],),
+            ).fetchall()
+        ]
+        return data
+
+    def get_dashboard_stats(self) -> dict[str, Any]:
+        total_orders = self.connection.execute(
+            "SELECT COUNT(*) AS c FROM analyses"
+        ).fetchone()["c"]
+        status_counts = {
+            row["status"]: row["c"]
+            for row in self.connection.execute(
+                "SELECT status, COUNT(*) AS c FROM analyses GROUP BY status"
+            ).fetchall()
+        }
+        decisions_count = {
+            row["decision"]: row["c"]
+            for row in self.connection.execute(
+                "SELECT decision, COUNT(*) AS c FROM decisions GROUP BY decision"
+            ).fetchall()
+        }
+        recent_rows = self.connection.execute(
+            """
+            SELECT id, po_number, customer, status, total, created_at 
+            FROM analyses ORDER BY id DESC LIMIT 5
+            """
+        ).fetchall()
+        return {
+            "total_orders": total_orders,
+            "status_counts": status_counts,
+            "decisions_count": decisions_count,
+            "recent_orders": [dict(r) for r in recent_rows],
+        }
+

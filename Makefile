@@ -1,8 +1,14 @@
-.PHONY: dev demo test install clean
+.PHONY: dev api demo test install clean
 
 dev:
 	@echo "🚀 Khởi động Web UI..."
 	npm run dev
+
+PORT ?= 8001
+
+api:
+	@echo "⚡ Khởi động FastAPI REST Gateway (http://localhost:$(PORT)/docs)..."
+	PYTHONPATH=src .venv/bin/uvicorn preflight.api.app:app --host 0.0.0.0 --port $(PORT) --reload
 
 demo:
 	@echo "🔍 Chạy demo phân tích đơn hàng..."
