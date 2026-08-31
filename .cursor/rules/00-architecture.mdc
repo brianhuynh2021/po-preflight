@@ -1,0 +1,27 @@
+---
+description: System Architecture, Domain Rules, and Stanford Inner Loop + MIT Outer System
+globs: **/*
+---
+
+# PO Preflight — Architecture & Domain Standards
+
+## 1. Domain Concept
+PO Preflight is the intelligent, controlled intake layer between customer Purchase Orders (files/messages) and downstream ERP systems (SAP, Odoo).
+
+## 2. Stanford Inner Loop + MIT Outer System
+- **Stanford Inner Loop (Agent Brain):**
+  - **Understand:** Extract structure from untrusted PO documents.
+  - **Retrieve:** Fetch context from Product Catalog & Contract terms via Hybrid RAG.
+  - **Plan & Act:** Validate deterministic business rules (SKU, Price, Inventory, Duplicates).
+  - **Verify & Reflect:** Self-verify line totals vs grand total; retry if extraction score is low.
+- **MIT Outer System (Governance & Action):**
+  - **Human-In-The-Loop:** Pause workflow and notify manager via Telegram/Zalo/Slack when risk is `REVIEW_REQUIRED` or `BLOCKED`.
+  - **Real-World Action:** Create ERP Sales Order ONLY upon explicit human approval (`APPROVED`).
+  - **Audit Trail:** Append-only log of all extractions, findings, and human decisions.
+
+## 3. Five Core Validation Codes
+- `PRICE_MISMATCH` (Warning): PO price differs from active catalog/contract price.
+- `INSUFFICIENT_STOCK` (Warning): Ordered quantity exceeds available stock.
+- `UNKNOWN_SKU` (Error): SKU not found in catalog.
+- `INACTIVE_SKU` (Error): Product is deactivated.
+- `DUPLICATE_PO` (Error): PO number already processed for this customer.

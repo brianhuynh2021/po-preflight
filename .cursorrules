@@ -1,0 +1,74 @@
+# PO PREFLIGHT — CURSOR AI ARCHITECTURAL RULES & CONTEXT
+
+You are an expert AI software architect and senior full-stack engineer working on **PO Preflight**.
+PO Preflight is an AI-powered, deterministic B2B Purchase Order (PO) intake, validation, and multi-channel approval system.
+
+---
+
+## 🏛️ 1. CORE ARCHITECTURAL PRINCIPLES
+
+1. **Deterministic-First (Zero-Token Rules):**
+   - NEVER use LLMs for mathematical calculations (totals, unit price * quantity, taxes), stock availability checks, or duplicate PO lookups.
+   - All business validations MUST be handled by deterministic Python code (`preflight.rules`) or SQL queries.
+   - LLMs are ONLY used for unstructured document extraction (scanned PDFs, handwritten images, ambiguous layout OCR) via **Gemini Flash / Vision**.
+
+2. **Human-In-The-Loop (HITL):**
+   - The system NEVER automatically creates an ERP Sales Order without explicit human approval.
+   - LangGraph orchestrator uses stateful interrupts (`interrupt_before=["human_approval"]`) when risks are detected (`REVIEW_REQUIRED` or `BLOCKED`).
+
+3. **Hybrid SKU Matching (3-Tier RAG):**
+   - Tier 1: Exact Match with Catalog DB (0 tokens).
+   - Tier 2: Fuzzy Matching via `RapidFuzz` / Levenshtein distance (0 tokens).
+   - Tier 3: Semantic Vector Search via `ChromaDB` / `FastEmbed` for descriptive names.
+
+4. **Multi-Channel Interaction:**
+   - Review and approval actions occur across **Telegram Bot**, **Zalo Official Account (ZNS)**, **Slack App**, and **Web Portal**.
+
+---
+
+## 🛠️ 2. TECH STACK & CONVENTIONS
+
+### Backend (`src/preflight` & `apps/api`)
+- **Language:** Python 3.11+
+- **Framework:** FastAPI, Pydantic v2, LangGraph, LangChain
+- **Database:** SQLite (local development) / PostgreSQL (production via SQLAlchemy/SQLModel)
+- **Vector DB:** ChromaDB / FastEmbed
+- **Fuzzy Search:** RapidFuzz
+- **Conventions:** Type hints on all functions (`from __future__ import annotations`), pure functions where possible, immutable state updates in LangGraph.
+
+### Frontend (`apps/web`)
+- **Language:** TypeScript strict mode, React 19
+- **Build Tool:** Vite, Tailwind CSS
+- **Visualization:** ECharts, SVG/GeoJSON WorldMap
+- **Conventions:**
+  - This is an **Enterprise Order Operations Dashboard**, NOT a generic e-commerce retail store.
+  - DO NOT use e-commerce statuses (`Paid`, `Refunded`).
+  - Use PO Preflight statuses: `Ready`, `Review required`, `Blocked`, `Approved`, `Changes requested`, `Rejected`.
+  - Always surface **Validation Findings** with code, severity, and evidence.
+
+---
+
+## 📂 3. WORKSPACE STRUCTURE
+
+```text
+po-preflight/
+├── .cursor/rules/               # Modular Cursor rules (.mdc)
+├── apps/
+│   ├── api/                     # FastAPI backend
+│   └── web/                     # React 19 + Vite frontend
+├── src/
+│   └── preflight/               # Core Python engine (parsers, catalog, rules, store)
+├── docs/                        # Specifications, PRD, architecture, roadmap
+├── examples/                    # Sample PO files (JSON, CSV, PDF, TXT)
+├── tests/                       # Automated test suite
+└── pyproject.toml               # Python packaging
+```
+
+---
+
+## 🎯 4. INSTRUCTIONS FOR CODE GENERATION
+
+- Always write clean, modular, self-documenting code with comprehensive error handling.
+- Preserve existing comments, docstrings, and contracts.
+- Ensure all new features are covered by unit tests.
+- When generating frontend code, ensure full responsive design, dark/light theme support, and adherence to [FE_BUSINESS_REQUIREMENTS_AND_TICKETS.md](docs/FE_BUSINESS_REQUIREMENTS_AND_TICKETS.md).

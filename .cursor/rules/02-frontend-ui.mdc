@@ -1,0 +1,31 @@
+---
+description: Frontend, React 19, TypeScript, Vite, Tailwind CSS, and UI component standards
+globs: apps/web/**/*.{ts,tsx,css,json,html}
+---
+
+# PO Preflight — Frontend UI & Component Standards
+
+## 1. Tech Stack
+- **Framework:** React 19, TypeScript strict mode, Vite
+- **Styling:** Tailwind CSS, CSS Custom Properties for theme tokens
+- **Data Visualization:** ECharts, custom SVG/GeoJSON WorldMap
+
+## 2. Core UI Philosophy
+- This is an **Enterprise B2B Preflight & Operations Dashboard**, NOT a generic retail shopping cart.
+- **Statuses to use:** `Ready`, `Review required`, `Blocked`, `Approved`, `Changes requested`, `Rejected`.
+- **Colors:**
+  - `Ready / Approved`: Green (`#19704c`) / Blue (`#386b8e`)
+  - `Review required`: Amber (`#a76418`)
+  - `Blocked / Rejected`: Red (`#a5453c`)
+- **Key UI Screens:**
+  1. `Dashboard`: Preflight KPIs, violation charts, activity timeline.
+  2. `Orders`: Order Queue with findings badges, risk status, sortable table.
+  3. `Order Detail`: Split-view with original PDF/image, line items table, and decision action bar (`Approve`, `Request Changes`, `Reject`).
+  4. `Upload PO Modal`: Drag-and-drop file upload with AI extraction progress simulation.
+  5. `Products`: Catalog & inventory lookup table.
+  6. `Reports`: Audit log timeline.
+
+## 3. Code Conventions
+- Keep components modular, accessible, and responsive.
+- Always handle loading, empty, and error states gracefully.
+- Refer to `docs/FE_BUSINESS_REQUIREMENTS_AND_TICKETS.md` for specifications.
