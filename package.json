@@ -3,8 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "npm --prefix apps/web run dev",
+    "dev": "concurrently -n \"API,WEB\" -c \"magenta.bold,cyan.bold\" \"make api\" \"npm --prefix apps/web run dev\"",
+    "dev:api": "make api",
+    "dev:web": "npm --prefix apps/web run dev",
     "build": "npm --prefix apps/web run build",
-    "start": "npm --prefix apps/web run start"
+    "start": "npm --prefix apps/web run start",
+    "test": "make test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
   }
 }

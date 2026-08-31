@@ -14,8 +14,10 @@
     ],
     "scripts": {
       "dev": "npm run dev",
+      "api": "npm run dev:api",
+      "web": "npm run dev:web",
       "demo": "./scripts/demo.sh",
-      "test": "PYTHONPATH=src python3 -m unittest discover -s tests",
+      "test": "make test",
       "analyze": "PYTHONPATH=src python3 -m preflight --catalog examples/catalog.csv --db runtime/preflight.db analyze"
     }
   }
