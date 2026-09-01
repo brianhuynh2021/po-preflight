@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+from decimal import Decimal
+from pathlib import Path
+from typing import Any
+
+from preflight.ingestion.detector import detect_document_type
+from preflight.ingestion.ocr_engine import GeminiVisionOCREngine
+from preflight.ingestion.schemas import (
+    DocumentType,
+    ExtractedLineItem,
+    ExtractedOrder,
+    ExtractedOrderHeader,
+    ExtractorEngine,
+)
+from preflight.ingestion.verifier import SelfReflectionVerifier
+from preflight.models import LineItem, Order
+from preflight.parsers import parse_order_content
+
+
+class IntelligentIngestionPipeline:
+    """Enterprise Multimodal PO Ingestion Pipeline.
+    Cascades from Zero-Token Deterministic Parsers to Gemini 2.0 Flash Vision OCR.
+    """
+
+    def __init__(self, gemini_api_key: str | None = None):
+        self.ocr_engine = GeminiVisionOCREngine(api_key=gemini_api_key)
+        self.verifier = SelfReflectionVerifier()
+
+    def process_file_bytes(self, file_bytes: bytes, filename: str) -> tuple[ExtractedOrder, Order]:
+        """Ingest document bytes, execute extraction, and produce validated domain Order."""
+        doc_type = detect_document_type(file_bytes, filename)
+
+        # -------------------------------------------------------------
+        # 1. Zero-Token Deterministic Path (JSON / CSV / TXT / Digital PDF)
+        # -------------------------------------------------------------
+        if doc_type in [
+            DocumentType.STRUCTURED_JSON,
+            DocumentType.DELIMITED_CSV,
+            DocumentType.PLAIN_TEXT,
+            DocumentType.DIGITAL_PDF,
+        ]:
+            try:
+                text_content = file_bytes.decode("utf-8", errors="ignore")
+                domain_order = parse_order_content(text_content, suffix=Path(filename).suffix)
+
+                if domain_order.items:
+                    items = [
+                        ExtractedLineItem(
+                            sku=it.sku,
+                            description=it.sku,
+                            quantity=it.quantity,
+                            unit_price=it.unit_price,
+                            amount=it.quantity * it.unit_price,
+                        )
+                        for it in domain_order.items
+                    ]
+                    subtotal = domain_order.total
+                    header = ExtractedOrderHeader(
+                        po_number=domain_order.po_number,
+                        customer=domain_order.customer,
+                        order_date=None,
+                        currency="VND",
+                        subtotal=subtotal,
+                        tax_amount=Decimal("0"),
+                        grand_total=subtotal,
+                        notes="Parsed via Zero-Token Deterministic Engine",
+                    )
+                    math_res = self.verifier.verify(header, items)
+
+                    extracted = ExtractedOrder(
+                        header=header,
+                        items=items,
+                        raw_text=text_content[:200],
+                        confidence_score=1.0,
+                        extractor_used=ExtractorEngine.DETERMINISTIC_PARSER,
+                        document_type=doc_type,
+                        math_verification=math_res,
+                    )
+                    return extracted, domain_order
+            except Exception:
+                pass  # Fallback to Vision OCR
+
+        # -------------------------------------------------------------
+        # 2. Multimodal Vision OCR Path (Scanned PDF / Photos / Receipts)
+        # -------------------------------------------------------------
+        extracted = self.ocr_engine.extract(file_bytes, filename, doc_type)
+
+        # Convert ExtractedOrder to Domain Order
+        domain_items = [
+            LineItem(
+                sku=it.sku,
+                quantity=it.quantity,
+                unit_price=it.unit_price,
+            )
+            for it in extracted.items
+        ]
+        domain_order = Order(
+            po_number=extracted.header.po_number,
+            customer=extracted.header.customer,
+            items=domain_items,
+        )
+
+        return extracted, domain_order
