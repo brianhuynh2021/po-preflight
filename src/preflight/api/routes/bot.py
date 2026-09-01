@@ -61,6 +61,13 @@ async def telegram_webhook(
     request: Request,
     store: AuditStore = Depends(get_store),
 ) -> dict[str, Any]:
+    # Anti-Spoofing Guard: Verify Secret Token if configured
+    expected_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET") or os.getenv("TELEGRAM_SECRET_TOKEN")
+    if expected_secret:
+        token_header = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+        if not token_header or token_header != expected_secret:
+            raise HTTPException(status_code=403, detail="Invalid or missing Telegram webhook secret token.")
+
     try:
         body = await request.json()
     except Exception:

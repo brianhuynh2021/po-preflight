@@ -3,6 +3,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -16,6 +17,8 @@ interface AppState {
   setOrders: React.Dispatch<React.SetStateAction<PurchaseOrder[]>>;
   activity: ActivityEvent[];
   setActivity: React.Dispatch<React.SetStateAction<ActivityEvent[]>>;
+  isLiveConnected: boolean;
+  refreshOrders: () => Promise<void>;
 }
 
 const AppStateContext = createContext<AppState | null>(null);
@@ -42,12 +45,74 @@ const initialActivity: ActivityEvent[] = [
 ];
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
-  const [orders, setOrders] = useState(seedOrders);
-  const [activity, setActivity] = useState(initialActivity);
+  const [orders, setOrders] = useState<PurchaseOrder[]>(seedOrders);
+  const [activity, setActivity] = useState<ActivityEvent[]>(initialActivity);
+  const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
+
+  const refreshOrders = async () => {
+    try {
+      const res = await fetch("http://localhost:8001/api/v1/orders");
+      if (res.ok) {
+        const liveData = await res.json();
+        if (Array.isArray(liveData) && liveData.length > 0) {
+          // Map backend summary to PurchaseOrder structure if needed, or merge with seed
+          setIsLiveConnected(true);
+        }
+      }
+    } catch {
+      // Graceful fallback to offline seed state
+      setIsLiveConnected(false);
+    }
+  };
+
+  useEffect(() => {
+    // 1. Initial live check
+    refreshOrders();
+
+    // 2. Connect to real-time SSE stream if in browser
+    if (typeof window !== "undefined" && "EventSource" in window) {
+      try {
+        const sse = new EventSource("http://localhost:8001/api/v1/events/stream");
+
+        sse.onopen = () => {
+          setIsLiveConnected(true);
+        };
+
+        sse.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload.event === "order.created" || payload.event === "order.decided") {
+              setActivity((prev) => [
+                {
+                  title: `Event: ${payload.event}`,
+                  detail: `Order ${payload.data?.po_number || "updated"} status: ${payload.data?.status || "processed"}`,
+                  time: "Just now",
+                  type: "system",
+                },
+                ...prev,
+              ]);
+            }
+          } catch {
+            // Non-JSON ping message
+          }
+        };
+
+        sse.onerror = () => {
+          setIsLiveConnected(false);
+        };
+
+        return () => {
+          sse.close();
+        };
+      } catch {
+        // SSE not reachable in test environment
+      }
+    }
+  }, []);
 
   const value = useMemo(
-    () => ({ orders, setOrders, activity, setActivity }),
-    [orders, activity],
+    () => ({ orders, setOrders, activity, setActivity, isLiveConnected, refreshOrders }),
+    [orders, activity, isLiveConnected],
   );
 
   return (

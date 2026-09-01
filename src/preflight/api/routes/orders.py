@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import JSONResponse
 
 from preflight.api.deps import get_audit_store, get_catalog
+from preflight.api.events import event_bus
 from preflight.api.logging_config import logger
 from preflight.api.schemas import (
     ConfirmExtractionRequest,
@@ -198,7 +199,8 @@ async def upload_order(
 ) -> OrderDetailResponse:
     upload_dir = Path("runtime/uploads")
     upload_dir.mkdir(parents=True, exist_ok=True)
-    temp_path = upload_dir / (file.filename or "uploaded_order.tmp")
+    safe_name = Path(file.filename).name if file.filename else "uploaded_order.tmp"
+    temp_path = upload_dir / safe_name
 
     try:
         content = await file.read()
@@ -217,6 +219,19 @@ async def upload_order(
 
         # Persist to database
         analysis_id = store.record_analysis(analysis, str(file.filename))
+
+        # Broadcast SSE Real-Time Event
+        event_bus.publish(
+            "order.created",
+            {
+                "id": str(analysis_id),
+                "po_number": order.po_number,
+                "customer": order.customer,
+                "status": analysis.status,
+                "total_amount": float(order.total) if order.total else 0.0,
+                "currency": order.currency,
+            },
+        )
 
         # Return full detail
         return get_order_detail(str(analysis_id), store=store, catalog=catalog)
@@ -269,6 +284,11 @@ def confirm_extraction(
     # Update database record
     store.update_analysis(int(row["id"]), analysis)
 
+    event_bus.publish(
+        "order.confirmed",
+        {"id": str(row["id"]), "po_number": po_number, "status": analysis.status},
+    )
+
     return get_order_detail(str(row["id"]), store=store, catalog=catalog)
 
 
@@ -298,6 +318,17 @@ def record_decision(
         )
         history = store.history(po_number)
         latest = history["decisions"][-1]
+
+        event_bus.publish(
+            "order.decided",
+            {
+                "id": str(order_id),
+                "po_number": po_number,
+                "decision": payload.decision,
+                "actor": payload.actor,
+            },
+        )
+
         return DecisionResponse(
             success=True,
             id=decision_id,

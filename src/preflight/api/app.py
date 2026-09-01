@@ -17,6 +17,7 @@ from preflight.api.routes import (
     catalog,
     dashboard,
     erp,
+    events,
     health,
     ingestion,
     matcher,
@@ -129,6 +130,7 @@ app.include_router(agent.router)
 app.include_router(bot.router)
 app.include_router(ingestion.router)
 app.include_router(erp.router)
+app.include_router(events.router)
 
 
 @app.get("/", include_in_schema=False)

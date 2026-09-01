@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { SubmittedAt } from "@/components/common/SubmittedAt";
 import { UploadModal } from "@/components/orders/UploadModal";
 import { DecisionModal } from "@/components/orders/DecisionModal";
+import { SideBySideViewer } from "@/components/orders/SideBySideViewer";
 
 export function OrdersView() {
   const { orders, setOrders, activity, setActivity } = useAppState();
@@ -18,6 +19,7 @@ export function OrdersView() {
   const [filter, setFilter] = useState<"All" | OrderStatus>("All");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [decisionOpen, setDecisionOpen] = useState(false);
+  const [sideBySideOpen, setSideBySideOpen] = useState(false);
   const [decisionNote, setDecisionNote] = useState("");
   const [toast, setToast] = useState("");
 
@@ -103,9 +105,17 @@ export function OrdersView() {
           order={selected}
           activity={activity}
           onOpenDecision={() => setDecisionOpen(true)}
+          onOpenSideBySide={() => setSideBySideOpen(true)}
           onRequestChanges={requestChanges}
         />
       </div>
+
+      {sideBySideOpen ? (
+        <SideBySideViewer
+          order={selected}
+          onClose={() => setSideBySideOpen(false)}
+        />
+      ) : null}
 
       {uploadOpen ? (
         <UploadModal
@@ -270,11 +280,13 @@ function OrderDetail({
   order,
   activity,
   onOpenDecision,
+  onOpenSideBySide,
   onRequestChanges,
 }: {
   order: PurchaseOrder;
   activity: ActivityEvent[];
   onOpenDecision: () => void;
+  onOpenSideBySide: () => void;
   onRequestChanges: () => void;
 }) {
   return (
@@ -289,9 +301,11 @@ function OrderDetail({
             {order.customer} · Submitted <SubmittedAt iso={order.submittedAt} />
           </p>
         </div>
-        <button className="more-button" aria-label="More order actions">
-          •••
-        </button>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button className="secondary-button" onClick={onOpenSideBySide} style={{ fontSize: "12px", padding: "6px 10px" }}>
+            🔍 Side-by-Side
+          </button>
+        </div>
       </div>
       <div className="order-summary">
         <div>

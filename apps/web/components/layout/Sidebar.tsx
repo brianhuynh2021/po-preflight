@@ -4,12 +4,18 @@ import { usePathname } from "next/navigation";
 
 import { useAppState } from "@/components/app/AppStateProvider";
 
-const NAV_ITEMS: { label: string; href: string; icon: string }[] = [
-  { label: "Overview", href: "/overview", icon: "⌂" },
-  { label: "Orders", href: "/orders", icon: "▤" },
-  { label: "Catalog", href: "/catalog", icon: "□" },
-  { label: "Rules", href: "/rules", icon: "✓" },
-  { label: "Audit log", href: "/audit-log", icon: "◷" },
+const NAV_ITEMS: { label: string; href: string; icon: string; group?: string }[] = [
+  { label: "Overview", href: "/overview", icon: "⌂", group: "CORE" },
+  { label: "Orders", href: "/orders", icon: "▤", group: "CORE" },
+  { label: "Staging Studio", href: "/staging", icon: "✎", group: "IDP" },
+  { label: "Catalog", href: "/catalog", icon: "□", group: "CATALOG" },
+  { label: "RAG Playground", href: "/rag-playground", icon: "⚡", group: "AI" },
+  { label: "LangGraph Agent", href: "/agent-graph", icon: "⎇", group: "AI" },
+  { label: "Rules & Policies", href: "/rules", icon: "✓", group: "RULES" },
+  { label: "ERP Outbox Sync", href: "/erp-sync", icon: "⇄", group: "ERP" },
+  { label: "Merkle Certificate", href: "/audit-certificate", icon: "🔒", group: "AUDIT" },
+  { label: "Audit Log", href: "/audit-log", icon: "◷", group: "AUDIT" },
+  { label: "Bot Settings", href: "/settings", icon: "⚙", group: "SETTINGS" },
 ];
 
 export function Sidebar() {

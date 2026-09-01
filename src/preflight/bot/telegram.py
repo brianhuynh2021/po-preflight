@@ -1,10 +1,9 @@
-from __future__ import annotations
-
-import os
-from typing import Any
-import urllib.request
+import html
 import json
 import logging
+import os
+import urllib.request
+from typing import Any
 
 from preflight.bot.schemas import BotNotificationResult
 from preflight.store import AuditStore
@@ -27,12 +26,12 @@ def format_currency(value: float | int | Decimal, currency: str = "VND") -> str:
 
 def format_telegram_po_card(order: dict[str, Any]) -> str:
     """Format rich HTML card for Telegram purchase order alerts."""
-    po_num = order.get("po_number", "N/A")
-    cust = order.get("customer", "N/A")
-    status = order.get("status", "review_required")
-    risk = order.get("risk_level", "MEDIUM")
+    po_num = html.escape(str(order.get("po_number", "N/A")))
+    cust = html.escape(str(order.get("customer", "N/A")))
+    status = str(order.get("status", "review_required"))
+    risk = str(order.get("risk_level", "MEDIUM"))
     total_val = order.get("total_value", 0)
-    curr = order.get("currency", "VND")
+    curr = str(order.get("currency", "VND"))
     findings = order.get("findings", [])
     lines = order.get("line_items", [])
 
@@ -60,7 +59,7 @@ def format_telegram_po_card(order: dict[str, Any]) -> str:
     # Line items summary
     text += f"📦 <b>Sản phẩm ({len(lines)} dòng):</b>\n"
     for idx, item in enumerate(lines[:3], 1):
-        sku = item.get("sku", "N/A")
+        sku = html.escape(str(item.get("sku", "N/A")))
         qty = item.get("quantity", 0)
         price = item.get("unit_price", 0)
         text += f"  {idx}. <code>{sku}</code> × {qty} (đơn giá: {format_currency(price, curr)})\n"
@@ -72,8 +71,8 @@ def format_telegram_po_card(order: dict[str, Any]) -> str:
     if findings:
         for f in findings:
             sev = f.get("severity", "warning")
-            code = f.get("code", "")
-            msg = f.get("message", "")
+            code = html.escape(str(f.get("code", "")))
+            msg = html.escape(str(f.get("message", "")))
             sev_icon = "❌" if sev == "error" else "⚠️"
             text += f"  {sev_icon} [<b>{code}</b>]: {msg}\n"
     else:
