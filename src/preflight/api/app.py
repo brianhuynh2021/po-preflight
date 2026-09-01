@@ -105,14 +105,24 @@ risk scoring, visual grounding evidence citations, and Human-in-the-loop approva
     lifespan=lifespan,
 )
 
-# CORS Configuration for local Web development (Vite, Next.js)
+import os
+
+# CORS Configuration with environment override
+raw_origins = os.getenv(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+)
+allowed_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+is_wildcard = allowed_origins == ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all for local dev (Vite on :5173, etc.)
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=not is_wildcard,  # Spec disallows allow_credentials with wildcard '*'
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Request Logging & Latency Middleware
 app.add_middleware(RequestLoggingMiddleware)

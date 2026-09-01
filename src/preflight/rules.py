@@ -26,7 +26,27 @@ def analyze_order(
         )
 
     for item in order.items:
+        if item.quantity <= 0:
+            findings.append(
+                Finding(
+                    code="INVALID_QUANTITY",
+                    severity="error",
+                    sku=item.sku,
+                    message=f"SKU {item.sku}: quantity must be positive (received {item.quantity}).",
+                )
+            )
+        if item.unit_price < 0:
+            findings.append(
+                Finding(
+                    code="INVALID_PRICE",
+                    severity="error",
+                    sku=item.sku,
+                    message=f"SKU {item.sku}: unit price cannot be negative (received {item.unit_price}).",
+                )
+            )
+
         product = catalog.get(item.sku)
+
         if product is None:
             # Check Hybrid SKU Matcher for suggestions
             resolution = matcher.resolve(item.sku, customer_id=order.customer)

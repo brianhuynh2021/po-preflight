@@ -221,17 +221,37 @@ def erp_sync_node(state: PreflightAgentState, catalog: dict[str, Product], store
             "audit_trail": trail,
         }
 
-    # Generate Idempotency Key (SHA256 of PO + Customer)
-    idemp_key = hashlib.sha256(f"{po_num}:{state.get('customer')}".encode()).hexdigest()[:16]
-    tx_id = f"ERP-TX-{uuid.uuid4().hex[:8].upper()}"
+    from decimal import Decimal
+    from preflight.erp.outbox import OutboxStore
+    from preflight.erp.worker import OutboxSyncWorker
+    from preflight.erp.adapters.sap import MockSAPAdapter
+
+
+    # Persist in Outbox and dispatch to ERP Adapter
+    outbox = OutboxStore()
+    event = outbox.enqueue_order(
+        po_number=po_num,
+        customer=str(state.get("customer", "")),
+        items=state.get("items", []),
+        total_amount=Decimal(str(state.get("total", 0))),
+        currency=str(state.get("currency", "VND")),
+    )
+    worker = OutboxSyncWorker(outbox_store=outbox, adapter=MockSAPAdapter())
+    batch_results = worker.process_batch(limit=5)
+    tx_id = f"ERP-TX-{event.idempotency_key[:8].upper()}"
+    if batch_results and batch_results[0].transaction_id:
+        tx_id = batch_results[0].transaction_id
+
 
     trail.append(
-        f"[{time.strftime('%H:%M:%S')}] Order '{po_num}' synced to ERP successfully. TxID: '{tx_id}', IdempotencyKey: '{idemp_key}'."
+        f"[{time.strftime('%H:%M:%S')}] Order '{po_num}' synced to ERP successfully via Outbox. TxID: '{tx_id}', IdempotencyKey: '{event.idempotency_key}'."
     )
+
 
     return {
         "erp_synced": True,
         "erp_tx_id": tx_id,
-        "idempotency_key": idemp_key,
+        "idempotency_key": event.idempotency_key,
         "audit_trail": trail,
     }
+

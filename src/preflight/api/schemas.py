@@ -218,6 +218,14 @@ class RuleConfigResponse(BaseModel):
     auto_approve_ready: bool = Field(False, description="Auto-sync orders with zero warnings to ERP")
 
 
+class RuleConfigUpdateRequest(BaseModel):
+    price_tolerance_percent: float | None = Field(None, ge=0.0, le=100.0, description="Allowed price variance before flagging")
+    stock_safety_margin: int | None = Field(None, ge=0, description="Buffer quantity for inventory checks")
+    allow_inactive_sku: bool | None = Field(None, description="Allow purchasing deactivated items")
+    auto_approve_ready: bool | None = Field(None, description="Auto-sync orders with zero warnings to ERP")
+
+
+
 # ---------------------------------------------------------
 # Extraction Confirmation Schemas (Issue #16)
 # ---------------------------------------------------------

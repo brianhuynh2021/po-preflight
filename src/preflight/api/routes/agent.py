@@ -9,17 +9,17 @@ from preflight.api.deps import get_audit_store, get_catalog
 from preflight.models import Product
 from preflight.store import AuditStore
 
+from langgraph.checkpoint.memory import MemorySaver
+
 router = APIRouter(prefix="/api/v1/agent", tags=["LangGraph Agentic Orchestrator"])
 
-# In-memory graph runner instance for the API server lifecycle
-_SERVER_GRAPH_INSTANCE = None
+# Shared in-memory checkpointer for thread persistence across requests
+_SERVER_CHECKPOINTER = MemorySaver()
 
 
 def _get_server_graph(catalog: dict[str, Product], store: AuditStore):
-    global _SERVER_GRAPH_INSTANCE
-    if _SERVER_GRAPH_INSTANCE is None:
-        _SERVER_GRAPH_INSTANCE = build_preflight_graph(catalog, store)
-    return _SERVER_GRAPH_INSTANCE
+    return build_preflight_graph(catalog, store, checkpointer=_SERVER_CHECKPOINTER)
+
 
 
 class AgentRunRequest(BaseModel):
