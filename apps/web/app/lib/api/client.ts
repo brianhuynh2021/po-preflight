@@ -8,9 +8,12 @@ import type {
   AgentRunResponse,
   CatalogItem,
   ConfirmExtractionRequest,
+  CustomerCreditProfile,
+  CustomerPriceAgreement,
   DashboardStats,
   DecisionRequest,
   DecisionResponse,
+  ERPAdapterType,
   ERPSyncResponse,
   ExtractedOrder,
   OrderDetail,
@@ -18,7 +21,9 @@ import type {
   OutboxStats,
   RuleConfig,
   SKUMatchResult,
+  UOMConversion,
 } from "./types";
+
 
 const DEFAULT_BASE_URL = "http://localhost:8001";
 
@@ -202,13 +207,13 @@ export function createApiClient(config: ClientConfig = {}) {
   // 6. ERP Integration & Transactional Outbox API
   // =========================================================================
   const erp = {
-    sync: (orderId: number | string, adapterType: "MOCK_SAP" | "MOCK_ODOO" = "MOCK_SAP") => {
+    sync: (orderId: number | string, adapterType: ERPAdapterType = "MOCK_SAP") => {
       return request<ERPSyncResponse>(`/api/v1/erp/sync/${orderId}?adapter_type=${adapterType}`, {
         method: "POST",
       });
     },
 
-    processOutbox: (limit = 10, adapterType: "MOCK_SAP" | "MOCK_ODOO" = "MOCK_SAP") => {
+    processOutbox: (limit = 10, adapterType: ERPAdapterType = "MOCK_SAP") => {
       return request<{
         processed_count: number;
         adapter_used: string;
@@ -228,7 +233,44 @@ export function createApiClient(config: ClientConfig = {}) {
   };
 
   // =========================================================================
-  // 7. System Dashboard, Catalog, and Rules APIs
+  // 7. Enterprise B2B Contracts & Risk Master Data APIs
+  // =========================================================================
+  const b2b = {
+    getCustomerPrices: (customerId: string) => {
+      return request<CustomerPriceAgreement[]>(`/api/v1/customers/${customerId}/prices`);
+    },
+    setCustomerPrice: (customerId: string, payload: Omit<CustomerPriceAgreement, "customer_id">) => {
+      return request<{ status: string; pricing: CustomerPriceAgreement }>(`/api/v1/customers/${customerId}/prices`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    getCustomerCredit: (customerId: string) => {
+      return request<CustomerCreditProfile>(`/api/v1/customers/${customerId}/credit`);
+    },
+    setCustomerCredit: (customerId: string, payload: Omit<CustomerCreditProfile, "customer_id">) => {
+      return request<{ status: string; profile: CustomerCreditProfile }>(`/api/v1/customers/${customerId}/credit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    getUOMConversions: (sku?: string) => {
+      const q = sku ? `?sku=${encodeURIComponent(sku)}` : "";
+      return request<UOMConversion[]>(`/api/v1/masters/uom-conversions${q}`);
+    },
+    setUOMConversion: (payload: UOMConversion) => {
+      return request<{ status: string; conversion: UOMConversion }>("/api/v1/masters/uom-conversions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+  };
+
+  // =========================================================================
+  // 8. System Dashboard, Catalog, Rules & Realtime SSE APIs
   // =========================================================================
   const dashboard = {
     getStats: () => request<DashboardStats>("/api/v1/dashboard/stats"),
@@ -242,6 +284,33 @@ export function createApiClient(config: ClientConfig = {}) {
     getConfig: () => request<RuleConfig>("/api/v1/rules"),
   };
 
+  function connectRealtimeStream(
+    onEvent: (data: { event: string; data: Record<string, unknown>; timestamp?: number }) => void,
+    onError?: (err: Event) => void,
+  ): () => void {
+    if (typeof window === "undefined" || !window.EventSource) {
+      return () => {};
+    }
+    const eventSource = new EventSource(`${baseUrl}/api/v1/events/stream`);
+
+    eventSource.onmessage = (e) => {
+      try {
+        const parsed = JSON.parse(e.data);
+        onEvent(parsed);
+      } catch {
+        // Raw text event
+      }
+    };
+
+    if (onError) {
+      eventSource.onerror = onError;
+    }
+
+    return () => {
+      eventSource.close();
+    };
+  }
+
   return {
     orders,
     agent,
@@ -249,10 +318,13 @@ export function createApiClient(config: ClientConfig = {}) {
     ingest,
     bot,
     erp,
+    b2b,
     dashboard,
     catalog,
     rules,
+    connectRealtimeStream,
   };
 }
 
 export const api = createApiClient();
+

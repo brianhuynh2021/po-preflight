@@ -228,10 +228,17 @@ export interface AgentRunResponse {
 // ---------------------------------------------------------------------------
 // ERP & Outbox Schemas
 // ---------------------------------------------------------------------------
+export type ERPAdapterType =
+  | "MOCK_SAP"
+  | "MOCK_ODOO"
+  | "ODOO_LIVE"
+  | "SAP_ODATA_LIVE"
+  | "MISA_AMIS_LIVE";
+
 export interface ERPSyncResponse {
   success: boolean;
   transaction_id?: string | null;
-  adapter_type: "MOCK_SAP" | "MOCK_ODOO";
+  adapter_type: ERPAdapterType;
   idempotency_key: string;
   timestamp: number;
   error_message?: string | null;
@@ -244,3 +251,33 @@ export interface OutboxStats {
   failed_count: number;
   total_events: number;
 }
+
+// ---------------------------------------------------------------------------
+// Enterprise B2B Contracts & Risk Master Schemas
+// ---------------------------------------------------------------------------
+export interface CustomerPriceAgreement {
+  customer_id: string;
+  sku: string;
+  contract_price: number;
+  min_quantity: number;
+  discount_percent: number;
+  valid_from?: string | null;
+  valid_to?: string | null;
+}
+
+export interface CustomerCreditProfile {
+  customer_id: string;
+  credit_limit: number;
+  outstanding_balance: number;
+  overdue_balance: number;
+  oldest_overdue_days: number;
+  status: "ACTIVE" | "ON_HOLD" | "BLOCKED";
+}
+
+export interface UOMConversion {
+  sku: string;
+  uom_code: string;
+  base_uom: string;
+  conversion_factor: number;
+}
+
