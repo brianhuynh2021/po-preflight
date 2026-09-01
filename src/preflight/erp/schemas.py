@@ -17,6 +17,10 @@ class ERPEventStatus(str, Enum):
 class ERPAdapterType(str, Enum):
     MOCK_SAP = "MOCK_SAP"
     MOCK_ODOO = "MOCK_ODOO"
+    ODOO_LIVE = "ODOO_LIVE"
+    SAP_ODATA_LIVE = "SAP_ODATA_LIVE"
+    MISA_AMIS_LIVE = "MISA_AMIS_LIVE"
+
 
 
 class ERPSyncPayload(BaseModel):
