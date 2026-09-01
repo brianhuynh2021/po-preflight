@@ -1,0 +1,11 @@
+node_modules
+dist
+.next
+.vinext
+.wrangler
+build
+out
+outputs
+work
+package-lock.json
+next-env.d.ts

@@ -99,7 +99,7 @@ class OrderSummaryResponse(BaseModel):
     id: int = Field(..., description="Primary analysis ID in audit store")
     po_number: str = Field(..., description="Purchase Order number (e.g. PO-10428)")
     customer: str = Field(..., description="Customer company name")
-    status: Literal["ready_for_approval", "review_required", "blocked", "approved", "rejected", "needs_changes"] = (
+    status: Literal["ready_for_approval", "review_required", "blocked", "approved", "rejected", "needs_changes", "extraction_review"] = (
         Field(..., description="Lifecycle status")
     )
     risk_level: Literal["LOW", "MEDIUM", "HIGH"] = Field(..., description="Computed risk score")
@@ -119,17 +119,17 @@ class OrderSummaryResponse(BaseModel):
             "example": {
                 "id": 1,
                 "po_number": "PO-10428",
-                "customer": "Northstar Retailers Ltd",
+                "customer": "Northstar Retail",
                 "status": "review_required",
                 "risk_level": "MEDIUM",
-                "total": "45000000",
+                "total": "18500000.00",
                 "currency": "VND",
-                "items_count": 4,
-                "findings_count": 2,
+                "items_count": 2,
+                "findings_count": 1,
                 "error_count": 0,
-                "warning_count": 2,
-                "source_file": "po-review.json",
-                "created_at": "2026-08-31T07:00:00Z",
+                "warning_count": 1,
+                "source_file": "order-10428.pdf",
+                "created_at": "2026-09-01T08:00:00Z",
                 "latest_decision": None,
                 "decided_at": None,
             }
@@ -138,10 +138,12 @@ class OrderSummaryResponse(BaseModel):
 
 
 class OrderDetailResponse(BaseModel):
-    id: int = Field(..., description="Primary analysis ID")
-    po_number: str = Field(..., description="Purchase Order number")
-    customer: str = Field(..., description="Customer company name")
-    status: str = Field(..., description="Lifecycle status")
+    id: int = Field(..., description="Order ID in audit store")
+    po_number: str = Field(..., description="Purchase Order identifier")
+    customer: str = Field(..., description="Customer legal entity name")
+    status: Literal["ready_for_approval", "review_required", "blocked", "approved", "rejected", "needs_changes", "extraction_review"] = (
+        Field(..., description="Lifecycle verification state")
+    )
     risk_level: str = Field(..., description="Computed risk level")
     total: Decimal = Field(..., description="Total order amount")
     currency: str = Field("VND", description="Currency code")

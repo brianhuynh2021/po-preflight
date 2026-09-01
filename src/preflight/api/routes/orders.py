@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import JSONResponse
 
 from preflight.api.deps import get_audit_store, get_catalog
+from preflight.api.events import event_bus
 from preflight.api.logging_config import logger
 from preflight.api.schemas import (
     ConfirmExtractionRequest,
@@ -23,6 +24,7 @@ from preflight.api.schemas import (
 from preflight.models import Analysis, LineItem, Order, Product
 from preflight.parsers import parse_order
 from preflight.rules import analyze_order
+from preflight.security.rbac import Role, UserPrincipal, require_role
 from preflight.store import AuditStore
 
 router = APIRouter(prefix="/api/v1/orders", tags=["Purchase Orders & Preflight Operations"])
@@ -218,6 +220,19 @@ async def upload_order(
         # Persist to database
         analysis_id = store.record_analysis(analysis, str(file.filename))
 
+        # Broadcast SSE Real-Time Event
+        event_bus.publish(
+            "order.created",
+            {
+                "id": str(analysis_id),
+                "po_number": order.po_number,
+                "customer": order.customer,
+                "status": analysis.status,
+                "total_amount": float(order.total) if order.total else 0.0,
+                "currency": order.currency,
+            },
+        )
+
         # Return full detail
         return get_order_detail(str(analysis_id), store=store, catalog=catalog)
     except Exception as exc:
@@ -234,6 +249,7 @@ async def upload_order(
 def confirm_extraction(
     order_id: str,
     payload: ConfirmExtractionRequest,
+    user: UserPrincipal = Depends(require_role(Role.MANAGER)),
     store: AuditStore = Depends(get_audit_store),
     catalog: dict[str, Product] = Depends(get_catalog),
 ) -> OrderDetailResponse:
@@ -268,6 +284,11 @@ def confirm_extraction(
     # Update database record
     store.update_analysis(int(row["id"]), analysis)
 
+    event_bus.publish(
+        "order.confirmed",
+        {"id": str(row["id"]), "po_number": po_number, "status": analysis.status},
+    )
+
     return get_order_detail(str(row["id"]), store=store, catalog=catalog)
 
 
@@ -280,6 +301,7 @@ def confirm_extraction(
 def record_decision(
     order_id: str,
     payload: DecisionRequest,
+    user: UserPrincipal = Depends(require_role(Role.MANAGER)),
     store: AuditStore = Depends(get_audit_store),
 ) -> DecisionResponse:
     row = store.get_order(order_id)
@@ -296,6 +318,17 @@ def record_decision(
         )
         history = store.history(po_number)
         latest = history["decisions"][-1]
+
+        event_bus.publish(
+            "order.decided",
+            {
+                "id": str(order_id),
+                "po_number": po_number,
+                "decision": payload.decision,
+                "actor": payload.actor,
+            },
+        )
+
         return DecisionResponse(
             success=True,
             id=decision_id,

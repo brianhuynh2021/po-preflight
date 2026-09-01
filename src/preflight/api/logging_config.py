@@ -113,6 +113,15 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 f"-> {status_color}{BOLD}{status_code}{RESET} "
                 f"({duration_ms:.2f}ms) {DIM}[req_id={request_id}]{RESET}"
             )
+
+            # Record Prometheus OpenMetrics
+            try:
+                from preflight.observability.metrics import metrics_registry
+
+                metrics_registry.record_http_request(method, path, status_code, duration_ms / 1000.0)
+            except Exception:
+                pass
+
             return response
         except Exception as exc:
             duration_ms = (time.perf_counter() - start_time) * 1000
