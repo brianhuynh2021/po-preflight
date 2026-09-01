@@ -1,6 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  Search,
+  Plus,
+  Split,
+  Check,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  FileText,
+  User,
+} from "lucide-react";
 
 import type { ActivityEvent, OrderStatus, PurchaseOrder } from "@/app/lib/types";
 import { useAppState } from "@/components/app/AppStateProvider";
@@ -10,9 +21,11 @@ import { SubmittedAt } from "@/components/common/SubmittedAt";
 import { UploadModal } from "@/components/orders/UploadModal";
 import { DecisionModal } from "@/components/orders/DecisionModal";
 import { SideBySideViewer } from "@/components/orders/SideBySideViewer";
+import { useRipple } from "@/app/lib/useRipple";
 
 export function OrdersView() {
   const { orders, setOrders, activity, setActivity } = useAppState();
+  const { createRipple } = useRipple();
 
   const [selectedId, setSelectedId] = useState("PO-10428");
   const [query, setQuery] = useState("");
@@ -70,7 +83,7 @@ export function OrdersView() {
   };
 
   return (
-    <div className="page orders-page">
+    <div className="page orders-page page-enter">
       <div className="page-heading">
         <div>
           <p className="eyebrow">ORDER OPERATIONS</p>
@@ -81,10 +94,15 @@ export function OrdersView() {
           </p>
         </div>
         <button
-          className="primary-button"
-          onClick={() => setUploadOpen(true)}
+          className="primary-button interactive"
+          onClick={(e) => {
+            createRipple(e);
+            setUploadOpen(true);
+          }}
+          style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
         >
-          <span aria-hidden="true">＋</span> Upload purchase order
+          <Plus size={16} strokeWidth={2.2} aria-hidden="true" />
+          <span>Upload purchase order</span>
         </button>
       </div>
 
@@ -139,8 +157,8 @@ export function OrdersView() {
 
       {toast ? (
         <div className="toast" role="status">
-          <span>✓</span>
-          {toast}
+          <Check size={16} strokeWidth={2.5} />
+          <span>{toast}</span>
         </div>
       ) : null}
     </div>
@@ -158,28 +176,28 @@ function OrdersMetrics({
     <div className="metrics-row">
       <div className="metric">
         <span>Needs attention</span>
-        <strong>{attentionCount}</strong>
+        <strong className="tabular-nums">{attentionCount}</strong>
         <small>
           <i className="metric-dot amber" /> Review or correction required
         </small>
       </div>
       <div className="metric">
         <span>Ready for approval</span>
-        <strong>{orders.filter((o) => o.status === "Ready").length}</strong>
+        <strong className="tabular-nums">{orders.filter((o) => o.status === "Ready").length}</strong>
         <small>
           <i className="metric-dot green" /> All validation rules passed
         </small>
       </div>
       <div className="metric">
         <span>Approved today</span>
-        <strong>{orders.filter((o) => o.status === "Approved").length}</strong>
+        <strong className="tabular-nums">{orders.filter((o) => o.status === "Approved").length}</strong>
         <small>
           <i className="metric-dot blue" /> Average decision time 6m
         </small>
       </div>
       <div className="metric metric-chart">
         <span>Orders this week</span>
-        <strong>42</strong>
+        <strong className="tabular-nums">42</strong>
         <div className="spark" aria-label="Orders increased during the week">
           <i style={{ height: "28%" }} />
           <i style={{ height: "48%" }} />
@@ -211,11 +229,13 @@ function OrderQueue({
   onFilterChange: (value: "All" | OrderStatus) => void;
   onSelect: (id: string) => void;
 }) {
+  const { createRipple } = useRipple();
+
   return (
     <section className="queue-panel" aria-label="Order queue">
       <div className="panel-toolbar">
         <label className="search">
-          <span aria-hidden="true">⌕</span>
+          <Search size={15} strokeWidth={2} style={{ opacity: 0.6 }} aria-hidden="true" />
           <input
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
@@ -243,8 +263,11 @@ function OrderQueue({
         {orders.map((order) => (
           <button
             key={order.id}
-            className={selectedId === order.id ? "order-row selected" : "order-row"}
-            onClick={() => onSelect(order.id)}
+            className={selectedId === order.id ? "order-row selected interactive" : "order-row interactive"}
+            onClick={(e) => {
+              createRipple(e);
+              onSelect(order.id);
+            }}
           >
             <span className="order-identity">
               <strong>{order.id}</strong>
@@ -256,20 +279,23 @@ function OrderQueue({
             <span>
               <StatusBadge status={order.status} />
               {order.findings.length > 0 ? (
-                <small className="finding-count">
+                <small className="finding-count tabular-nums">
                   {order.findings.length}{" "}
                   {order.findings.length === 1 ? "finding" : "findings"}
                 </small>
               ) : null}
             </span>
             <span className="order-value">
-              <strong>{money(order.value, order.currency)}</strong>
+              <strong className="tabular-nums">{money(order.value, order.currency)}</strong>
               <small>{order.currency}</small>
             </span>
           </button>
         ))}
         {orders.length === 0 ? (
-          <div className="empty-state">No orders match this view.</div>
+          <div className="empty-state">
+            <FileText size={28} strokeWidth={1.5} style={{ opacity: 0.4, marginBottom: "8px" }} />
+            <p>No orders match this view.</p>
+          </div>
         ) : null}
       </div>
     </section>
@@ -289,6 +315,8 @@ function OrderDetail({
   onOpenSideBySide: () => void;
   onRequestChanges: () => void;
 }) {
+  const { createRipple } = useRipple();
+
   return (
     <section className="detail-panel" aria-label={`${order.id} details`}>
       <div className="detail-header">
@@ -302,19 +330,27 @@ function OrderDetail({
           </p>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
-          <button className="secondary-button" onClick={onOpenSideBySide} style={{ fontSize: "12px", padding: "6px 10px" }}>
-            🔍 Side-by-Side
+          <button
+            className="secondary-button interactive"
+            onClick={(e) => {
+              createRipple(e);
+              onOpenSideBySide();
+            }}
+            style={{ fontSize: "12px", padding: "6px 10px", display: "inline-flex", alignItems: "center", gap: "6px" }}
+          >
+            <Split size={14} strokeWidth={2} />
+            <span>Side-by-Side</span>
           </button>
         </div>
       </div>
       <div className="order-summary">
         <div>
           <span>Order value</span>
-          <strong>{money(order.value, order.currency)}</strong>
+          <strong className="tabular-nums">{money(order.value, order.currency)}</strong>
         </div>
         <div>
           <span>Line items</span>
-          <strong>{order.lines.length}</strong>
+          <strong className="tabular-nums">{order.lines.length}</strong>
         </div>
         <div>
           <span>Owner</span>
@@ -332,7 +368,7 @@ function OrderDetail({
             <h3>Validation findings</h3>
             <p>Evidence from active company rules</p>
           </div>
-          <span className="finding-pill">{order.findings.length}</span>
+          <span className="finding-pill tabular-nums">{order.findings.length}</span>
         </div>
         {order.findings.length ? (
           <div className="findings">
@@ -341,8 +377,12 @@ function OrderDetail({
                 className={`finding finding-${finding.severity === "Error" ? "blocked" : "review"}`}
                 key={`${finding.code}-${finding.sku ?? ""}`}
               >
-                <div className="finding-symbol" aria-hidden="true">
-                  {finding.severity === "Error" ? "×" : "!"}
+                <div className="finding-symbol" aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {finding.severity === "Error" ? (
+                    <XCircle size={16} strokeWidth={2.2} />
+                  ) : (
+                    <AlertTriangle size={15} strokeWidth={2.2} />
+                  )}
                 </div>
                 <div>
                   <div className="finding-top">
@@ -357,7 +397,9 @@ function OrderDetail({
           </div>
         ) : (
           <div className="clear-state">
-            <span>✓</span>
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <CheckCircle2 size={20} strokeWidth={2.2} />
+            </span>
             <div>
               <strong>All validation rules passed</strong>
               <p>
@@ -373,17 +415,19 @@ function OrderDetail({
             <h3>Normalized line items</h3>
             <p>Extracted values compared with company data</p>
           </div>
-          <button className="text-button">View source</button>
+          <button className="text-button interactive" onClick={createRipple}>
+            View source
+          </button>
         </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>SKU / Product</th>
-                <th>Qty</th>
-                <th>Available</th>
-                <th>Unit price</th>
-                <th>Catalog</th>
+                <th style={{ textAlign: "right" }}>Qty</th>
+                <th style={{ textAlign: "right" }}>Available</th>
+                <th style={{ textAlign: "right" }}>Unit price</th>
+                <th style={{ textAlign: "right" }}>Catalog</th>
               </tr>
             </thead>
             <tbody>
@@ -393,25 +437,28 @@ function OrderDetail({
                     <strong>{line.sku}</strong>
                     <small>{line.product}</small>
                   </td>
-                  <td>{line.quantity}</td>
                   <td
-                    className={
-                      line.available < line.quantity ? "cell-warning" : ""
-                    }
+                    className="tabular-nums"
+                    style={{ textAlign: "right" }}
+                  >
+                    {line.quantity}
+                  </td>
+                  <td
+                    className={`tabular-nums ${line.available < line.quantity ? "cell-warning" : ""}`}
+                    style={{ textAlign: "right" }}
                   >
                     {line.available}
                   </td>
                   <td
-                    className={
-                      line.catalogPrice > 0 &&
-                      line.unitPrice !== line.catalogPrice
-                        ? "cell-warning"
-                        : ""
-                    }
+                    className={`tabular-nums ${line.catalogPrice > 0 && line.unitPrice !== line.catalogPrice ? "cell-warning" : ""}`}
+                    style={{ textAlign: "right" }}
                   >
                     ${line.unitPrice.toFixed(2)}
                   </td>
-                  <td>
+                  <td
+                    className="tabular-nums"
+                    style={{ textAlign: "right" }}
+                  >
                     {line.catalogPrice
                       ? `$${line.catalogPrice.toFixed(2)}`
                       : "—"}
@@ -431,8 +478,15 @@ function OrderDetail({
         <div className="timeline">
           {activity.map((event, index) => (
             <div className="timeline-event" key={`${event.title}-${index}`}>
-              <span className={`timeline-mark ${event.type}`}>
-                {event.type === "human" ? "M" : "✓"}
+              <span
+                className={`timeline-mark ${event.type}`}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                {event.type === "human" ? (
+                  <User size={13} strokeWidth={2.2} />
+                ) : (
+                  <Check size={13} strokeWidth={2.5} />
+                )}
               </span>
               <div>
                 <strong>{event.title}</strong>
@@ -445,12 +499,21 @@ function OrderDetail({
       </div>
 
       <div className="decision-bar">
-        <button className="secondary-button" onClick={onRequestChanges}>
+        <button
+          className="secondary-button interactive"
+          onClick={(e) => {
+            createRipple(e);
+            onRequestChanges();
+          }}
+        >
           Request changes
         </button>
         <button
-          className="approve-button"
-          onClick={onOpenDecision}
+          className="approve-button interactive"
+          onClick={(e) => {
+            createRipple(e);
+            onOpenDecision();
+          }}
           disabled={
             order.status === "Blocked" || order.status === "Approved"
           }

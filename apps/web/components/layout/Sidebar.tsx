@@ -1,38 +1,62 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  FileText,
+  ScanLine,
+  Package,
+  Workflow,
+  Zap,
+  ShieldCheck,
+  RefreshCw,
+  Lock,
+  History,
+  Settings,
+  Globe,
+  ChevronDown,
+  MoreHorizontal,
+  type LucideIcon,
+} from "lucide-react";
 import { useAppState } from "@/components/app/AppStateProvider";
+import { useRipple } from "@/app/lib/useRipple";
+
+interface NavItem {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+}
 
 interface NavGroup {
   name: string;
-  items: { label: string; href: string; icon: string }[];
+  items: NavItem[];
 }
 
 const NAV_GROUPS: NavGroup[] = [
   {
     name: "OPERATIONS",
     items: [
-      { label: "Overview", href: "/overview", icon: "⌂" },
-      { label: "Orders", href: "/orders", icon: "▤" },
-      { label: "Staging Studio", href: "/staging", icon: "✎" },
-      { label: "Product Catalog", href: "/catalog", icon: "□" },
+      { label: "Overview", href: "/overview", icon: LayoutDashboard },
+      { label: "Orders", href: "/orders", icon: FileText },
+      { label: "Staging Studio", href: "/staging", icon: ScanLine },
+      { label: "Product Catalog", href: "/catalog", icon: Package },
     ],
   },
   {
     name: "AI & ORCHESTRATION",
     items: [
-      { label: "LangGraph Visualizer", href: "/agent-graph", icon: "⎇" },
-      { label: "4-Tier RAG Tester", href: "/rag-playground", icon: "⚡" },
-      { label: "Rules & Policies", href: "/rules", icon: "✓" },
+      { label: "LangGraph Visualizer", href: "/agent-graph", icon: Workflow },
+      { label: "4-Tier RAG Tester", href: "/rag-playground", icon: Zap },
+      { label: "Rules & Policies", href: "/rules", icon: ShieldCheck },
     ],
   },
   {
     name: "COMPLIANCE & ERP",
     items: [
-      { label: "ERP Outbox Sync", href: "/erp-sync", icon: "⇄" },
-      { label: "Merkle Certificate", href: "/audit-certificate", icon: "🔒" },
-      { label: "Audit Log", href: "/audit-log", icon: "◷" },
-      { label: "Bot Settings", href: "/settings", icon: "⚙" },
+      { label: "ERP Outbox Sync", href: "/erp-sync", icon: RefreshCw },
+      { label: "Merkle Certificate", href: "/audit-certificate", icon: Lock },
+      { label: "Audit Log", href: "/audit-log", icon: History },
+      { label: "Bot Settings", href: "/settings", icon: Settings },
     ],
   },
 ];
@@ -40,6 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const { orders } = useAppState();
+  const { createRipple } = useRipple();
 
   const attentionCount = orders.filter(
     (order) => order.status === "Review required" || order.status === "Blocked",
@@ -49,17 +74,18 @@ export function Sidebar() {
     <aside className="sidebar">
       <div className="brand">
         <span className="brand-mark" aria-hidden="true">
-          O
+          ✈
         </span>
         <span>Preflight</span>
       </div>
-      <div className="workspace-switcher">
+
+      <div className="workspace-switcher interactive" onClick={createRipple}>
         <span className="workspace-avatar">N</span>
         <span>
           <strong>Northwind Co.</strong>
           <small>Operations workspace</small>
         </span>
-        <span aria-hidden="true">⌄</span>
+        <ChevronDown size={14} style={{ opacity: 0.7 }} aria-hidden="true" />
       </div>
 
       <nav aria-label="Primary navigation" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -71,15 +97,17 @@ export function Sidebar() {
                 (item.href === "/overview" && pathname === "/") ||
                 pathname === item.href ||
                 pathname.startsWith(`${item.href}/`);
+              const IconComponent = item.icon;
 
               return (
                 <a
                   key={item.href}
                   href={item.href}
-                  className={isActive ? "nav-item active" : "nav-item"}
+                  className={isActive ? "nav-item active interactive" : "nav-item interactive"}
+                  onClick={createRipple}
                 >
-                  <span className="nav-icon" aria-hidden="true">
-                    {item.icon}
+                  <span className="nav-icon" aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <IconComponent size={18} strokeWidth={1.75} />
                   </span>
                   <span>{item.label}</span>
                   {item.label === "Orders" && attentionCount > 0 ? (
@@ -93,10 +121,13 @@ export function Sidebar() {
       </nav>
 
       <div className="sidebar-spacer" />
+
       <a
         href="/landing"
         target="_blank"
         rel="noreferrer"
+        className="interactive"
+        onClick={createRipple}
         style={{
           display: "flex",
           alignItems: "center",
@@ -112,9 +143,10 @@ export function Sidebar() {
           marginBottom: "10px",
         }}
       >
-        <span>🌐</span>
+        <Globe size={15} strokeWidth={1.75} />
         <span>Marketing Landing Page ↗</span>
       </a>
+
       <div className="processing-card">
         <span className="live-dot" />
         <div>
@@ -122,13 +154,14 @@ export function Sidebar() {
           <small>Last checked just now</small>
         </div>
       </div>
-      <button className="profile">
+
+      <button className="profile interactive" onClick={createRipple}>
         <span className="profile-avatar">MC</span>
         <span>
           <strong>Maya Chen</strong>
           <small>Operations manager</small>
         </span>
-        <span aria-hidden="true">⋯</span>
+        <MoreHorizontal size={16} style={{ opacity: 0.7 }} aria-hidden="true" />
       </button>
     </aside>
   );
