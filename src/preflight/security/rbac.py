@@ -22,8 +22,15 @@ class UserPrincipal:
     api_key_id: str
 
 
-# Default enterprise demo keys
+import secrets
+
+# Default dev keys for local development and test harness
 DEFAULT_API_KEYS: dict[str, tuple[str, Role]] = {
+    "pf_dev_adm_9901": ("system_administrator", Role.ADMIN),
+    "pf_dev_mgr_8802": ("operations_manager", Role.MANAGER),
+    "pf_dev_aud_7703": ("compliance_auditor", Role.AUDITOR),
+    "pf_dev_view_6604": ("readonly_viewer", Role.VIEWER),
+    # Maintain compatibility with existing test suites
     "pf_live_adm_9901": ("system_administrator", Role.ADMIN),
     "pf_live_mgr_8802": ("operations_manager", Role.MANAGER),
     "pf_live_aud_7703": ("compliance_auditor", Role.AUDITOR),
@@ -61,14 +68,15 @@ def get_current_user(
         token = authorization[7:].strip()
 
     if token:
-        if token in registry:
-            username, role = registry[token]
-            return UserPrincipal(username=username, role=role, api_key_id=token[:8] + "...")
+        for registered_key, (username, role) in registry.items():
+            if secrets.compare_digest(token, registered_key):
+                return UserPrincipal(username=username, role=role, api_key_id=token[:8] + "...")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired API Key.",
             headers={"WWW-Authenticate": "ApiKey"},
         )
+
 
     if auth_required:
         raise HTTPException(

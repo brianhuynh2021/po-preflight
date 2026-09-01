@@ -207,9 +207,20 @@ async def upload_order(
     temp_path = upload_dir / safe_name
 
 
+    MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB Limit
+
     try:
-        content = await file.read()
+        content = bytearray()
+        chunk_size = 64 * 1024
+        while chunk := await file.read(chunk_size):
+            content.extend(chunk)
+            if len(content) > MAX_UPLOAD_SIZE:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"Uploaded file exceeds maximum limit of {MAX_UPLOAD_SIZE // (1024 * 1024)}MB.",
+                )
         temp_path.write_bytes(content)
+
 
         # Parse order
         order = parse_order(temp_path)

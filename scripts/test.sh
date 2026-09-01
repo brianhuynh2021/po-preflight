@@ -24,4 +24,11 @@ if grep -RInE --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.venv 
   exit 1
 fi
 
+if command -v npm >/dev/null 2>&1 && [[ -d "${repo_root}/apps/web" ]]; then
+  echo "Running frontend web tests..."
+  npm --prefix "${repo_root}/apps/web" run lint
+  npm --prefix "${repo_root}/apps/web" run test
+fi
+
 echo "All checks passed."
+
