@@ -1,0 +1,99 @@
+[
+  {
+    "id": "EVAL-001",
+    "description": "Standard Clean Laptop & Monitor Order",
+    "input": {
+      "po_number": "PO-EVAL-001",
+      "customer": "Apex Solutions",
+      "currency": "VND",
+      "items": [
+        {"raw_sku": "LAPTOP-A14", "quantity": 5, "unit_price": 18500000},
+        {"raw_sku": "MONITOR-27", "quantity": 5, "unit_price": 6200000}
+      ]
+    },
+    "expected": {
+      "status": "ready_for_approval",
+      "risk_level": "LOW",
+      "matched_skus": ["LAPTOP-A14", "MONITOR-27"],
+      "findings_count": 0,
+      "math_valid": true
+    }
+  },
+  {
+    "id": "EVAL-002",
+    "description": "Vietnamese Dialect Nickname SKU Resolution",
+    "input": {
+      "po_number": "PO-EVAL-002",
+      "customer": "Vingroup Retail",
+      "currency": "VND",
+      "items": [
+        {"raw_sku": "dây mạng 3m bấm sẵn", "quantity": 20, "unit_price": 72000}
+      ]
+    },
+    "expected": {
+      "status": "ready_for_approval",
+      "risk_level": "LOW",
+      "matched_skus": ["CAB-CAT6-3M"],
+      "findings_count": 0,
+      "math_valid": true
+    }
+  },
+  {
+    "id": "EVAL-003",
+    "description": "Insufficient Stock Violation Detection",
+    "input": {
+      "po_number": "PO-EVAL-003",
+      "customer": "Northstar Logistics",
+      "currency": "VND",
+      "items": [
+        {"raw_sku": "HEADSET-PRO", "quantity": 50, "unit_price": 1450000}
+      ]
+    },
+    "expected": {
+      "status": "review_required",
+      "risk_level": "MEDIUM",
+      "matched_skus": ["HEADSET-PRO"],
+      "findings_count": 1,
+      "math_valid": true
+    }
+  },
+  {
+    "id": "EVAL-004",
+    "description": "Price Discrepancy Discount Violation Detection",
+    "input": {
+      "po_number": "PO-EVAL-004",
+      "customer": "Techcombank Tech",
+      "currency": "VND",
+      "items": [
+        {"raw_sku": "LAPTOP-A14", "quantity": 5, "unit_price": 17000000}
+      ]
+    },
+    "expected": {
+      "status": "review_required",
+      "risk_level": "MEDIUM",
+      "matched_skus": ["LAPTOP-A14"],
+      "findings_count": 1,
+      "math_valid": true
+    }
+  },
+  {
+    "id": "EVAL-005",
+    "description": "Inactive SKU Rejection Detection",
+    "input": {
+      "po_number": "PO-EVAL-005",
+      "customer": "Legacy Client",
+      "currency": "VND",
+      "items": [
+        {"raw_sku": "LAPTOP-A14", "quantity": 1, "unit_price": 18500000},
+        {"raw_sku": "MOUSE-BT", "quantity": 1, "unit_price": 350000}
+      ]
+    },
+    "expected": {
+      "status": "blocked",
+      "risk_level": "HIGH",
+      "matched_skus": ["LAPTOP-A14", "MOUSE-BT"],
+      "findings_count": 1,
+      "math_valid": true
+    }
+  }
+]
