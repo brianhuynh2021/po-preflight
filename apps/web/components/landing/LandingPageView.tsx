@@ -131,7 +131,7 @@ export function LandingPageView() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ background: "#10b981", color: "#fff", padding: "1px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 800 }}>NHẬT MINH TECH</span>
-          <span>Dự án AI Deep-Tech: Kết hợp kiến trúc <strong>MIT Outer System + Stanford Inner Loop</strong> cho Doanh nghiệp B2B Việt Nam.</span>
+          <span>Cổng Kiểm Soát Đơn Hàng B2B Tự Động Hóa Dành Cho Doanh Nghiệp Phân Phối &amp; Bán Buôn.</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "16px", fontSize: "12px" }}>
           <a href="tel:0984883750" style={{ color: "#fef08a", textDecoration: "none", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px" }}>
@@ -188,7 +188,7 @@ export function LandingPageView() {
         <nav className="landing-nav-links">
           <a href="#demo-video" style={{ color: "var(--muted)", textDecoration: "none", transition: "color 0.2s" }}>🎬 Video Demo Tự Động</a>
           <a href="#problem" style={{ color: "var(--muted)", textDecoration: "none" }}>So Sánh Giải Pháp</a>
-          <a href="#architecture" style={{ color: "var(--muted)", textDecoration: "none" }}>Kiến Trúc MIT/Stanford</a>
+          <a href="#features" style={{ color: "var(--muted)", textDecoration: "none" }}>4 Trụ Cột Công Nghệ</a>
           <a href="#sandbox" style={{ color: "var(--muted)", textDecoration: "none" }}>Thử Khớp Mã RAG</a>
           <a href="#pricing" style={{ color: "var(--muted)", textDecoration: "none" }}>Gói Dịch Vụ</a>
           <a href="#security" style={{ color: "var(--muted)", textDecoration: "none" }}>Bảo Mật SOX 404</a>
@@ -269,7 +269,7 @@ export function LandingPageView() {
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "28px", flexWrap: "wrap", fontSize: "12.5px", color: "var(--muted)", fontWeight: 600 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <span style={{ color: "#10b981", fontSize: "15px" }}>✔</span>
-            <span>Mô hình kết hợp MIT Outer System + Stanford Inner Loop</span>
+            <span>Bóc tách Zero-Hallucination &amp; Tự kiểm toán số học 100%</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <span style={{ color: "#10b981", fontSize: "15px" }}>✔</span>
@@ -884,25 +884,25 @@ export function LandingPageView() {
         </div>
       </section>
 
-      {/* 6. MIT Outer System + Stanford Inner Loop Architecture Section */}
-      <section id="architecture" style={{ background: "var(--paper)", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "64px 24px" }}>
+      {/* 6. 4 Core Technological Pillars Section */}
+      <section id="features" style={{ background: "var(--paper)", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "64px 24px" }}>
         <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: "48px" }}>
-            <p className="eyebrow">KIẾN TRÚC ĐỘT PHÁ TỪ NHẬT MINH TECH</p>
+            <p className="eyebrow">4 TRỤ CỘT CÔNG NGHỆ CỐT LÕI</p>
             <h2 style={{ fontSize: "32px", fontWeight: 800, letterSpacing: "-0.02em", margin: "6px 0" }}>
-              Kết Hợp MIT Outer System &amp; Stanford Inner Loop
+              Những Đột Phá Giúp PO Preflight Hoạt Động Chuẩn Xác 100%
             </h2>
             <p style={{ color: "var(--muted)", maxWidth: "750px", margin: "0 auto" }}>
-              Phân tách rạch ròi giữa <strong>Hệ Thống Điều Phối &amp; Thực Thi An Toàn</strong> (MIT Outer System) và <strong>Bộ Não Tác Tử Tự Phản Biện Sửa Sai</strong> (Stanford Inner Loop).
+              Được thiết kế chuyên biệt để tự động hóa an toàn khâu tiếp nhận đơn hàng cho các doanh nghiệp bán buôn và chuỗi phân phối tại Việt Nam.
             </p>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "24px" }}>
             <div className="clean-card" style={{ borderTop: "3px solid #10b981" }}>
               <div style={{ fontSize: "28px", marginBottom: "12px" }}>🔍</div>
-              <h3 style={{ fontSize: "16px", fontWeight: 700, margin: "0 0 8px" }}>Stanford Inner Loop: Self-Reflection</h3>
+              <h3 style={{ fontSize: "16px", fontWeight: 700, margin: "0 0 8px" }}>Bóc Tách Zero-Hallucination</h3>
               <p style={{ fontSize: "13px", color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
-                Không bao giờ tự ý bịa số liệu. Cơ chế Self-Reflection toán học kiểm tra chéo tổng tiền vs dòng chi tiết, loại bỏ 100% rủi ro AI ảo giác.
+                Không bao giờ tự ý bịa số liệu. Cơ chế tự kiểm toán số học kiểm tra chéo tổng tiền vs từng dòng chi tiết, loại bỏ 100% rủi ro AI ảo giác.
               </p>
             </div>
 
@@ -916,9 +916,9 @@ export function LandingPageView() {
 
             <div className="clean-card" style={{ borderTop: "3px solid #f59e0b" }}>
               <div style={{ fontSize: "28px", marginBottom: "12px" }}>📱</div>
-              <h3 style={{ fontSize: "16px", fontWeight: 700, margin: "0 0 8px" }}>MIT Outer: Multi-Channel HITL</h3>
+              <h3 style={{ fontSize: "16px", fontWeight: 700, margin: "0 0 8px" }}>Phê Duyệt 1 Chạm Telegram &amp; Zalo</h3>
               <p style={{ fontSize: "13px", color: "var(--muted)", lineHeight: 1.6, margin: 0 }}>
-                Human-In-The-Loop: Luồng Agent tự động dừng khi phát hiện rủi ro và bắn cảnh báo tới Telegram/Zalo. Quản lý bấm Duyệt 1 chạm ngay trên điện thoại.
+                Human-In-The-Loop: Luồng xử lý tự động dừng khi phát hiện rủi ro và bắn cảnh báo tới Telegram/Zalo. Quản lý bấm Duyệt 1 chạm ngay trên điện thoại.
               </p>
             </div>
 
@@ -1390,7 +1390,7 @@ export function LandingPageView() {
               </div>
               <p style={{ fontSize: "12.5px", lineHeight: 1.7, color: "#94a3b8", marginBottom: "16px" }}>
                 <strong>NHAT MINH TECHNOLOGY (NHAT MINH TECH)</strong><br />
-                Đơn vị phát triển nền tảng Deep-Tech <strong>PO Preflight</strong> — Cổng Tiền Phê Duyệt &amp; Kiểm Soát Đơn Hàng B2B Tự Động Hóa kết hợp mô hình MIT Outer System &amp; Stanford Inner Loop.
+                Đơn vị phát triển nền tảng <strong>PO Preflight</strong> — Cổng Tiền Phê Duyệt &amp; Kiểm Soát Đơn Hàng B2B Tự Động Hóa Chuẩn SOX 404 Hàng Đầu Cho Doanh Nghiệp Việt Nam.
               </p>
 
               <div style={{ fontSize: "12.5px", lineHeight: 1.8, color: "#cbd5e1" }}>
