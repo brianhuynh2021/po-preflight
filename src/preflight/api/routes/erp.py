@@ -8,16 +8,16 @@ from preflight.api.deps import get_audit_store, get_db_path
 from preflight.api.events import event_bus
 from preflight.erp.adapters.odoo import MockOdooAdapter
 from preflight.erp.adapters.sap import MockSAPAdapter
-from preflight.erp.outbox import OutboxStore
+from preflight.erp.outbox import BaseOutboxStore, OutboxStore, create_outbox_store
 from preflight.erp.schemas import ERPAdapterType, ERPSyncResponse, OutboxStats
 from preflight.erp.worker import OutboxSyncWorker
-from preflight.store import AuditStore
+from preflight.store import AuditStore, BaseAuditStore
 
 router = APIRouter(prefix="/api/v1/erp", tags=["ERP Integration & Outbox Worker"])
 
 
-def get_outbox_store(db_path: str = Depends(get_db_path)) -> OutboxStore:
-    return OutboxStore(db_path)
+def get_outbox_store(db_path: str = Depends(get_db_path)) -> BaseOutboxStore:
+    return create_outbox_store(db_path)
 
 
 @router.post(

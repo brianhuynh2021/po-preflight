@@ -6,7 +6,7 @@ from typing import Generator
 
 from preflight.catalog import load_catalog
 from preflight.models import Product
-from preflight.store import AuditStore
+from preflight.store import AuditStore, BaseAuditStore, create_audit_store
 
 DEFAULT_DB_PATH = Path("runtime/preflight.db")
 DEFAULT_CATALOG_PATH = Path("examples/catalog.csv")
@@ -29,9 +29,9 @@ def get_catalog() -> dict[str, Product]:
     return {}
 
 
-def get_audit_store() -> Generator[AuditStore, None, None]:
+def get_audit_store() -> Generator[BaseAuditStore, None, None]:
     db_path = get_db_path()
-    store = AuditStore(db_path)
+    store = create_audit_store(db_path)
     try:
         yield store
     finally:
