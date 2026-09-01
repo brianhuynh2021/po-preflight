@@ -4,6 +4,9 @@ import React, { useState } from "react";
 import { money } from "@/app/lib/derive";
 
 export function LandingPageView() {
+  // Interactive Demo Video / Showcase State
+  const [activeDemoTab, setActiveDemoTab] = useState<"intake" | "approval" | "merkle">("intake");
+
   // Interactive Sandbox State
   const [testQuery, setTestQuery] = useState("dây mạng 3m bấm sẵn");
   const [matchedSku, setMatchedSku] = useState("CAB-CAT6-3M");
@@ -56,14 +59,11 @@ export function LandingPageView() {
   };
 
   // ROI Calculations
-  // Manual time: 20 mins/PO -> 0.333 hours
-  // Automated time: 30 secs/PO -> 0.0083 hours
   const monthlyPOs = dailyPOs * 24; // 24 working days
   const manualHoursMonthly = monthlyPOs * (20 / 60);
   const preflightHoursMonthly = monthlyPOs * (0.5 / 60);
   const hoursSavedMonthly = Math.round(manualHoursMonthly - preflightHoursMonthly);
   const laborCostSaved = hoursSavedMonthly * adminHourlyWage;
-  // Estimated pricing error prevention: ~2% of orders have pricing discrepancies averaging 350k VND
   const pricingRiskSaved = Math.round(monthlyPOs * 0.02 * 350000);
   const totalMonthlySavings = laborCostSaved + pricingRiskSaved;
 
@@ -116,11 +116,11 @@ export function LandingPageView() {
         </div>
 
         <nav style={{ display: "flex", alignItems: "center", gap: "24px", fontSize: "13.5px", fontWeight: 500 }}>
+          <a href="#demo-video" style={{ color: "var(--muted)", textDecoration: "none", fontWeight: 600 }}>🎬 Video Demo Trực Quan</a>
           <a href="#problem" style={{ color: "var(--muted)", textDecoration: "none" }}>Vấn Đề & Rủi Ro</a>
-          <a href="#sandbox" style={{ color: "var(--muted)", textDecoration: "none" }}>Thử Nghiệm Khớp Mã Kho</a>
-          <a href="#roi" style={{ color: "var(--muted)", textDecoration: "none" }}>Bảng Tính Tiết Kiệm (ROI)</a>
-          <a href="#security" style={{ color: "var(--muted)", textDecoration: "none" }}>Bảo Mật & Chống Gian Lận</a>
-          <a href="#pricing" style={{ color: "var(--muted)", textDecoration: "none" }}>Đăng Ký Dùng Thử</a>
+          <a href="#sandbox" style={{ color: "var(--muted)", textDecoration: "none" }}>Thử Nghiệm Khớp Mã</a>
+          <a href="#roi" style={{ color: "var(--muted)", textDecoration: "none" }}>Bảng Tính ROI</a>
+          <a href="#security" style={{ color: "var(--muted)", textDecoration: "none" }}>Bảo Mật SOX 404</a>
         </nav>
 
         <div style={{ display: "flex", gap: "10px" }}>
@@ -134,19 +134,19 @@ export function LandingPageView() {
       </header>
 
       {/* 2. Hero Section */}
-      <section style={{ maxWidth: "1200px", margin: "0 auto", padding: "64px 24px 48px", textAlign: "center" }}>
+      <section style={{ maxWidth: "1200px", margin: "0 auto", padding: "64px 24px 32px", textAlign: "center" }}>
         <div className="badge-clean badge-clean-success" style={{ marginBottom: "16px", padding: "6px 14px", fontSize: "12px" }}>
           🚀 Autonomous B2B Order Intake & Preflight Gatekeeper
         </div>
 
         <h1
           style={{
-            fontSize: "48px",
+            fontSize: "46px",
             fontWeight: 800,
             letterSpacing: "-0.03em",
             lineHeight: 1.15,
             margin: "0 auto 18px",
-            maxWidth: "900px",
+            maxWidth: "920px",
             color: "var(--ink)",
           }}
         >
@@ -168,11 +168,11 @@ export function LandingPageView() {
 
         <div style={{ display: "flex", justifyContent: "center", gap: "14px", marginBottom: "48px" }}>
           <a
-            href="#sandbox"
+            href="#demo-video"
             className="primary-button"
             style={{ fontSize: "15px", padding: "12px 24px", textDecoration: "none", fontWeight: 700 }}
           >
-            ⚡ Trải Nghiệm Thử Nghiệm Ngay
+            🎬 Xem Video Demo Trực Quan (3 Chế Độ)
           </a>
           <a
             href="/overview"
@@ -182,52 +182,183 @@ export function LandingPageView() {
             🖥️ Khám Phá Live Prototype
           </a>
         </div>
+      </section>
 
-        {/* Hero Interactive Visual Canvas */}
+      {/* 3. INTERACTIVE VISUAL DEMO & VIDEO SHOWCASE PLAYER */}
+      <section id="demo-video" style={{ maxWidth: "1160px", margin: "0 auto 64px", padding: "0 24px" }}>
         <div
           className="clean-card"
           style={{
-            maxWidth: "1000px",
-            margin: "0 auto",
             padding: "24px",
             background: "var(--paper)",
-            textAlign: "left",
-            boxShadow: "0 20px 40px rgba(0,0,0,0.06)",
+            borderRadius: "14px",
+            boxShadow: "0 20px 50px rgba(0,0,0,0.08)",
+            border: "1px solid var(--line)",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid var(--line)", paddingBottom: "12px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span className="live-dot" />
-              <strong style={{ fontSize: "13px" }}>Live Preflight Ingestion Pipeline (Simulated Stream)</strong>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", flexWrap: "wrap", gap: "12px" }}>
+            <div>
+              <p className="eyebrow" style={{ margin: "0 0 2px" }}>LIVE PRODUCT DEMO SHOWCASE</p>
+              <h2 style={{ fontSize: "20px", fontWeight: 800, margin: 0, letterSpacing: "-0.01em" }}>
+                Trải Nghiệm Quy Trình Vận Hành Thực Tế
+              </h2>
             </div>
-            <span className="code-snippet">Latency: 14.8ms | Accuracy: 100%</span>
+
+            {/* Interactive Mode Tabs */}
+            <div style={{ display: "flex", gap: "6px", background: "var(--canvas)", padding: "4px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+              <button
+                className={activeDemoTab === "intake" ? "primary-button" : "secondary-button"}
+                style={{ fontSize: "12.5px", padding: "6px 14px" }}
+                onClick={() => setActiveDemoTab("intake")}
+              >
+                📄 1. Bóc Tách & Đối Chiếu Song Song
+              </button>
+              <button
+                className={activeDemoTab === "approval" ? "primary-button" : "secondary-button"}
+                style={{ fontSize: "12.5px", padding: "6px 14px" }}
+                onClick={() => setActiveDemoTab("approval")}
+              >
+                📱 2. Duyệt 1 Chạm Telegram / Zalo
+              </button>
+              <button
+                className={activeDemoTab === "merkle" ? "primary-button" : "secondary-button"}
+                style={{ fontSize: "12.5px", padding: "6px 14px" }}
+                onClick={() => setActiveDemoTab("merkle")}
+              >
+                🔒 3. Chứng Thư Merkle & SAP Sync
+              </button>
+            </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "20px" }}>
-            <div style={{ background: "var(--canvas)", padding: "16px", borderRadius: "8px", border: "1px solid var(--line)" }}>
-              <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 700 }}>INGESTED DOCUMENT: PO-10428.PDF</span>
-              <div style={{ marginTop: "8px", fontSize: "13px", lineHeight: 1.6, fontFamily: "ui-monospace, monospace" }}>
-                <div><strong>Customer:</strong> Northstar Retail</div>
-                <div><strong>Declared Item:</strong> 10x dây mạng 3m bấm sẵn</div>
-                <div><strong>Declared Price:</strong> 65,000 VND/cái</div>
-                <div style={{ color: "var(--green)", marginTop: "6px" }}>✔ OCR Vision Confidence: 99.4%</div>
+          {/* Media Player Frame */}
+          <div
+            style={{
+              position: "relative",
+              borderRadius: "10px",
+              overflow: "hidden",
+              border: "1px solid var(--line)",
+              background: "#0d1117",
+              boxShadow: "inset 0 0 20px rgba(0,0,0,0.5)",
+            }}
+          >
+            {activeDemoTab === "intake" && (
+              <div>
+                <img
+                  src="/demo/hero-split-view.jpg"
+                  alt="Giao diện Bóc Tách Đối Chiếu Song Song PO Preflight"
+                  style={{ width: "100%", height: "auto", display: "block", aspectRatio: "16/9", objectFit: "cover" }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    background: "linear-gradient(to top, rgba(13,17,23,0.95), rgba(13,17,23,0.6), transparent)",
+                    padding: "24px",
+                    color: "#fff",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <span className="badge-clean badge-clean-success" style={{ marginBottom: "6px", display: "inline-block" }}>
+                        CHẶNG 1 & 2: INGESTION & DUAL-PANE OCR
+                      </span>
+                      <h3 style={{ margin: "4px 0", fontSize: "16px", color: "#fff" }}>
+                        Đối Chiếu Trực Quan File Scan Gốc vs Dữ Liệu Bóc Tách Đã Chuẩn Hóa
+                      </h3>
+                      <p style={{ margin: 0, fontSize: "13px", color: "#9ca3af", maxWidth: "800px" }}>
+                        Hệ thống tự động đọc file PDF/ảnh scan mờ, bóc tách từng dòng sản phẩm với độ chính xác 99.4%, kiểm tra tồn kho và định dạng giá tiền trong 14.8ms.
+                      </p>
+                    </div>
+                    <span className="code-snippet" style={{ color: "#34d399", background: "rgba(6,78,59,0.8)", borderColor: "#059669" }}>
+                      Confidence: 99.4% | Status: Ready
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div style={{ background: "var(--green-soft)", padding: "16px", borderRadius: "8px", border: "1px solid rgba(25,112,76,0.2)" }}>
-              <span style={{ fontSize: "11px", color: "var(--green)", fontWeight: 700 }}>4-TIER WATERFALL RESOLUTION</span>
-              <div style={{ marginTop: "8px", fontSize: "13px", lineHeight: 1.6 }}>
-                <div>Target SKU: <strong style={{ color: "var(--green)" }}>CAB-CAT6-3M</strong></div>
-                <div>Warehouse Stock: <strong>140 units (Available)</strong></div>
-                <div>Price Policy: <strong>Matched Catalog (0% Variance)</strong></div>
-                <div style={{ color: "var(--green)", fontWeight: 700, marginTop: "6px" }}>⚡ Status: READY FOR ERP DISPATCH</div>
+            {activeDemoTab === "approval" && (
+              <div>
+                <img
+                  src="/demo/mobile-telegram-approval.jpg"
+                  alt="Sơ đồ LangGraph & Phê duyệt 1 chạm trên Telegram"
+                  style={{ width: "100%", height: "auto", display: "block", aspectRatio: "16/9", objectFit: "cover" }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    background: "linear-gradient(to top, rgba(13,17,23,0.95), rgba(13,17,23,0.6), transparent)",
+                    padding: "24px",
+                    color: "#fff",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <span className="badge-clean badge-clean-warning" style={{ marginBottom: "6px", display: "inline-block" }}>
+                        CHẶNG 3 & 4: LANGGRAPH HITL & MOBILE BOT
+                      </span>
+                      <h3 style={{ margin: "4px 0", fontSize: "16px", color: "#fff" }}>
+                        Tự Động Bắn Cảnh Báo Lệch Giá / Hết Hàng Về Telegram & Zalo
+                      </h3>
+                      <p style={{ margin: 0, fontSize: "13px", color: "#9ca3af", maxWidth: "800px" }}>
+                        Luồng LangGraph tự động dừng lại khi phát hiện đơn hàng có rủi ro và gửi thông báo giàu thông tin về điện thoại. Quản lý bấm [Approve] hoặc [Reject] chỉ với 1 chạm.
+                      </p>
+                    </div>
+                    <span className="code-snippet" style={{ color: "#fbbf24", background: "rgba(120,53,15,0.8)", borderColor: "#d97706" }}>
+                      HITL Checkpoint: Paused (Waiting Approval)
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+
+            {activeDemoTab === "merkle" && (
+              <div>
+                <img
+                  src="/demo/merkle-sox-erp.jpg"
+                  alt="Chứng thư Merkle Tree SOX 404 & Đồng bộ SAP S/4HANA"
+                  style={{ width: "100%", height: "auto", display: "block", aspectRatio: "16/9", objectFit: "cover" }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    background: "linear-gradient(to top, rgba(13,17,23,0.95), rgba(13,17,23,0.6), transparent)",
+                    padding: "24px",
+                    color: "#fff",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <span className="badge-clean badge-clean-success" style={{ marginBottom: "6px", display: "inline-block" }}>
+                        CHẶNG 5 & 6: SOX 404 MERKLE ROOT & SAP OUTBOX
+                      </span>
+                      <h3 style={{ margin: "4px 0", fontSize: "16px", color: "#fff" }}>
+                        Niêm Phong Chữ Ký Mã Hóa SHA-256 & Đẩy Đơn Vào SAP S/4HANA Đúng Duy Nhất 1 Lần
+                      </h3>
+                      <p style={{ margin: 0, fontSize: "13px", color: "#9ca3af", maxWidth: "800px" }}>
+                        Toàn bộ nhật ký bóc tách và người duyệt được băm vào chuỗi Merkle Tree chống sửa đổi lén. Sổ cái Outbox đảm bảo đồng bộ vào ERP chính xác tuyệt đối 100%.
+                      </p>
+                    </div>
+                    <span className="code-snippet" style={{ color: "#34d399", background: "rgba(6,78,59,0.8)", borderColor: "#059669" }}>
+                      Merkle Hash: Verified | SAP: 100% Dispatched
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* 3. Enterprise ERP Integration Logos Bar */}
+      {/* 4. Enterprise ERP Integration Logos Bar */}
       <section style={{ borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", background: "var(--paper)", padding: "28px 24px", textAlign: "center" }}>
         <p style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", color: "var(--muted)", textTransform: "uppercase", margin: "0 0 16px" }}>
           TÍCH HỢP LIỀN MẠCH VỚI HỆ THỐNG ERP & KHO HIỆN CÓ
@@ -242,7 +373,7 @@ export function LandingPageView() {
         </div>
       </section>
 
-      {/* 4. The Problem vs Solution (Side-by-Side Comparison) */}
+      {/* 5. The Problem vs Solution (Side-by-Side Comparison) */}
       <section id="problem" style={{ maxWidth: "1200px", margin: "0 auto", padding: "64px 24px" }}>
         <div style={{ textAlign: "center", marginBottom: "40px" }}>
           <p className="eyebrow">SO SÁNH TRỰC QUAN</p>
@@ -278,7 +409,7 @@ export function LandingPageView() {
             <h3 style={{ fontSize: "18px", margin: "0 0 12px", color: "var(--green)" }}>Tốc Độ & Chính Xác 100%</h3>
             <ul style={{ paddingLeft: "20px", fontSize: "13.5px", lineHeight: 1.8, color: "var(--ink)", margin: 0 }}>
               <li>Xử lý hoàn tất trong <strong>&lt; 30 giây</strong> với độ chính xác OCR 99.4%.</li>
-              <li><strong>4-Tier RAG Waterfall</strong> tự dịch tên lóng sang đúng mã SKU kho trong &lt;15ms.</li>
+              <li><strong>4 Lớp Khớp Mã Kho</strong> tự dịch tên lóng sang đúng mã SKU kho trong &lt;15ms.</li>
               <li>Kiểm toán số học tự động (Số lượng x Đơn giá = Tổng tiền) chống gian lận.</li>
               <li>Chặn đứng đơn hàng nếu tồn kho không khả dụng hoặc phát hiện trùng lặp.</li>
               <li>Quản lý duyệt 1 chạm trên <strong>Telegram / Zalo</strong> khi đang đi công tác.</li>
@@ -287,7 +418,7 @@ export function LandingPageView() {
         </div>
       </section>
 
-      {/* 5. Live Interactive SKU Matching Sandbox Widget */}
+      {/* 6. Live Interactive SKU Matching Sandbox Widget */}
       <section id="sandbox" style={{ background: "var(--paper)", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "64px 24px" }}>
         <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: "36px" }}>
@@ -357,7 +488,7 @@ export function LandingPageView() {
         </div>
       </section>
 
-      {/* 6. Interactive ROI Calculator Widget */}
+      {/* 7. Interactive ROI Calculator Widget */}
       <section id="roi" style={{ maxWidth: "1000px", margin: "0 auto", padding: "64px 24px" }}>
         <div style={{ textAlign: "center", marginBottom: "36px" }}>
           <p className="eyebrow">HIỆU QUẢ TÀI CHÍNH</p>
@@ -439,7 +570,7 @@ export function LandingPageView() {
         </div>
       </section>
 
-      {/* 7. Enterprise Security & SOX 404 Merkle Hash Chain */}
+      {/* 8. Enterprise Security & SOX 404 Merkle Hash Chain */}
       <section id="security" style={{ background: "var(--paper)", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "64px 24px" }}>
         <div style={{ maxWidth: "1000px", margin: "0 auto", textAlign: "center" }}>
           <p className="eyebrow">BẢO MẬT CẤP DOANH NGHIỆP</p>
@@ -473,7 +604,7 @@ export function LandingPageView() {
         </div>
       </section>
 
-      {/* 8. Pricing & Lead Capture Form */}
+      {/* 9. Pricing & Lead Capture Form */}
       <section id="pilot" style={{ maxWidth: "900px", margin: "0 auto", padding: "64px 24px" }}>
         <div className="clean-card" style={{ padding: "36px", background: "var(--paper)", boxShadow: "0 10px 30px rgba(0,0,0,0.05)" }}>
           <div style={{ textAlign: "center", marginBottom: "28px" }}>
@@ -564,7 +695,7 @@ export function LandingPageView() {
         </div>
       </section>
 
-      {/* 9. Footer */}
+      {/* 10. Footer */}
       <footer style={{ borderTop: "1px solid var(--line)", background: "var(--paper)", padding: "32px 24px", fontSize: "12.5px", color: "var(--muted)" }}>
         <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
           <div>
@@ -574,9 +705,10 @@ export function LandingPageView() {
 
           <div style={{ display: "flex", gap: "20px" }}>
             <a href="/overview" style={{ color: "var(--muted)", textDecoration: "none" }}>Web App</a>
-            <a href="#sandbox" style={{ color: "var(--muted)", textDecoration: "none" }}>RAG Tester</a>
-            <a href="#roi" style={{ color: "var(--muted)", textDecoration: "none" }}>ROI Calculator</a>
-            <a href="/audit-certificate" style={{ color: "var(--muted)", textDecoration: "none" }}>Compliance Certificate</a>
+            <a href="#demo-video" style={{ color: "var(--muted)", textDecoration: "none" }}>Video Demo</a>
+            <a href="#sandbox" style={{ color: "var(--muted)", textDecoration: "none" }}>Khớp Mã Kho</a>
+            <a href="#roi" style={{ color: "var(--muted)", textDecoration: "none" }}>Tính ROI</a>
+            <a href="/audit-certificate" style={{ color: "var(--muted)", textDecoration: "none" }}>Chứng Thư SOX 404</a>
           </div>
         </div>
       </footer>
