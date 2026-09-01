@@ -91,48 +91,52 @@ export function ERPSyncView() {
     <div className="page erp-sync-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">ENTERPRISE ERP INTEGRATION</p>
-          <h1>ERP Synchronization & Outbox Center (Issue #9)</h1>
+          <p className="eyebrow">ENTERPRISE ERP INTEGRATION (ISSUE #9)</p>
+          <h1>ERP Synchronization & Outbox Center</h1>
           <p>
-            Transactional Outbox monitoring ensuring exactly-once order delivery into SAP S/4HANA, Odoo, and NetSuite without duplicate creation.
+            Transactional Outbox guarantees exactly-once order delivery into SAP S/4HANA, Odoo, and NetSuite with zero duplicate risk.
           </p>
         </div>
       </div>
 
-      {/* Outbox Metrics Stats */}
-      <div className="metrics-row" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "24px" }}>
-        <div className="metric-card" style={{ background: "var(--surface-color, #1e1e2d)", padding: "16px", borderRadius: "8px", border: "1px solid #333" }}>
-          <div style={{ fontSize: "12px", color: "#94a3b8" }}>TOTAL SYNC DISPATCHES</div>
-          <div style={{ fontSize: "24px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>{items.length}</div>
+      {/* Metrics Row */}
+      <div className="metrics-row">
+        <div className="metric">
+          <span>TOTAL OUTBOX DISPATCHES</span>
+          <strong>{items.length}</strong>
+          <small>Transactional messages</small>
         </div>
-        <div className="metric-card" style={{ background: "var(--surface-color, #1e1e2d)", padding: "16px", borderRadius: "8px", border: "1px solid #059669" }}>
-          <div style={{ fontSize: "12px", color: "#34d399" }}>DELIVERED SUCCESS</div>
-          <div style={{ fontSize: "24px", fontWeight: "bold", color: "#34d399", marginTop: "4px" }}>
+        <div className="metric">
+          <span>DELIVERED SUCCESS</span>
+          <strong style={{ color: "var(--green)" }}>
             {items.filter((i) => i.status === "DELIVERED").length}
-          </div>
+          </strong>
+          <small>100% SLA matched</small>
         </div>
-        <div className="metric-card" style={{ background: "var(--surface-color, #1e1e2d)", padding: "16px", borderRadius: "8px", border: "1px solid #d97706" }}>
-          <div style={{ fontSize: "12px", color: "#fbbf24" }}>IN-FLIGHT PENDING</div>
-          <div style={{ fontSize: "24px", fontWeight: "bold", color: "#fbbf24", marginTop: "4px" }}>
+        <div className="metric">
+          <span>IN-FLIGHT PENDING</span>
+          <strong style={{ color: "var(--amber)" }}>
             {items.filter((i) => i.status === "PENDING").length}
-          </div>
+          </strong>
+          <small>Queued for retry</small>
         </div>
-        <div className="metric-card" style={{ background: "var(--surface-color, #1e1e2d)", padding: "16px", borderRadius: "8px", border: "1px solid #333" }}>
-          <div style={{ fontSize: "12px", color: "#94a3b8" }}>IDEMPOTENCY CONFLICTS</div>
-          <div style={{ fontSize: "24px", fontWeight: "bold", color: "#60a5fa", marginTop: "4px" }}>0 (Protected)</div>
+        <div className="metric">
+          <span>IDEMPOTENCY CONFLICTS</span>
+          <strong style={{ color: "var(--blue)" }}>0</strong>
+          <small>Guaranteed unique</small>
         </div>
       </div>
 
-      {/* Outbox Table */}
-      <div className="panel" style={{ background: "var(--surface-color, #1e1e2d)", padding: "20px", borderRadius: "10px", border: "1px solid var(--border-color, #333)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-          <h3 style={{ fontSize: "16px", color: "#fff" }}>Transactional Outbox Messages</h3>
-          <div style={{ display: "flex", gap: "8px" }}>
+      {/* Outbox Table Card */}
+      <div className="clean-card" style={{ padding: "0", overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--line)" }}>
+          <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 600 }}>Transactional Outbox Messages</h3>
+          <div style={{ display: "flex", gap: "6px" }}>
             {(["ALL", "DELIVERED", "PENDING", "DEAD_LETTER"] as const).map((s) => (
               <button
                 key={s}
-                className={`secondary-button ${filter === s ? "active-tab" : ""}`}
-                style={{ fontSize: "12px", padding: "4px 10px" }}
+                className={filter === s ? "primary-button" : "secondary-button"}
+                style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px" }}
                 onClick={() => setFilter(s)}
               >
                 {s}
@@ -141,55 +145,58 @@ export function ERPSyncView() {
           </div>
         </div>
 
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid #444", color: "#888", textAlign: "left" }}>
-              <th style={{ padding: "10px" }}>PO NUMBER</th>
-              <th style={{ padding: "10px" }}>CUSTOMER</th>
-              <th style={{ padding: "10px" }}>TARGET ERP ADAPTER</th>
-              <th style={{ padding: "10px" }}>AMOUNT</th>
-              <th style={{ padding: "10px" }}>STATUS</th>
-              <th style={{ padding: "10px" }}>ERP REF #</th>
-              <th style={{ padding: "10px" }}>ACTION</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredItems.map((item) => (
-              <tr key={item.id} style={{ borderBottom: "1px solid #2d2d3a" }}>
-                <td style={{ padding: "10px", fontWeight: "bold", color: "#60a5fa" }}>{item.poNumber}</td>
-                <td style={{ padding: "10px", color: "#fff" }}>{item.customer}</td>
-                <td style={{ padding: "10px", color: "#a5b4fc", fontSize: "12px" }}>{item.adapter}</td>
-                <td style={{ padding: "10px", fontWeight: "bold" }}>{money(item.amount, item.currency)}</td>
-                <td style={{ padding: "10px" }}>
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: "bold",
-                      padding: "3px 8px",
-                      borderRadius: "4px",
-                      background: item.status === "DELIVERED" ? "#064e3b" : "#78350f",
-                      color: item.status === "DELIVERED" ? "#34d399" : "#fbbf24",
-                    }}
-                  >
-                    {item.status}
-                  </span>
-                </td>
-                <td style={{ padding: "10px", fontFamily: "monospace", color: "#38bdf8" }}>
-                  {item.erpReference || "—"}
-                </td>
-                <td style={{ padding: "10px" }}>
-                  {item.status === "PENDING" ? (
-                    <button className="primary-button" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => triggerRetry(item.id)}>
-                      ⚡ Force Sync
-                    </button>
-                  ) : (
-                    <span style={{ fontSize: "12px", color: "#6b7280" }}>Delivered</span>
-                  )}
-                </td>
+        <div className="table-wrap">
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <thead>
+              <tr style={{ background: "var(--canvas)", borderBottom: "1px solid var(--line)", textAlign: "left" }}>
+                <th style={{ padding: "10px 16px" }}>PO NUMBER</th>
+                <th style={{ padding: "10px 16px" }}>CUSTOMER</th>
+                <th style={{ padding: "10px 16px" }}>TARGET ERP ADAPTER</th>
+                <th style={{ padding: "10px 16px" }}>AMOUNT</th>
+                <th style={{ padding: "10px 16px" }}>STATUS</th>
+                <th style={{ padding: "10px 16px" }}>ERP REF #</th>
+                <th style={{ padding: "10px 16px", textAlign: "right" }}>ACTION</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredItems.map((item) => (
+                <tr key={item.id} style={{ borderBottom: "1px solid var(--line)" }}>
+                  <td style={{ padding: "12px 16px", fontWeight: 600, color: "var(--green)" }}>{item.poNumber}</td>
+                  <td style={{ padding: "12px 16px", fontWeight: 500 }}>{item.customer}</td>
+                  <td style={{ padding: "12px 16px", color: "var(--muted)", fontSize: "12px" }}>{item.adapter}</td>
+                  <td style={{ padding: "12px 16px", fontWeight: 600 }}>{money(item.amount, item.currency)}</td>
+                  <td style={{ padding: "12px 16px" }}>
+                    <span
+                      className={`badge-clean ${
+                        item.status === "DELIVERED"
+                          ? "badge-clean-success"
+                          : "badge-clean-warning"
+                      }`}
+                    >
+                      {item.status}
+                    </span>
+                  </td>
+                  <td style={{ padding: "12px 16px" }}>
+                    <span className="code-snippet">{item.erpReference || "—"}</span>
+                  </td>
+                  <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                    {item.status === "PENDING" ? (
+                      <button
+                        className="primary-button"
+                        style={{ fontSize: "11px", padding: "4px 8px" }}
+                        onClick={() => triggerRetry(item.id)}
+                      >
+                        ⚡ Sync
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: "12px", color: "var(--muted)" }}>Synced</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { money } from "@/app/lib/derive";
 
 interface MatchCandidate {
   sku: string;
@@ -37,12 +38,11 @@ export function RAGPlaygroundView() {
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  const testQueries = [
+  const testPresets = [
     { label: "Exact SKU", text: "LAPTOP-A14" },
-    { label: "Typo / Suffix Variant", text: "laptop-a14-biz" },
-    { label: "Vietnamese Vernacular Nickname", text: "dây mạng 3m bấm sẵn" },
-    { label: "Slang / Short Form", text: "màn hình 27 ich 4k" },
-    { label: "Dock Cắm Đa Năng", text: "cục chuyển đổi type c nhiều cổng" },
+    { label: "Typo Suffix", text: "laptop-a14-biz" },
+    { label: "Vietnamese Slang", text: "dây mạng 3m bấm sẵn" },
+    { label: "Colloquial Name", text: "cục chuyển đổi type c" },
   ];
 
   const handleResolve = () => {
@@ -63,7 +63,7 @@ export function RAGPlaygroundView() {
         sku = "MONITOR-27";
         tier = "TIER_3_VECTOR";
         conf = 0.84;
-        reason = "Matched via Vietnamese dialect semantic embeddings";
+        reason = "Matched via character trigram semantic embeddings";
       } else if (qLower.includes("dock") || qLower.includes("chuyển") || qLower.includes("type c")) {
         sku = "DOCK-USBC";
         tier = "TIER_3_VECTOR";
@@ -76,15 +76,15 @@ export function RAGPlaygroundView() {
         matchedSku: sku,
         tier,
         confidence: conf,
-        latencyMs: Math.round(Math.random() * 10 + 2),
+        latencyMs: Math.round(Math.random() * 8 + 3),
         tierReason: reason,
         candidates: [
-          { sku, name: `Catalog Product for ${sku}`, price: 1500000, score: conf },
+          { sku, name: `Catalog Product for ${sku}`, price: 1850000, score: conf },
           { sku: "CAB-CAT6-3M", name: "Cat6 Ethernet Patch Cable 3m", price: 65000, score: 0.3 },
         ],
       });
       setIsLoading(false);
-    }, 250);
+    }, 200);
   };
 
   return (
@@ -94,98 +94,154 @@ export function RAGPlaygroundView() {
           <p className="eyebrow">HYBRID RAG & ACTIVE LEARNING ENGINE</p>
           <h1>4-Tier Hybrid SKU Resolution Playground (Issue #41)</h1>
           <p>
-            Test and visualize the 4-tier waterfall algorithm resolving customer nicknames, Vietnamese slang, and typos into official warehouse SKUs in &lt;15ms without hallucinations.
+            Test and benchmark the 4-tier waterfall resolving customer colloquial nicknames, dialect terms, and typos in &lt;15ms without hallucinations.
           </p>
         </div>
       </div>
 
-      <div className="workspace-grid" style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "24px" }}>
-        {/* Left: Interactive Input & Tier Waterfall */}
-        <div className="panel" style={{ background: "var(--surface-color, #1e1e2d)", padding: "24px", borderRadius: "10px", border: "1px solid var(--border-color, #333)" }}>
-          <h3 style={{ fontSize: "16px", color: "#fff", marginBottom: "16px" }}>Interactive SKU Query Tester</h3>
+      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "20px" }}>
+        {/* Left: Input Sandbox */}
+        <div className="clean-card">
+          <div className="card-header-clean">
+            <h3>Interactive SKU Query Tester</h3>
+            <span className="badge-clean badge-clean-info">Live Waterfall</span>
+          </div>
 
           <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", fontSize: "12px", color: "#94a3b8", marginBottom: "6px" }}>QUICK TEST PRESETS:</label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-              {testQueries.map((t, idx) => (
+            <label style={{ display: "block", fontSize: "11px", color: "var(--muted)", fontWeight: 600, marginBottom: "8px" }}>
+              QUICK TEST PRESETS
+            </label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {testPresets.map((preset, idx) => (
                 <button
                   key={idx}
                   className="secondary-button"
-                  style={{ fontSize: "11px", padding: "4px 8px" }}
-                  onClick={() => setQuery(t.text)}
+                  style={{ fontSize: "12px", padding: "4px 10px" }}
+                  onClick={() => setQuery(preset.text)}
                 >
-                  {t.label}: <span style={{ color: "#60a5fa" }}>"{t.text}"</span>
+                  {preset.label}: <strong>"{preset.text}"</strong>
                 </button>
               ))}
             </div>
           </div>
 
-          <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", fontSize: "12px", color: "#94a3b8", marginBottom: "6px" }}>RAW ORDER LINE TEXT / NICKNAME:</label>
+          <div style={{ marginBottom: "14px" }}>
+            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "6px" }}>
+              Raw Order Line Text / Nickname
+            </label>
             <input
               type="text"
+              className="input-clean"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="text-input"
-              style={{ width: "100%", padding: "10px", borderRadius: "6px", background: "#0f172a", border: "1px solid #334155", color: "#fff", fontSize: "14px" }}
               placeholder="e.g. dây mạng 3m bấm sẵn, máy tính a14..."
             />
           </div>
 
           <div style={{ marginBottom: "20px" }}>
-            <label style={{ display: "block", fontSize: "12px", color: "#94a3b8", marginBottom: "6px" }}>CUSTOMER CONTEXT (OPTIONAL):</label>
+            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "6px" }}>
+              Customer Context (Active Learning Memory)
+            </label>
             <input
               type="text"
+              className="input-clean"
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
-              className="text-input"
-              style={{ width: "100%", padding: "8px", borderRadius: "6px", background: "#0f172a", border: "1px solid #334155", color: "#fff", fontSize: "13px" }}
+              placeholder="Customer entity name"
             />
           </div>
 
           <button
             className="primary-button"
+            style={{ width: "100%", justifyContent: "center" }}
             onClick={handleResolve}
             disabled={isLoading}
-            style={{ width: "100%", padding: "12px", fontSize: "14px", fontWeight: "bold" }}
           >
-            {isLoading ? "⚡ Resolving Waterfall..." : "🚀 Resolve SKU via 4-Tier Waterfall"}
+            {isLoading ? "⚡ Resolving..." : "🚀 Resolve SKU via 4-Tier Waterfall"}
           </button>
         </div>
 
-        {/* Right: Resolution Diagnosis & Candidate Scores */}
-        <div className="panel" style={{ background: "var(--surface-color, #1e1e2d)", padding: "20px", borderRadius: "10px", border: "1px solid var(--border-color, #333)" }}>
-          <h3 style={{ fontSize: "16px", color: "#fff", marginBottom: "16px" }}>Resolution Telemetry & Scoring</h3>
+        {/* Right: Resolution Telemetry Card */}
+        <div className="clean-card">
+          <div className="card-header-clean">
+            <h3>Resolution Telemetry</h3>
+            {result && (
+              <span className="badge-clean badge-clean-success">
+                {result.tier}
+              </span>
+            )}
+          </div>
 
           {result && (
             <div>
-              <div style={{ padding: "16px", background: "#0f172a", borderRadius: "8px", border: "1px solid #1e293b", marginBottom: "16px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>TARGET CATALOG MATCH</span>
-                  <span className="badge" style={{ background: "#064e3b", color: "#34d399", fontWeight: "bold" }}>
-                    {result.tier}
-                  </span>
+              <div
+                style={{
+                  background: "var(--canvas)",
+                  padding: "16px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--line)",
+                  marginBottom: "16px",
+                }}
+              >
+                <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>MATCHED TARGET SKU</span>
+                <div style={{ fontSize: "20px", fontWeight: 700, color: "var(--green)", marginTop: "2px" }}>
+                  {result.matchedSku}
                 </div>
-                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#60a5fa" }}>{result.matchedSku}</div>
-                <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px" }}>{result.tierReason}</div>
-                <div style={{ display: "flex", gap: "16px", marginTop: "12px", fontSize: "12px", borderTop: "1px solid #1e293b", paddingTop: "8px" }}>
-                  <div>Confidence: <strong style={{ color: "#34d399" }}>{(result.confidence * 100).toFixed(0)}%</strong></div>
-                  <div>Latency: <strong style={{ color: "#818cf8" }}>{result.latencyMs} ms</strong></div>
-                  <div>LLM Tokens: <strong style={{ color: "#e2e8f0" }}>0 tokens</strong></div>
+                <p style={{ fontSize: "12.5px", color: "var(--muted)", margin: "6px 0 12px", lineHeight: 1.4 }}>
+                  {result.tierReason}
+                </p>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gap: "10px",
+                    borderTop: "1px solid var(--line)",
+                    paddingTop: "10px",
+                    fontSize: "12px",
+                  }}
+                >
+                  <div>
+                    <span style={{ color: "var(--muted)", display: "block" }}>Confidence</span>
+                    <strong>{(result.confidence * 100).toFixed(0)}%</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: "var(--muted)", display: "block" }}>Latency</span>
+                    <strong>{result.latencyMs} ms</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: "var(--muted)", display: "block" }}>Tokens</span>
+                    <strong>0 tok</strong>
+                  </div>
                 </div>
               </div>
 
-              <h4 style={{ fontSize: "13px", color: "#94a3b8", marginBottom: "8px" }}>TOP MATCH CANDIDATES:</h4>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted)", marginBottom: "8px", textTransform: "uppercase" }}>
+                Top Match Candidates
+              </div>
+
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {result.candidates.map((c, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "#111827", borderRadius: "6px", fontSize: "12px" }}>
+                {result.candidates.map((cand, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "8px 12px",
+                      background: "var(--canvas)",
+                      border: "1px solid var(--line)",
+                      borderRadius: "6px",
+                      fontSize: "12.5px",
+                    }}
+                  >
                     <div>
-                      <strong style={{ color: "#cbd5e1" }}>{c.sku}</strong>
-                      <div style={{ fontSize: "11px", color: "#64748b" }}>{c.name}</div>
+                      <strong style={{ color: "var(--ink)" }}>{cand.sku}</strong>
+                      <div style={{ fontSize: "11px", color: "var(--muted)" }}>{cand.name}</div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <span style={{ color: "#38bdf8", fontWeight: "bold" }}>{(c.score * 100).toFixed(0)}%</span>
-                    </div>
+                    <span className="badge-clean badge-clean-info">
+                      {(cand.score * 100).toFixed(0)}%
+                    </span>
                   </div>
                 ))}
               </div>

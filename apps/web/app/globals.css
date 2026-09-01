@@ -54,8 +54,11 @@ body {
   margin: 0;
   background: var(--canvas);
   color: var(--ink);
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
+  font-size: 13.5px;
+  letter-spacing: -0.012em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
@@ -1608,3 +1611,125 @@ html.dark .decision-bar {
     padding: 23px;
   }
 }
+
+/* ==========================================================================
+   ENTERPRISE ELITE DESIGN SYSTEM (MIT/STANFORD HCI STANDARD)
+   ========================================================================== */
+
+.nav-section-label {
+  color: #728a80;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 14px 10px 4px;
+  text-transform: uppercase;
+}
+
+.clean-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 12px rgba(20, 35, 31, 0.03);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.clean-card:hover {
+  border-color: var(--line-strong);
+}
+
+.card-header-clean {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.card-header-clean h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.input-clean {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 13.5px;
+  transition: all 0.15s ease;
+}
+
+.input-clean:focus {
+  outline: none;
+  border-color: var(--green);
+  background: var(--paper);
+  box-shadow: 0 0 0 3px var(--green-soft);
+}
+
+.badge-clean {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.badge-clean-success {
+  background: var(--green-soft);
+  color: var(--green);
+  border: 1px solid rgba(25, 112, 76, 0.2);
+}
+
+.badge-clean-warning {
+  background: var(--amber-soft);
+  color: var(--amber);
+  border: 1px solid rgba(167, 100, 24, 0.2);
+}
+
+.badge-clean-info {
+  background: var(--blue-soft);
+  color: var(--blue);
+  border: 1px solid rgba(56, 107, 142, 0.2);
+}
+
+.dag-node {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.dag-node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+  border-color: var(--green);
+}
+
+.dag-node.active-step {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px var(--green-soft);
+}
+
+.code-snippet {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
