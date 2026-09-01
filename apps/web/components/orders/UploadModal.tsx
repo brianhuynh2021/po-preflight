@@ -5,7 +5,7 @@ export function UploadModal({
   onFile,
 }: {
   onClose: () => void;
-  onFile: (fileName: string) => void;
+  onFile: (fileName: string, file?: File) => void;
 }) {
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
@@ -31,10 +31,11 @@ export function UploadModal({
             accept=".pdf,.csv,.json,.txt,.xlsx,.xls,.xlsm"
             onChange={(event) => {
               if (event.target.files?.length) {
-                onFile(event.target.files[0].name);
+                onFile(event.target.files[0].name, event.target.files[0]);
               }
             }}
           />
+
           <span className="upload-symbol">＋</span>
           <strong>Drop a file here or choose a file</strong>
           <small>PDF, Excel (.xlsx/.xls), CSV, JSON, or TXT · Maximum 20 MB</small>

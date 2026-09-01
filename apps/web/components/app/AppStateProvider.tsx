@@ -46,6 +46,16 @@ const initialActivity: ActivityEvent[] = [
   },
 ];
 
+function mapBackendStatusToFE(backendStatus: string): OrderStatus {
+  const s = (backendStatus || "").toLowerCase();
+  if (s.includes("ready") || s === "ready_for_approval") return "Ready";
+  if (s.includes("block")) return "Blocked";
+  if (s.includes("approv")) return "Approved";
+  if (s.includes("change") || s === "needs_changes") return "Changes requested";
+  if (s.includes("reject")) return "Rejected";
+  return "Review required";
+}
+
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<PurchaseOrder[]>(seedOrders);
   const [activity, setActivity] = useState<ActivityEvent[]>(initialActivity);
@@ -55,12 +65,69 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     try {
       const liveData = await api.orders.list();
       if (Array.isArray(liveData) && liveData.length > 0) {
+        const liveOrders: PurchaseOrder[] = await Promise.all(
+          liveData.map(async (sum) => {
+            try {
+              const detail = await api.orders.get(sum.id);
+              return {
+                id: detail.po_number || sum.po_number,
+                customer: detail.customer || sum.customer,
+                submittedAt: detail.created_at || sum.created_at || new Date().toISOString(),
+                sourceFile: detail.source_file || `${sum.po_number}.json`,
+                value: Number(detail.total ?? sum.total ?? 0),
+                currency: detail.currency || sum.currency || "VND",
+                status: mapBackendStatusToFE(detail.status || sum.status),
+                findings: (detail.findings || []).map((f) => ({
+                  code: (f.code as FindingCode) || "PRICE_MISMATCH",
+                  severity: f.severity === "error" ? "Error" : "Warning",
+                  title: FINDING_TITLE[f.code as FindingCode] || f.message || "Phát hiện bất thường",
+                  detail: f.message || "",
+                  evidence: f.evidence || "",
+                  sku: f.sku || null,
+                })),
+                lines: (detail.items || []).map((it) => ({
+                  sku: it.sku,
+                  product: it.name || it.sku,
+                  quantity: it.quantity,
+                  available: it.stock_available ?? 100,
+                  unitPrice: Number(it.unit_price),
+                  catalogPrice: Number(it.catalog_unit_price ?? it.unit_price),
+                })),
+                owner: "Live API Gateway",
+                timeline: (detail.decisions || []).map((d) => ({
+                  title: d.decision === "approved" ? "Order approved" : "Decision recorded",
+                  detail: d.note || `Decision: ${d.decision} by ${d.actor}`,
+                  time: d.created_at || "Just now",
+                  type: "human" as const,
+                })),
+              };
+            } catch {
+              return {
+                id: sum.po_number,
+                customer: sum.customer,
+                submittedAt: sum.created_at || new Date().toISOString(),
+                sourceFile: `${sum.po_number}.json`,
+                value: Number(sum.total),
+                currency: sum.currency || "VND",
+                status: mapBackendStatusToFE(sum.status),
+                findings: [],
+                lines: [],
+                owner: "Live API Gateway",
+                timeline: [],
+              };
+            }
+          }),
+        );
+        setOrders(liveOrders);
+        setIsLiveConnected(true);
+      } else {
         setIsLiveConnected(true);
       }
     } catch {
       setIsLiveConnected(false);
     }
   }, []);
+
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

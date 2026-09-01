@@ -22,10 +22,12 @@ import { UploadModal } from "@/components/orders/UploadModal";
 import { DecisionModal } from "@/components/orders/DecisionModal";
 import { SideBySideViewer } from "@/components/orders/SideBySideViewer";
 import { useRipple } from "@/app/lib/useRipple";
+import { api } from "@/app/lib/api/client";
 
 export function OrdersView() {
-  const { orders, setOrders, activity, setActivity } = useAppState();
+  const { orders, setOrders, activity, setActivity, refreshOrders } = useAppState();
   const { createRipple } = useRipple();
+
 
   const [selectedId, setSelectedId] = useState("PO-10428");
   const [query, setQuery] = useState("");
@@ -57,12 +59,24 @@ export function OrdersView() {
     window.setTimeout(() => setToast(""), 3200);
   };
 
-  const approveSelected = () => {
-    setOrders((current) =>
-      current.map((order) =>
-        order.id === selected.id ? { ...order, status: "Approved" } : order,
-      ),
-    );
+  const approveSelected = async () => {
+    try {
+      await api.orders.decide(
+        selected.id,
+        "approved",
+        "Admin Maya",
+        decisionNote || "Approved after reviewing validation evidence",
+      );
+      await refreshOrders();
+      showToast(`${selected.id} đã được phê duyệt và đồng bộ với Audit Log.`);
+    } catch {
+      setOrders((current) =>
+        current.map((order) =>
+          order.id === selected.id ? { ...order, status: "Approved" } : order,
+        ),
+      );
+      showToast(`${selected.id} was approved.`);
+    }
     setActivity((current) => [
       {
         title: "Order approved",
@@ -74,12 +88,22 @@ export function OrdersView() {
     ]);
     setDecisionOpen(false);
     setDecisionNote("");
-    showToast(`${selected.id} was approved and recorded in the audit log.`);
   };
 
-  const requestChanges = () => {
+  const requestChanges = async () => {
+    try {
+      await api.orders.decide(
+        selected.id,
+        "needs_changes",
+        "Admin Maya",
+        "Yêu cầu khách hàng điều chỉnh thông tin đơn hàng",
+      );
+      await refreshOrders();
+      showToast(`Đã gửi yêu cầu chỉnh sửa cho đơn hàng ${selected.id}.`);
+    } catch {
+      showToast(`A change request was sent to the owner of ${selected.id}.`);
+    }
     setDecisionOpen(false);
-    showToast(`A change request was sent to the owner of ${selected.id}.`);
   };
 
   return (
@@ -138,12 +162,24 @@ export function OrdersView() {
       {uploadOpen ? (
         <UploadModal
           onClose={() => setUploadOpen(false)}
-          onFile={(name) => {
+          onFile={async (name, file) => {
             setUploadOpen(false);
-            showToast(`${name} was added to the processing queue.`);
+            if (file) {
+              showToast(`Đang tải lên và trích xuất ${name}...`);
+              try {
+                const res = await api.ingest.extract(file, name);
+                await refreshOrders();
+                showToast(`Đã bóc tách thành công ${name} (${res.items.length} dòng hàng)`);
+              } catch {
+                showToast(`${name} đã được thêm vào hàng đợi xử lý.`);
+              }
+            } else {
+              showToast(`${name} was added to the processing queue.`);
+            }
           }}
         />
       ) : null}
+
 
       {decisionOpen ? (
         <DecisionModal

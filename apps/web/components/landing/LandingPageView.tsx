@@ -292,13 +292,13 @@ export function LandingPageView() {
           TƯƠNG THÍCH VÀ ĐỒNG BỘ 2 CHIỀU VỚI CÁC NỀN TẢNG ERP DOANH NGHIỆP TẠI VIỆT NAM
         </p>
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "36px", flexWrap: "wrap" }}>
-          <div style={{ fontWeight: 800, fontSize: "16px", color: "#1e293b", padding: "6px 14px", background: "#f8fafc", borderRadius: "6px", border: "1px solid #e2e8f0" }}>SAP S/4HANA</div>
-          <div style={{ fontWeight: 800, fontSize: "16px", color: "#1e293b", padding: "6px 14px", background: "#f8fafc", borderRadius: "6px", border: "1px solid #e2e8f0" }}>Odoo Enterprise</div>
+          <div style={{ fontWeight: 800, fontSize: "16px", color: "#1e293b", padding: "6px 14px", background: "#f8fafc", borderRadius: "6px", border: "1px solid #e2e8f0" }}>SAP S/4HANA (OData/BAPI)</div>
+          <div style={{ fontWeight: 800, fontSize: "16px", color: "#1e293b", padding: "6px 14px", background: "#f8fafc", borderRadius: "6px", border: "1px solid #e2e8f0" }}>Odoo Enterprise (XML-RPC)</div>
           <div style={{ fontWeight: 800, fontSize: "16px", color: "#1e293b", padding: "6px 14px", background: "#f8fafc", borderRadius: "6px", border: "1px solid #e2e8f0" }}>MISA AMIS ERP</div>
-          <div style={{ fontWeight: 800, fontSize: "16px", color: "#1e293b", padding: "6px 14px", background: "#f8fafc", borderRadius: "6px", border: "1px solid #e2e8f0" }}>Bravo Software</div>
-          <div style={{ fontWeight: 800, fontSize: "16px", color: "#1e293b", padding: "6px 14px", background: "#f8fafc", borderRadius: "6px", border: "1px solid #e2e8f0" }}>FAST Financial</div>
-          <div style={{ fontWeight: 800, fontSize: "16px", color: "#1e293b", padding: "6px 14px", background: "#f8fafc", borderRadius: "6px", border: "1px solid #e2e8f0" }}>Excel / Google Sheets</div>
+          <div style={{ fontWeight: 800, fontSize: "16px", color: "#1e293b", padding: "6px 14px", background: "#f8fafc", borderRadius: "6px", border: "1px solid #e2e8f0" }}>REST / Webhook API</div>
+          <div style={{ fontWeight: 800, fontSize: "16px", color: "#1e293b", padding: "6px 14px", background: "#f8fafc", borderRadius: "6px", border: "1px solid #e2e8f0" }}>Excel / CSV Bảng tính</div>
         </div>
+
       </section>
 
       {/* 4. AUTO-PLAYING INTERACTIVE VIDEO DEMO SHOWCASE PLAYER */}
@@ -1130,11 +1130,12 @@ export function LandingPageView() {
             <ul style={{ listStyle: "none", padding: 0, margin: "0 0 24px", fontSize: "13px", lineHeight: 2 }}>
               <li>✔ Xử lý tối đa <strong>3.000 đơn PO / tháng</strong></li>
               <li>✔ Toàn bộ tính năng gói Startup</li>
-              <li>✔ Đồng bộ 2 chiều vào SAP / Odoo / MISA / Bravo</li>
+              <li>✔ Kiến trúc sẵn sàng kết nối SAP / Odoo / MISA qua Transactional Outbox</li>
               <li>✔ Chứng thư số Merkle Tree SOX 404</li>
               <li>✔ Tự học thêm biệt danh hàng hóa mới</li>
               <li>✔ Hỗ trợ kỹ sư dedicated 24/7 trực tiếp</li>
             </ul>
+
             <a href="#pilot" className="primary-button" style={{ width: "100%", justifyContent: "center", textDecoration: "none", padding: "10px", fontWeight: 700, background: "linear-gradient(135deg, #059669 0%, #10b981 100%)" }}>
               Dùng Thử Gói Pro 14 Ngày
             </a>
@@ -1346,10 +1347,10 @@ export function LandingPageView() {
                   <option>SAP S/4HANA</option>
                   <option>Odoo Enterprise</option>
                   <option>MISA AMIS ERP</option>
-                  <option>Bravo Software</option>
-                  <option>FAST Financial</option>
+                  <option>REST API / Webhook</option>
                   <option>Khác / Đang dùng Excel</option>
                 </select>
+
               </div>
 
               <div style={{ gridColumn: "span 2", marginTop: "10px" }}>
