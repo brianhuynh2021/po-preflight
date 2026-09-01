@@ -21,15 +21,59 @@ from preflight.models import LineItem, Order
 
 class ExcelExtractor:
     """Enterprise Multi-Sheet Excel (.xlsx / .xlsm / .xls) PO Extractor.
-    Features dynamic header recognition, currency normalization & math verification.
+    Features dynamic header recognition, flat-table vs form layout detection,
+    currency normalization & math verification.
     """
 
-    SKU_ALIASES = ["mã hàng", "mã sản phẩm", "mã sp", "mã vt", "mã vật tư", "item code", "sku", "part number", "mã"]
-    DESC_ALIASES = ["tên hàng", "tên hàng hóa", "tên sản phẩm", "diễn giải", "mô tả", "description", "item name", "hàng hóa"]
-    QTY_ALIASES = ["số lượng", "sl", "qty", "quantity", "so luong"]
-    PRICE_ALIASES = ["đơn giá", "đơn giá trước thuế", "price", "unit price", "don gia", "giá"]
-    AMOUNT_ALIASES = ["thành tiền", "tổng tiền", "amount", "total", "thanh tien", "tổng cộng", "tong cong"]
-    UOM_ALIASES = ["đơn vị tính", "đvt", "dvt", "uom", "unit", "đơn vị"]
+    PO_ALIASES = [
+        "số po", "so po", "po no", "po no.", "po number", "po_number", "ponumber",
+        "mã đơn", "số đơn", "số đơn hàng", "mã đơn hàng", "po #", "po#",
+        "order number", "order_number", "order no", "so chung tu", "số chứng từ",
+    ]
+    CUSTOMER_ALIASES = [
+        "khách hàng", "khach hang", "customer", "customer_name", "customer name",
+        "đơn vị mua", "buyer", "công ty", "tên khách hàng", "ten khach hang",
+        "khach_hang", "ten_khach_hang", "tên công ty", "ten cong ty", "khách", "khach",
+        "partner", "client", "tên đơn vị", "ten don vi",
+    ]
+    DATE_ALIASES = [
+        "ngày", "ngay", "ngày đặt", "ngay dat", "order date", "order_date", "date",
+        "ngay_dat", "ngày tạo", "po_date", "ngày po", "ngay po", "order_dt",
+    ]
+    CURRENCY_ALIASES = [
+        "tiền tệ", "tien te", "currency", "loại tiền", "loai tien", "ngoại tệ", "đơn vị tiền tệ",
+    ]
+    SKU_ALIASES = [
+        "mã hàng", "mã sản phẩm", "mã sp", "mã vt", "mã vật tư", "item code", "sku",
+        "part number", "mã", "ma hang", "ma sp", "ma vt", "product code", "product_code",
+    ]
+    DESC_ALIASES = [
+        "tên hàng", "tên hàng hóa", "tên sản phẩm", "diễn giải", "mô tả", "description",
+        "item name", "hàng hóa", "ten hang", "ten san pham", "product name", "product_name",
+    ]
+    QTY_ALIASES = [
+        "số lượng", "sl", "qty", "quantity", "so luong", "soluong", "số lượng đặt",
+    ]
+    PRICE_ALIASES = [
+        "đơn giá", "đơn giá trước thuế", "price", "unit price", "unit_price", "don gia",
+        "giá", "gia", "đơn giá bán", "don gia ban",
+    ]
+    AMOUNT_ALIASES = [
+        "thành tiền", "tổng tiền", "amount", "total", "thanh tien", "tổng cộng", "tong cong",
+        "line_total", "line total", "total_amount",
+    ]
+    UOM_ALIASES = [
+        "đơn vị tính", "đvt", "dvt", "uom", "unit", "đơn vị", "don vi tinh", "don vi",
+    ]
+
+    KNOWN_HEADER_KEYWORDS = {
+        "stt", "no", "no.", "sku", "mã", "mã hàng", "mã sp", "mã vt", "item", "item code",
+        "description", "diễn giải", "tên hàng", "tên sản phẩm", "hàng hóa", "số lượng",
+        "sl", "qty", "quantity", "đơn giá", "unit price", "price", "giá", "thành tiền",
+        "amount", "total", "tổng cộng", "đvt", "dvt", "uom", "unit", "đơn vị", "ghi chú",
+        "note", "notes", "khách hàng", "customer", "buyer", "po", "số po", "po number",
+        "po_number", "order date", "ngày đặt", "tiền tệ", "currency",
+    }
 
     def __init__(self):
         self.verifier = SelfReflectionVerifier()
@@ -39,8 +83,10 @@ class ExcelExtractor:
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
         sheet = self._select_primary_sheet(wb)
 
-        po_number, customer, currency, order_date = self._extract_metadata(sheet, filename)
         header_row_idx, col_map = self._detect_table_headers(sheet)
+        po_number, customer, currency, order_date = self._extract_metadata(
+            sheet, filename, header_row_idx=header_row_idx, col_map=col_map
+        )
 
         items: list[ExtractedLineItem] = []
         domain_items: list[LineItem] = []
@@ -145,34 +191,78 @@ class ExcelExtractor:
                     return sheet
         return wb.active
 
-    def _extract_metadata(self, sheet: Any, filename: str) -> tuple[str, str, str, str | None]:
-        """Extract PO identifier, customer name, date and currency from top header cells."""
-        po_number = re.sub(r"\.[^.]+$", "", filename)
+    def _extract_metadata(
+        self,
+        sheet: Any,
+        filename: str,
+        header_row_idx: int | None = None,
+        col_map: dict[str, int] | None = None,
+    ) -> tuple[str, str, str, str | None]:
+        """Extract PO identifier, customer name, date and currency from top header cells or table columns."""
+        col_map = col_map or {}
+        default_po = re.sub(r"\.[^.]+$", "", filename)
+        po_number = default_po
         customer = "Excel Enterprise Customer"
         currency = "VND"
         order_date = None
 
-        max_search_row = min(15, sheet.max_row or 1)
+        # 1. First check if metadata is present in tabular columns (Flat Table Layout)
+        if header_row_idx is not None and sheet.max_row and sheet.max_row > header_row_idx:
+            first_data_row = header_row_idx + 1
+            if col_map.get("po_number"):
+                po_col_val = self._get_cell_str(sheet, first_data_row, col_map["po_number"])
+                if po_col_val and not self._is_header_keyword(po_col_val):
+                    po_number = po_col_val
+
+            if col_map.get("customer"):
+                cust_col_val = self._get_cell_str(sheet, first_data_row, col_map["customer"])
+                if cust_col_val and not self._is_header_keyword(cust_col_val):
+                    customer = cust_col_val
+
+            if col_map.get("date"):
+                date_col_val = self._get_cell_str(sheet, first_data_row, col_map["date"])
+                if date_col_val:
+                    order_date = str(date_col_val)
+
+            if col_map.get("currency"):
+                curr_col_val = self._get_cell_str(sheet, first_data_row, col_map["currency"])
+                if curr_col_val:
+                    curr_upper = curr_col_val.upper()
+                    if "USD" in curr_upper or "$" in curr_upper:
+                        currency = "USD"
+                    elif "EUR" in curr_upper or "€" in curr_upper:
+                        currency = "EUR"
+                    elif "VND" in curr_upper or "VNĐ" in curr_upper:
+                        currency = "VND"
+
+        # 2. If po_number or customer wasn't resolved from flat columns, scan form rows above table header
+        form_search_row = min(15, (header_row_idx - 1) if (header_row_idx and header_row_idx > 1) else (sheet.max_row or 1))
         max_search_col = min(10, sheet.max_column or 1)
 
-        for r in range(1, max_search_row + 1):
+        for r in range(1, form_search_row + 1):
             for c in range(1, max_search_col + 1):
                 val = str(sheet.cell(row=r, column=c).value or "").strip()
                 if not val:
                     continue
                 val_lower = val.lower()
 
-                # PO Number Detection
-                if any(k in val_lower for k in ["số po", "po no", "po number", "mã đơn", "số đơn"]):
+                # PO Number Detection in Form Area
+                if po_number == default_po and any(k in val_lower for k in self.PO_ALIASES):
                     extracted_po = self._extract_adjacent_or_embedded(sheet, r, c, val)
-                    if extracted_po:
+                    if extracted_po and not self._is_header_keyword(extracted_po):
                         po_number = extracted_po
 
-                # Customer Detection
-                if any(k in val_lower for k in ["khách hàng", "customer", "đơn vị mua", "buyer", "công ty"]):
+                # Customer Detection in Form Area
+                if customer == "Excel Enterprise Customer" and any(k in val_lower for k in self.CUSTOMER_ALIASES):
                     extracted_cust = self._extract_adjacent_or_embedded(sheet, r, c, val)
-                    if extracted_cust:
+                    if extracted_cust and not self._is_header_keyword(extracted_cust):
                         customer = extracted_cust
+
+                # Order Date Detection in Form Area
+                if not order_date and any(k in val_lower for k in self.DATE_ALIASES):
+                    extracted_date = self._extract_adjacent_or_embedded(sheet, r, c, val)
+                    if extracted_date and not self._is_header_keyword(extracted_date):
+                        order_date = extracted_date
 
                 # Currency Detection
                 if "usd" in val_lower or "$" in val_lower:
@@ -182,21 +272,40 @@ class ExcelExtractor:
 
         return po_number, customer, currency, order_date
 
+    def _is_header_keyword(self, text: str | None) -> bool:
+        """Check if an extracted string matches a table header keyword rather than real data."""
+        if not text:
+            return False
+        clean = text.lower().strip()
+        if clean in self.KNOWN_HEADER_KEYWORDS:
+            return True
+        # Check against list aliases
+        all_aliases = (
+            self.PO_ALIASES + self.CUSTOMER_ALIASES + self.DATE_ALIASES +
+            self.CURRENCY_ALIASES + self.SKU_ALIASES + self.DESC_ALIASES +
+            self.QTY_ALIASES + self.PRICE_ALIASES + self.AMOUNT_ALIASES + self.UOM_ALIASES
+        )
+        return clean in all_aliases
+
     def _extract_adjacent_or_embedded(self, sheet: Any, row: int, col: int, cell_text: str) -> str | None:
         """Extract label payload either after ':' in same cell or in next adjacent cell."""
         if ":" in cell_text:
             parts = cell_text.split(":", 1)
             if len(parts) > 1 and parts[1].strip():
-                return parts[1].strip()
+                candidate = parts[1].strip()
+                if not self._is_header_keyword(candidate):
+                    return candidate
         # Look in next column
         next_val = sheet.cell(row=row, column=col + 1).value
         if next_val:
-            return str(next_val).strip()
+            candidate = str(next_val).strip()
+            if not self._is_header_keyword(candidate):
+                return candidate
         return None
 
     def _detect_table_headers(self, sheet: Any) -> tuple[int | None, dict[str, int]]:
-        """Identify header row and map column indices for SKU, description, quantity, price, amount."""
-        max_search_row = min(20, sheet.max_row or 1)
+        """Identify header row and map column indices for SKU, description, quantity, price, amount, etc."""
+        max_search_row = min(25, sheet.max_row or 1)
         for r_idx in range(1, max_search_row + 1):
             col_map: dict[str, int] = {}
             for c_idx in range(1, sheet.max_column + 1):
@@ -204,7 +313,15 @@ class ExcelExtractor:
                 if not raw:
                     continue
 
-                if not col_map.get("sku") and any(k == raw or k in raw for k in self.SKU_ALIASES):
+                if not col_map.get("po_number") and any(k == raw or k in raw for k in self.PO_ALIASES):
+                    col_map["po_number"] = c_idx
+                elif not col_map.get("customer") and any(k == raw or k in raw for k in self.CUSTOMER_ALIASES):
+                    col_map["customer"] = c_idx
+                elif not col_map.get("date") and any(k == raw or k in raw for k in self.DATE_ALIASES):
+                    col_map["date"] = c_idx
+                elif not col_map.get("currency") and any(k == raw or k in raw for k in self.CURRENCY_ALIASES):
+                    col_map["currency"] = c_idx
+                elif not col_map.get("sku") and any(k == raw or k in raw for k in self.SKU_ALIASES):
                     col_map["sku"] = c_idx
                 elif not col_map.get("desc") and any(k == raw or k in raw for k in self.DESC_ALIASES):
                     col_map["desc"] = c_idx
@@ -217,12 +334,14 @@ class ExcelExtractor:
                 elif not col_map.get("uom") and any(k == raw or k in raw for k in self.UOM_ALIASES):
                     col_map["uom"] = c_idx
 
-            # If we matched at least 2 key columns (e.g. SKU/desc and price/qty), we found the table header!
-            matched_count = len(col_map)
-            if matched_count >= 2 and ("qty" in col_map or "price" in col_map or "sku" in col_map):
+            # If we matched at least 2 key columns (e.g. SKU/desc and price/qty, or po_number/customer and items), we found table header!
+            key_cols = {"sku", "desc", "qty", "price", "amount", "po_number", "customer"}
+            matched_keys = set(col_map.keys()) & key_cols
+            if len(matched_keys) >= 2 and ("qty" in col_map or "price" in col_map or "sku" in col_map or "desc" in col_map):
                 return r_idx, col_map
 
         return None, {}
+
 
     def _get_cell_raw(self, sheet: Any, row: int, col: int | None) -> Any:
         if not col:

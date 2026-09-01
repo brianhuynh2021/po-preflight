@@ -12,6 +12,7 @@ import {
 
 import type { ActivityEvent, PurchaseOrder } from "@/app/lib/types";
 import { seedOrders } from "@/app/lib/seed";
+import { api } from "@/app/lib/api/client";
 
 interface AppState {
   orders: PurchaseOrder[];
@@ -52,12 +53,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const refreshOrders = useCallback(async () => {
     try {
-      const res = await fetch("http://localhost:8001/api/v1/orders");
-      if (res.ok) {
-        const liveData = await res.json();
-        if (Array.isArray(liveData) && liveData.length > 0) {
-          setIsLiveConnected(true);
-        }
+      const liveData = await api.orders.list();
+      if (Array.isArray(liveData) && liveData.length > 0) {
+        setIsLiveConnected(true);
       }
     } catch {
       setIsLiveConnected(false);
@@ -65,50 +63,34 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // 1. Initial live check
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshOrders();
 
-    // 2. Connect to real-time SSE stream if in browser
-    if (typeof window !== "undefined" && "EventSource" in window) {
-      try {
-        const sse = new EventSource("http://localhost:8001/api/v1/events/stream");
+    // Connect to real-time SSE stream via api client
+    const cleanup = api.connectRealtimeStream(
 
-        sse.onopen = () => {
-          setIsLiveConnected(true);
-        };
+      (payload) => {
+        setIsLiveConnected(true);
+        if (payload.event === "order.created" || payload.event === "order.decided" || payload.event === "erp.synced") {
+          setActivity((prev) => [
+            {
+              title: `Event: ${payload.event}`,
+              detail: `Order ${String(payload.data?.po_number || "updated")} status: ${String(payload.data?.status || "processed")}`,
+              time: "Just now",
+              type: "system",
+            },
+            ...prev,
+          ]);
+        }
+      },
+      () => {
+        setIsLiveConnected(false);
+      },
+    );
 
-        sse.onmessage = (event) => {
-          try {
-            const payload = JSON.parse(event.data);
-            if (payload.event === "order.created" || payload.event === "order.decided") {
-              setActivity((prev) => [
-                {
-                  title: `Event: ${payload.event}`,
-                  detail: `Order ${payload.data?.po_number || "updated"} status: ${payload.data?.status || "processed"}`,
-                  time: "Just now",
-                  type: "system",
-                },
-                ...prev,
-              ]);
-            }
-          } catch {
-            // Non-JSON ping message
-          }
-        };
-
-        sse.onerror = () => {
-          setIsLiveConnected(false);
-        };
-
-        return () => {
-          sse.close();
-        };
-      } catch {
-        // SSE not reachable in test environment
-      }
-    }
+    return cleanup;
   }, [refreshOrders]);
+
 
   const value = useMemo(
     () => ({ orders, setOrders, activity, setActivity, isLiveConnected, refreshOrders }),

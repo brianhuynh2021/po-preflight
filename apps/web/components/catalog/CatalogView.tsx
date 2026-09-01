@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 
 import { FilterSelect } from "@/components/common/FilterSelect";
 import { SearchFilter } from "@/components/common/SearchFilter";
 import { money } from "@/app/lib/derive";
-import { catalog } from "@/app/lib/seed";
+import { catalog as seedCatalog } from "@/app/lib/seed";
+import { api } from "@/app/lib/api/client";
 import { useRipple } from "@/app/lib/useRipple";
 
 const STATUS_OPTIONS = [
@@ -16,13 +17,43 @@ const STATUS_OPTIONS = [
 ];
 
 export function CatalogView() {
+  const [items, setItems] = useState(seedCatalog);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const { createRipple } = useRipple();
 
+  const syncCatalog = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const liveItems = await api.catalog.list();
+      if (Array.isArray(liveItems) && liveItems.length > 0) {
+        setItems(
+          liveItems.map((it) => ({
+            sku: it.sku,
+            name: it.name,
+            unit_price: Number(it.unit_price),
+            stock: Number(it.stock),
+            active: Boolean(it.active),
+          })),
+        );
+      }
+    } catch {
+      // Keep current state
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void syncCatalog();
+  }, [syncCatalog]);
+
+
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return catalog.filter((item) => {
+    return items.filter((item) => {
       if (statusFilter === "active" && !item.active) {
         return false;
       }
@@ -34,7 +65,8 @@ export function CatalogView() {
       }
       return `${item.sku} ${item.name}`.toLowerCase().includes(needle);
     });
-  }, [query, statusFilter]);
+  }, [items, query, statusFilter]);
+
 
   return (
     <div className="page simple-page page-enter">
@@ -46,12 +78,17 @@ export function CatalogView() {
         </div>
         <button
           className="primary-button interactive"
-          onClick={createRipple}
+          onClick={(e) => {
+            createRipple(e);
+            void syncCatalog();
+          }}
+          disabled={isSyncing}
           style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
         >
-          <RefreshCw size={15} strokeWidth={2} />
-          <span>Sync catalog</span>
+          <RefreshCw size={15} strokeWidth={2} className={isSyncing ? "animate-spin" : ""} />
+          <span>{isSyncing ? "Đang đồng bộ..." : "Sync catalog"}</span>
         </button>
+
       </div>
       <section className="content-card table-card">
         <div className="panel-toolbar">
