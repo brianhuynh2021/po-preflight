@@ -18,7 +18,48 @@
   --red-soft: #fcece9;
   --blue: #386b8e;
   --blue-soft: #e9f1f6;
-  --shadow: 0 12px 30px rgba(20, 35, 31, 0.07);
+
+  /* Material 3 Motion Tokens */
+  --dur-instant: 90ms;
+  --dur-fast: 140ms;
+  --dur-base: 200ms;
+  --dur-slow: 280ms;
+
+  /* M3 Asymmetric Easing Curves */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized-decel: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-emphasized-accel: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+  /* Material 3 Scale Tokens */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* Elevation Scale Tokens */
+  --elev-1: 0 1px 2px rgba(20, 35, 31, 0.06), 0 1px 3px rgba(20, 35, 31, 0.04);
+  --elev-2: 0 2px 4px rgba(20, 35, 31, 0.06), 0 4px 8px rgba(20, 35, 31, 0.05);
+  --elev-3: 0 4px 8px rgba(20, 35, 31, 0.07), 0 12px 24px rgba(20, 35, 31, 0.06);
+  --elev-4: 0 8px 16px rgba(20, 35, 31, 0.08), 0 24px 48px rgba(20, 35, 31, 0.08);
+
+  --shadow: var(--elev-2);
 }
 
 html.dark {
@@ -39,7 +80,13 @@ html.dark {
   --red-soft: #3a1f1c;
   --blue: #60a5fa;
   --blue-soft: #1a2a3a;
-  --shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.24), 0 1px 3px rgba(0, 0, 0, 0.2);
+  --elev-2: 0 2px 4px rgba(0, 0, 0, 0.28), 0 4px 8px rgba(0, 0, 0, 0.24);
+  --elev-3: 0 4px 8px rgba(0, 0, 0, 0.32), 0 12px 24px rgba(0, 0, 0, 0.28);
+  --elev-4: 0 8px 16px rgba(0, 0, 0, 0.36), 0 24px 48px rgba(0, 0, 0, 0.32);
+
+  --shadow: var(--elev-2);
 }
 
 * {
@@ -73,9 +120,212 @@ button {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
-  outline: 3px solid rgba(56, 107, 142, 0.3);
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--green);
   outline-offset: 2px;
+}
+
+/* Material 3 State Layer System */
+.interactive,
+.nav-item,
+.order-row,
+.attention-row,
+.primary-button,
+.approve-button,
+.secondary-button,
+.light-button,
+.clean-card,
+.drop-zone,
+.action-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.interactive::after,
+.nav-item::after,
+.order-row::after,
+.attention-row::after,
+.primary-button::after,
+.approve-button::after,
+.secondary-button::after,
+.light-button::after,
+.clean-card::after,
+.drop-zone::after,
+.action-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+  z-index: -1;
+  border-radius: inherit;
+}
+
+.interactive:hover::after,
+.nav-item:hover::after,
+.order-row:hover::after,
+.attention-row:hover::after,
+.primary-button:hover::after,
+.approve-button:hover::after,
+.secondary-button:hover::after,
+.light-button:hover::after,
+.clean-card:hover::after,
+.drop-zone:hover::after,
+.action-card:hover::after {
+  opacity: 0.08;
+}
+
+.interactive:focus-visible::after,
+.nav-item:focus-visible::after,
+.order-row:focus-visible::after,
+.attention-row:focus-visible::after,
+.primary-button:focus-visible::after,
+.approve-button:focus-visible::after,
+.secondary-button:focus-visible::after,
+.light-button:focus-visible::after {
+  opacity: 0.10;
+}
+
+.interactive:active::after,
+.nav-item:active::after,
+.order-row:active::after,
+.attention-row:active::after,
+.primary-button:active::after,
+.approve-button:active::after,
+.secondary-button:active::after,
+.light-button:active::after {
+  opacity: 0.12;
+}
+
+/* Material 3 Transitions */
+.nav-item,
+.order-row,
+.attention-row,
+.primary-button,
+.approve-button,
+.secondary-button,
+.light-button,
+.clean-card,
+.drop-zone,
+.chip,
+.status-badge,
+.tab,
+.dag-node,
+.icon-button {
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-base) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard),
+    opacity var(--dur-fast) var(--ease-standard);
+}
+
+/* Material 3 Active States */
+.primary-button:active,
+.secondary-button:active,
+.approve-button:active,
+.light-button:active {
+  transform: translateY(1px) scale(0.985);
+  transition-duration: var(--dur-instant);
+}
+
+.nav-item:active,
+.order-row:active,
+.attention-row:active,
+.icon-button:active {
+  transform: scale(0.992);
+  transition-duration: var(--dur-instant);
+}
+
+/* Material 3 Ripple Host & Animation */
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.20;
+  transform: scale(0);
+  animation: ripple-expand 520ms var(--ease-emphasized-decel) forwards;
+  pointer-events: none;
+}
+
+@keyframes ripple-expand {
+  to {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+/* Page Enter Transition */
+.page-enter {
+  animation: page-enter-animation 240ms var(--ease-emphasized-decel) forwards;
+}
+
+@keyframes page-enter-animation {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Tabular Numbers */
+.tabular-nums,
+.order-value strong,
+.money-cell,
+.metric-value,
+.attention-row b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Skeleton Loading Shimmer */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(20, 35, 31, 0.06) 0%,
+    rgba(20, 35, 31, 0.12) 50%,
+    rgba(20, 35, 31, 0.06) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite var(--ease-standard);
+  border-radius: var(--radius-sm);
+}
+
+html.dark .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 200% 100%;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Accessibility: prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ripple {
+    display: none !important;
+  }
 }
 
 .app-shell {
@@ -1663,7 +1913,10 @@ html.dark .decision-bar {
   background: var(--canvas);
   color: var(--ink);
   font-size: 13.5px;
-  transition: all 0.15s ease;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
 }
 
 .input-clean:focus {
@@ -1708,7 +1961,10 @@ html.dark .decision-bar {
   border-radius: 10px;
   padding: 14px;
   position: relative;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-base) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
 }
 

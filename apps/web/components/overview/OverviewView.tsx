@@ -1,29 +1,39 @@
 "use client";
 
 import Link from "next/link";
-
+import { ArrowRight, AlertTriangle, XCircle, Plus } from "lucide-react";
 import { useAppState } from "@/components/app/AppStateProvider";
 import { money } from "@/app/lib/derive";
+import { useRipple } from "@/app/lib/useRipple";
 
 export function OverviewView() {
   const { orders } = useAppState();
+  const { createRipple } = useRipple();
+
   const attention = orders.filter(
     (order) =>
       order.status === "Review required" || order.status === "Blocked",
   );
 
   return (
-    <div className="page simple-page">
+    <div className="page simple-page page-enter">
       <div className="page-heading">
         <div>
           <p className="eyebrow">GOOD MORNING, MAYA</p>
           <h1>Operations overview</h1>
           <p>Two orders need attention. Everything else is moving normally.</p>
         </div>
-        <Link className="primary-button" href="/orders">
-          ＋ Upload purchase order
+        <Link
+          className="primary-button interactive"
+          href="/orders"
+          onClick={createRipple}
+          style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+        >
+          <Plus size={16} strokeWidth={2.2} />
+          <span>Upload purchase order</span>
         </Link>
       </div>
+
       <div className="overview-hero">
         <div>
           <span className="overview-label">TODAY&apos;S PRIORITY</span>
@@ -32,8 +42,14 @@ export function OverviewView() {
             cut-off.
           </h2>
           <p>One price and inventory review, and one blocked catalog item.</p>
-          <Link className="light-button" href="/orders">
-            Review priority orders →
+          <Link
+            className="light-button interactive"
+            href="/orders"
+            onClick={createRipple}
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+          >
+            <span>Review priority orders</span>
+            <ArrowRight size={14} strokeWidth={2} />
           </Link>
         </div>
         <div className="radial">
@@ -45,6 +61,7 @@ export function OverviewView() {
           </span>
         </div>
       </div>
+
       <div className="overview-columns">
         <section className="content-card">
           <div className="card-heading">
@@ -52,16 +69,26 @@ export function OverviewView() {
               <h2>Attention queue</h2>
               <p>Prioritized by business impact</p>
             </div>
-            <Link href="/orders" className="text-button">
+            <Link href="/orders" className="text-button interactive" onClick={createRipple}>
               View all
             </Link>
           </div>
           {attention.map((order) => (
-            <Link className="attention-row" key={order.id} href="/orders">
+            <Link
+              className="attention-row interactive"
+              key={order.id}
+              href="/orders"
+              onClick={createRipple}
+            >
               <span
                 className={`attention-icon ${order.status === "Blocked" ? "red" : "amber"}`}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
               >
-                {order.status === "Blocked" ? "×" : "!"}
+                {order.status === "Blocked" ? (
+                  <XCircle size={16} strokeWidth={2.2} />
+                ) : (
+                  <AlertTriangle size={15} strokeWidth={2.2} />
+                )}
               </span>
               <span>
                 <strong>
@@ -72,11 +99,12 @@ export function OverviewView() {
                   {order.findings.length === 1 ? "finding" : "findings"}
                 </small>
               </span>
-              <b>{money(order.value, order.currency)}</b>
-              <span>→</span>
+              <b className="tabular-nums">{money(order.value, order.currency)}</b>
+              <ArrowRight size={14} strokeWidth={1.75} style={{ opacity: 0.6 }} />
             </Link>
           ))}
         </section>
+
         <section className="content-card">
           <div className="card-heading">
             <div>
