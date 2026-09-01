@@ -7,11 +7,18 @@ import sqlite3
 import threading
 import time
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from preflight.models import Analysis
+from preflight.models import (
+    Analysis,
+    CustomerCreditProfile,
+    CustomerPriceAgreement,
+    UOMConversion,
+)
 from preflight.security.audit_chain import calculate_hash, compute_payload_hash
+
 
 
 
@@ -59,6 +66,43 @@ CREATE TABLE IF NOT EXISTS audit_blocks (
     block_hash TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_blocks_po ON audit_blocks(po_number);
+
+CREATE TABLE IF NOT EXISTS customer_pricing (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id TEXT NOT NULL,
+    sku TEXT NOT NULL,
+    contract_price TEXT NOT NULL,
+    min_quantity INTEGER NOT NULL DEFAULT 1,
+    discount_percent TEXT NOT NULL DEFAULT '0',
+    valid_from TEXT,
+    valid_to TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(customer_id, sku, min_quantity)
+);
+CREATE INDEX IF NOT EXISTS idx_customer_pricing ON customer_pricing(customer_id, sku);
+
+CREATE TABLE IF NOT EXISTS uom_conversions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sku TEXT NOT NULL,
+    uom_code TEXT NOT NULL,
+    base_uom TEXT NOT NULL,
+    conversion_factor TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(sku, uom_code)
+);
+CREATE INDEX IF NOT EXISTS idx_uom_conversions ON uom_conversions(sku, uom_code);
+
+CREATE TABLE IF NOT EXISTS customer_credits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id TEXT NOT NULL UNIQUE,
+    credit_limit TEXT NOT NULL,
+    outstanding_balance TEXT NOT NULL DEFAULT '0',
+    overdue_balance TEXT NOT NULL DEFAULT '0',
+    oldest_overdue_days INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_customer_credits ON customer_credits(customer_id);
 """
 
 POSTGRES_SCHEMA = """
@@ -108,6 +152,44 @@ CREATE TABLE IF NOT EXISTS audit_blocks (
     block_hash VARCHAR(64) NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pg_audit_blocks_po ON audit_blocks(po_number);
+
+CREATE TABLE IF NOT EXISTS customer_pricing (
+    id SERIAL PRIMARY KEY,
+    customer_id VARCHAR(255) NOT NULL,
+    sku VARCHAR(128) NOT NULL,
+    contract_price VARCHAR(64) NOT NULL,
+    min_quantity INTEGER NOT NULL DEFAULT 1,
+    discount_percent VARCHAR(64) NOT NULL DEFAULT '0',
+    valid_from VARCHAR(64),
+    valid_to VARCHAR(64),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(customer_id, sku, min_quantity)
+);
+CREATE INDEX IF NOT EXISTS idx_pg_customer_pricing ON customer_pricing(customer_id, sku);
+
+CREATE TABLE IF NOT EXISTS uom_conversions (
+    id SERIAL PRIMARY KEY,
+    sku VARCHAR(128) NOT NULL,
+    uom_code VARCHAR(64) NOT NULL,
+    base_uom VARCHAR(64) NOT NULL,
+    conversion_factor VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(sku, uom_code)
+);
+CREATE INDEX IF NOT EXISTS idx_pg_uom_conversions ON uom_conversions(sku, uom_code);
+
+CREATE TABLE IF NOT EXISTS customer_credits (
+    id SERIAL PRIMARY KEY,
+    customer_id VARCHAR(255) NOT NULL UNIQUE,
+    credit_limit VARCHAR(64) NOT NULL,
+    outstanding_balance VARCHAR(64) NOT NULL DEFAULT '0',
+    overdue_balance VARCHAR(64) NOT NULL DEFAULT '0',
+    oldest_overdue_days INTEGER NOT NULL DEFAULT 0,
+    status VARCHAR(64) NOT NULL DEFAULT 'ACTIVE',
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pg_customer_credits ON customer_credits(customer_id);
+
 """
 
 
@@ -197,6 +279,31 @@ class BaseAuditStore(abc.ABC):
     @abc.abstractmethod
     def get_audit_blocks(self, po_number: str) -> list[dict[str, Any]]:
         pass
+
+    @abc.abstractmethod
+    def set_customer_pricing(self, pricing: CustomerPriceAgreement) -> None:
+        pass
+
+    @abc.abstractmethod
+    def get_customer_pricing(self, customer_id: str) -> list[CustomerPriceAgreement]:
+        pass
+
+    @abc.abstractmethod
+    def set_uom_conversion(self, conversion: UOMConversion) -> None:
+        pass
+
+    @abc.abstractmethod
+    def get_uom_conversions(self, sku: str | None = None) -> list[UOMConversion]:
+        pass
+
+    @abc.abstractmethod
+    def set_customer_credit(self, credit: CustomerCreditProfile) -> None:
+        pass
+
+    @abc.abstractmethod
+    def get_customer_credit(self, customer_id: str) -> CustomerCreditProfile | None:
+        pass
+
 
 
 
@@ -566,10 +673,137 @@ class AuditStore(BaseAuditStore):
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def set_customer_pricing(self, pricing: CustomerPriceAgreement) -> None:
+        with self._lock:
+            self.connection.execute(
+                """
+                INSERT INTO customer_pricing (customer_id, sku, contract_price, min_quantity, discount_percent, valid_from, valid_to, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(customer_id, sku, min_quantity) DO UPDATE SET
+                    contract_price = excluded.contract_price,
+                    discount_percent = excluded.discount_percent,
+                    valid_from = excluded.valid_from,
+                    valid_to = excluded.valid_to,
+                    created_at = excluded.created_at
+                """,
+                (
+                    pricing.customer_id.strip(),
+                    pricing.sku.strip().upper(),
+                    str(pricing.contract_price),
+                    pricing.min_quantity,
+                    str(pricing.discount_percent),
+                    pricing.valid_from,
+                    pricing.valid_to,
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+            self.connection.commit()
 
+    def get_customer_pricing(self, customer_id: str) -> list[CustomerPriceAgreement]:
+        with self._lock:
+            rows = self.connection.execute(
+                "SELECT * FROM customer_pricing WHERE customer_id = ? ORDER BY sku ASC, min_quantity DESC",
+                (customer_id.strip(),),
+            ).fetchall()
+            return [
+                CustomerPriceAgreement(
+                    customer_id=r["customer_id"],
+                    sku=r["sku"],
+                    contract_price=Decimal(r["contract_price"]),
+                    min_quantity=int(r["min_quantity"]),
+                    discount_percent=Decimal(r["discount_percent"]),
+                    valid_from=r["valid_from"],
+                    valid_to=r["valid_to"],
+                )
+                for r in rows
+            ]
+
+    def set_uom_conversion(self, conversion: UOMConversion) -> None:
+        with self._lock:
+            self.connection.execute(
+                """
+                INSERT INTO uom_conversions (sku, uom_code, base_uom, conversion_factor, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(sku, uom_code) DO UPDATE SET
+                    base_uom = excluded.base_uom,
+                    conversion_factor = excluded.conversion_factor,
+                    created_at = excluded.created_at
+                """,
+                (
+                    conversion.sku.strip().upper(),
+                    conversion.uom_code.strip().upper(),
+                    conversion.base_uom.strip().upper(),
+                    str(conversion.conversion_factor),
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+            self.connection.commit()
+
+    def get_uom_conversions(self, sku: str | None = None) -> list[UOMConversion]:
+        with self._lock:
+            if sku:
+                rows = self.connection.execute(
+                    "SELECT * FROM uom_conversions WHERE sku = ? ORDER BY uom_code ASC",
+                    (sku.strip().upper(),),
+                ).fetchall()
+            else:
+                rows = self.connection.execute("SELECT * FROM uom_conversions ORDER BY sku ASC, uom_code ASC").fetchall()
+            return [
+                UOMConversion(
+                    sku=r["sku"],
+                    uom_code=r["uom_code"],
+                    base_uom=r["base_uom"],
+                    conversion_factor=Decimal(r["conversion_factor"]),
+                )
+                for r in rows
+            ]
+
+    def set_customer_credit(self, credit: CustomerCreditProfile) -> None:
+        with self._lock:
+            self.connection.execute(
+                """
+                INSERT INTO customer_credits (customer_id, credit_limit, outstanding_balance, overdue_balance, oldest_overdue_days, status, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(customer_id) DO UPDATE SET
+                    credit_limit = excluded.credit_limit,
+                    outstanding_balance = excluded.outstanding_balance,
+                    overdue_balance = excluded.overdue_balance,
+                    oldest_overdue_days = excluded.oldest_overdue_days,
+                    status = excluded.status,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    credit.customer_id.strip(),
+                    str(credit.credit_limit),
+                    str(credit.outstanding_balance),
+                    str(credit.overdue_balance),
+                    credit.oldest_overdue_days,
+                    credit.status,
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+            self.connection.commit()
+
+    def get_customer_credit(self, customer_id: str) -> CustomerCreditProfile | None:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT * FROM customer_credits WHERE customer_id = ? LIMIT 1",
+                (customer_id.strip(),),
+            ).fetchone()
+            if not row:
+                return None
+            return CustomerCreditProfile(
+                customer_id=row["customer_id"],
+                credit_limit=Decimal(row["credit_limit"]),
+                outstanding_balance=Decimal(row["outstanding_balance"]),
+                overdue_balance=Decimal(row["overdue_balance"]),
+                oldest_overdue_days=int(row["oldest_overdue_days"]),
+                status=row["status"],
+            )
 
 
 class PostgresAuditStore(BaseAuditStore):
+
     """Enterprise PostgreSQL Audit Store with Connection Pooling (pool_size=20, max_overflow=10)."""
 
     def __init__(
@@ -922,6 +1156,175 @@ class PostgresAuditStore(BaseAuditStore):
                 return [dict(r) for r in cur.fetchall()]
         finally:
             self._pool.putconn(conn)
+
+    def set_customer_pricing(self, pricing: CustomerPriceAgreement) -> None:
+        if self._fallback_sqlite:
+            self._fallback_sqlite.set_customer_pricing(pricing)
+            return
+        conn = self._pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO customer_pricing (customer_id, sku, contract_price, min_quantity, discount_percent, valid_from, valid_to, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(customer_id, sku, min_quantity) DO UPDATE SET
+                        contract_price = EXCLUDED.contract_price,
+                        discount_percent = EXCLUDED.discount_percent,
+                        valid_from = EXCLUDED.valid_from,
+                        valid_to = EXCLUDED.valid_to,
+                        created_at = EXCLUDED.created_at
+                    """,
+                    (
+                        pricing.customer_id.strip(),
+                        pricing.sku.strip().upper(),
+                        str(pricing.contract_price),
+                        pricing.min_quantity,
+                        str(pricing.discount_percent),
+                        pricing.valid_from,
+                        pricing.valid_to,
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+            conn.commit()
+        finally:
+            self._pool.putconn(conn)
+
+    def get_customer_pricing(self, customer_id: str) -> list[CustomerPriceAgreement]:
+        if self._fallback_sqlite:
+            return self._fallback_sqlite.get_customer_pricing(customer_id)
+        conn = self._pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM customer_pricing WHERE customer_id = %s ORDER BY sku ASC, min_quantity DESC",
+                    (customer_id.strip(),),
+                )
+                return [
+                    CustomerPriceAgreement(
+                        customer_id=r["customer_id"],
+                        sku=r["sku"],
+                        contract_price=Decimal(r["contract_price"]),
+                        min_quantity=int(r["min_quantity"]),
+                        discount_percent=Decimal(r["discount_percent"]),
+                        valid_from=r["valid_from"],
+                        valid_to=r["valid_to"],
+                    )
+                    for r in cur.fetchall()
+                ]
+        finally:
+            self._pool.putconn(conn)
+
+    def set_uom_conversion(self, conversion: UOMConversion) -> None:
+        if self._fallback_sqlite:
+            self._fallback_sqlite.set_uom_conversion(conversion)
+            return
+        conn = self._pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO uom_conversions (sku, uom_code, base_uom, conversion_factor, created_at)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT(sku, uom_code) DO UPDATE SET
+                        base_uom = EXCLUDED.base_uom,
+                        conversion_factor = EXCLUDED.conversion_factor,
+                        created_at = EXCLUDED.created_at
+                    """,
+                    (
+                        conversion.sku.strip().upper(),
+                        conversion.uom_code.strip().upper(),
+                        conversion.base_uom.strip().upper(),
+                        str(conversion.conversion_factor),
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+            conn.commit()
+        finally:
+            self._pool.putconn(conn)
+
+    def get_uom_conversions(self, sku: str | None = None) -> list[UOMConversion]:
+        if self._fallback_sqlite:
+            return self._fallback_sqlite.get_uom_conversions(sku)
+        conn = self._pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                if sku:
+                    cur.execute(
+                        "SELECT * FROM uom_conversions WHERE sku = %s ORDER BY uom_code ASC",
+                        (sku.strip().upper(),),
+                    )
+                else:
+                    cur.execute("SELECT * FROM uom_conversions ORDER BY sku ASC, uom_code ASC")
+                return [
+                    UOMConversion(
+                        sku=r["sku"],
+                        uom_code=r["uom_code"],
+                        base_uom=r["base_uom"],
+                        conversion_factor=Decimal(r["conversion_factor"]),
+                    )
+                    for r in cur.fetchall()
+                ]
+        finally:
+            self._pool.putconn(conn)
+
+    def set_customer_credit(self, credit: CustomerCreditProfile) -> None:
+        if self._fallback_sqlite:
+            self._fallback_sqlite.set_customer_credit(credit)
+            return
+        conn = self._pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO customer_credits (customer_id, credit_limit, outstanding_balance, overdue_balance, oldest_overdue_days, status, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(customer_id) DO UPDATE SET
+                        credit_limit = EXCLUDED.credit_limit,
+                        outstanding_balance = EXCLUDED.outstanding_balance,
+                        overdue_balance = EXCLUDED.overdue_balance,
+                        oldest_overdue_days = EXCLUDED.oldest_overdue_days,
+                        status = EXCLUDED.status,
+                        updated_at = EXCLUDED.updated_at
+                    """,
+                    (
+                        credit.customer_id.strip(),
+                        str(credit.credit_limit),
+                        str(credit.outstanding_balance),
+                        str(credit.overdue_balance),
+                        credit.oldest_overdue_days,
+                        credit.status,
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+            conn.commit()
+        finally:
+            self._pool.putconn(conn)
+
+    def get_customer_credit(self, customer_id: str) -> CustomerCreditProfile | None:
+        if self._fallback_sqlite:
+            return self._fallback_sqlite.get_customer_credit(customer_id)
+        conn = self._pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM customer_credits WHERE customer_id = %s LIMIT 1",
+                    (customer_id.strip(),),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                return CustomerCreditProfile(
+                    customer_id=row["customer_id"],
+                    credit_limit=Decimal(row["credit_limit"]),
+                    outstanding_balance=Decimal(row["outstanding_balance"]),
+                    overdue_balance=Decimal(row["overdue_balance"]),
+                    oldest_overdue_days=int(row["oldest_overdue_days"]),
+                    status=row["status"],
+                )
+        finally:
+            self._pool.putconn(conn)
+
 
 
 

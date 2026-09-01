@@ -10,12 +10,14 @@ class LineItem:
     sku: str
     quantity: int
     unit_price: Decimal
+    uom: str = "PCS"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "sku": self.sku,
             "quantity": self.quantity,
             "unit_price": str(self.unit_price),
+            "uom": self.uom,
         }
 
 
@@ -50,6 +52,73 @@ class Product:
     unit_price: Decimal
     stock: int
     active: bool = True
+    base_uom: str = "PCS"
+    moq: int = 1
+    pack_size: int = 1
+
+
+@dataclass(frozen=True)
+class CustomerPriceAgreement:
+    customer_id: str
+    sku: str
+    contract_price: Decimal
+    min_quantity: int = 1
+    discount_percent: Decimal = Decimal("0")
+    valid_from: str | None = None
+    valid_to: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "customer_id": self.customer_id,
+            "sku": self.sku,
+            "contract_price": str(self.contract_price),
+            "min_quantity": self.min_quantity,
+            "discount_percent": str(self.discount_percent),
+            "valid_from": self.valid_from,
+            "valid_to": self.valid_to,
+        }
+
+
+@dataclass(frozen=True)
+class UOMConversion:
+    sku: str
+    uom_code: str
+    base_uom: str
+    conversion_factor: Decimal
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sku": self.sku,
+            "uom_code": self.uom_code,
+            "base_uom": self.base_uom,
+            "conversion_factor": str(self.conversion_factor),
+        }
+
+
+@dataclass(frozen=True)
+class CustomerCreditProfile:
+    customer_id: str
+    credit_limit: Decimal
+    outstanding_balance: Decimal
+    overdue_balance: Decimal
+    oldest_overdue_days: int = 0
+    status: str = "ACTIVE"  # ACTIVE, ON_HOLD, BLOCKED
+
+    @property
+    def available_credit(self) -> Decimal:
+        return max(Decimal("0"), self.credit_limit - self.outstanding_balance)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "customer_id": self.customer_id,
+            "credit_limit": str(self.credit_limit),
+            "outstanding_balance": str(self.outstanding_balance),
+            "overdue_balance": str(self.overdue_balance),
+            "oldest_overdue_days": self.oldest_overdue_days,
+            "status": self.status,
+            "available_credit": str(self.available_credit),
+        }
+
 
 
 @dataclass(frozen=True)
