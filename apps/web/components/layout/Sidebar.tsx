@@ -93,6 +93,28 @@ export function Sidebar() {
       </nav>
 
       <div className="sidebar-spacer" />
+      <a
+        href="/landing"
+        target="_blank"
+        rel="noreferrer"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          padding: "8px 12px",
+          background: "var(--canvas)",
+          border: "1px solid var(--line)",
+          borderRadius: "6px",
+          fontSize: "12px",
+          fontWeight: 600,
+          color: "var(--green)",
+          textDecoration: "none",
+          marginBottom: "10px",
+        }}
+      >
+        <span>🌐</span>
+        <span>Marketing Landing Page ↗</span>
+      </a>
       <div className="processing-card">
         <span className="live-dot" />
         <div>
