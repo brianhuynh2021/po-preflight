@@ -6,6 +6,7 @@
 import type {
   AgentRunRequest,
   AgentRunResponse,
+  BotConfigStatus,
   CatalogItem,
   ConfirmExtractionRequest,
   CustomerCreditProfile,
@@ -23,6 +24,7 @@ import type {
   SKUMatchResult,
   UOMConversion,
 } from "./types";
+
 
 
 const DEFAULT_BASE_URL = "http://localhost:8001";
@@ -148,19 +150,19 @@ export function createApiClient(config: ClientConfig = {}) {
   // 3. 4-Tier SKU Resolution RAG API
   // =========================================================================
   const sku = {
-    resolve: (querySku: string, customerId?: string) => {
+    resolve: (rawText: string, customerId?: string) => {
       return request<SKUMatchResult>("/api/v1/sku/resolve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query_sku: querySku, customer_id: customerId }),
+        body: JSON.stringify({ raw_text: rawText, customer_id: customerId }),
       });
     },
 
-    batchResolve: (queries: Array<{ query_sku: string; customer_id?: string }>) => {
+    batchResolve: (items: Array<{ raw_text: string; customer_id?: string }>) => {
       return request<SKUMatchResult[]>("/api/v1/sku/batch-resolve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ queries }),
+        body: JSON.stringify({ items }),
       });
     },
   };
@@ -184,24 +186,24 @@ export function createApiClient(config: ClientConfig = {}) {
   // =========================================================================
   const bot = {
     status: () => {
-      return request<{
-        telegram: { configured: boolean; dry_run: boolean };
-        zalo: { configured: boolean; dry_run: boolean };
-      }>("/api/v1/bot/status");
+      return request<BotConfigStatus>("/api/v1/bot/status");
     },
 
     notifyTelegram: (orderId: number | string) => {
-      return request<{ success: boolean; dry_run: boolean }>(`/api/v1/bot/telegram/notify/${orderId}`, {
-        method: "POST",
-      });
+      return request<{ success: boolean; channel: string; order_id: string; dry_run: boolean; details: string }>(
+        `/api/v1/bot/telegram/notify/${orderId}`,
+        { method: "POST" }
+      );
     },
 
     notifyZalo: (orderId: number | string) => {
-      return request<{ success: boolean; dry_run: boolean }>(`/api/v1/bot/zalo/notify/${orderId}`, {
-        method: "POST",
-      });
+      return request<{ success: boolean; channel: string; order_id: string; dry_run: boolean; details: string }>(
+        `/api/v1/bot/zalo/notify/${orderId}`,
+        { method: "POST" }
+      );
     },
   };
+
 
   // =========================================================================
   // 6. ERP Integration & Transactional Outbox API

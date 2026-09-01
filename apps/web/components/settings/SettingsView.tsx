@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { api } from "@/app/lib/api/client";
 
 export function SettingsView() {
   const [telegramToken, setTelegramToken] = useState("7281928374:AAH_...");
@@ -9,11 +10,36 @@ export function SettingsView() {
   const [zaloToken, setZaloToken] = useState("eyJhbGciOi...");
   const [autoApproveReady, setAutoApproveReady] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [botStatus, setBotStatus] = useState<{ telegram_enabled: boolean; zalo_enabled: boolean } | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    api.bot
+      .status()
+      .then((st) => {
+        if (mounted) {
+          setBotStatus({
+            telegram_enabled: st.telegram_enabled,
+            zalo_enabled: st.zalo_enabled,
+          });
+          if (st.telegram_chat_id) {
+            setTelegramChatId(st.telegram_chat_id);
+          }
+        }
+      })
+      .catch(() => {
+        // Offline / fallback mode
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleSave = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
+
 
   return (
     <div className="page settings-page">
@@ -51,7 +77,9 @@ export function SettingsView() {
               <span style={{ fontSize: "18px" }}>✈️</span>
               <h3>Telegram Bot &amp; Phê duyệt Di động</h3>
             </div>
-            <span className="badge-clean badge-clean-info">Đang kết nối trực tiếp</span>
+            <span className={`badge-clean ${botStatus?.telegram_enabled ? "badge-clean-success" : "badge-clean-info"}`}>
+              {botStatus?.telegram_enabled ? "Đang hoạt động (Live)" : "Đang kết nối"}
+            </span>
           </div>
 
           <div style={{ marginBottom: "14px" }}>
@@ -102,8 +130,11 @@ export function SettingsView() {
               <span style={{ fontSize: "18px" }}>💬</span>
               <h3>Zalo Official Account (Zalo OA)</h3>
             </div>
-            <span className="badge-clean badge-clean-info">Zalo v4</span>
+            <span className={`badge-clean ${botStatus?.zalo_enabled ? "badge-clean-success" : "badge-clean-info"}`}>
+              {botStatus?.zalo_enabled ? "Đã kết nối OA" : "Chế độ kiểm thử (Sandbox)"}
+            </span>
           </div>
+
 
           <div style={{ marginBottom: "16px" }}>
             <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>

@@ -128,5 +128,72 @@ class TestExcelIngestion(unittest.TestCase):
 
 
 
+    def _create_sample_flat_table_excel_bytes(self) -> bytes:
+        """Create a flat tabular Excel file (like CSV with po_number, customer, sku, qty, price columns)."""
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Orders"
+
+        # Row 1: Flat Column Headers
+        headers = ["PO Number", "Customer Name", "Order Date", "SKU", "Description", "Quantity", "Unit Price", "UOM"]
+        for col_idx, h in enumerate(headers, 1):
+            ws.cell(row=1, column=col_idx, value=h)
+
+        # Data Rows
+        rows = [
+            ("PO-FLAT-9988", "VinMart Hypermarket", "2026-09-01", "LAPTOP-A14", "A14 Business Laptop", 3, 18500000, "PCS"),
+            ("PO-FLAT-9988", "VinMart Hypermarket", "2026-09-01", "CAB-CAT6-3M", "Cat6 Cable 3m", 20, 72000, "PCS"),
+        ]
+        for r_offset, r_data in enumerate(rows):
+            r_num = 2 + r_offset
+            for c_idx, val in enumerate(r_data, 1):
+                ws.cell(row=r_num, column=c_idx, value=val)
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
+
+    def test_excel_flat_table_layout_metadata_and_items(self):
+        """Test ExcelExtractor correctly extracts PO and Customer from flat table columns without misidentifying headers."""
+        excel_bytes = self._create_sample_flat_table_excel_bytes()
+        extractor = ExcelExtractor()
+        extracted, domain_order = extractor.extract(excel_bytes, "test_file_name_should_not_be_used.xlsx")
+
+        # PO must come from the 'PO Number' column, NOT filename
+        self.assertEqual(extracted.header.po_number, "PO-FLAT-9988")
+        self.assertEqual(domain_order.po_number, "PO-FLAT-9988")
+
+        # Customer must come from 'Customer Name' column, NOT the adjacent 'SKU' column header
+        self.assertEqual(extracted.header.customer, "VinMart Hypermarket")
+        self.assertEqual(domain_order.customer, "VinMart Hypermarket")
+
+        # Items
+        self.assertEqual(len(extracted.items), 2)
+        self.assertEqual(extracted.items[0].sku, "LAPTOP-A14")
+        self.assertEqual(extracted.items[0].quantity, 3)
+        self.assertEqual(extracted.items[0].unit_price, Decimal("18500000"))
+        self.assertEqual(extracted.items[1].sku, "CAB-CAT6-3M")
+        self.assertEqual(extracted.items[1].quantity, 20)
+        self.assertEqual(extracted.items[1].unit_price, Decimal("72000"))
+
+        # Subtotal: 3 * 18,500,000 + 20 * 72,000 = 55,500,000 + 1,440,000 = 56,940,000
+        self.assertEqual(extracted.header.subtotal, Decimal("56940000"))
+        self.assertTrue(extracted.math_verification.is_valid)
+
+    def test_api_upload_excel_flat_table(self):
+        """Test POST /api/v1/ingest/extract with flat table Excel file."""
+        excel_bytes = self._create_sample_flat_table_excel_bytes()
+        files = {
+            "file": ("arbitrary_filename.xlsx", excel_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        }
+        res = self.client.post("/api/v1/ingest/extract", files=files)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["header"]["po_number"], "PO-FLAT-9988")
+        self.assertEqual(data["header"]["customer"], "VinMart Hypermarket")
+        self.assertEqual(len(data["items"]), 2)
+
+
 if __name__ == "__main__":
     unittest.main()
+

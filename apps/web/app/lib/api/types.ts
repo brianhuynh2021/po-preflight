@@ -153,15 +153,26 @@ export interface SKUMatchCandidate {
 }
 
 export interface SKUMatchResult {
-  query_sku: string;
+  raw_query: string;
   matched_sku?: string | null;
   name?: string | null;
+  unit_price?: number | null;
+  stock?: number | null;
+  active?: boolean;
   confidence_score: number;
   tier_used: string;
   is_confident: boolean;
   candidates: SKUMatchCandidate[];
   explanation: string;
 }
+
+export interface BotConfigStatus {
+  telegram_enabled: boolean;
+  telegram_chat_id?: string | null;
+  zalo_enabled: boolean;
+  webhook_url: string;
+}
+
 
 export interface MathVerificationResult {
   is_valid: boolean;
