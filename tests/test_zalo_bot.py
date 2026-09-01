@@ -12,13 +12,18 @@ from starlette.testclient import TestClient
 from preflight.api.app import app
 from preflight.bot.zalo import ZaloBotService, format_zalo_notification
 from preflight.models import Analysis, LineItem, Order
+from preflight.security.rate_limiter import global_rate_limiter
 from preflight.store import AuditStore
 
 
 class TestZaloBot(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(app)
+        cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
+
+    def setUp(self):
+        global_rate_limiter.reset()
+
 
     def test_format_zalo_notification(self):
         """Test formatting Zalo OA rich interactive card."""

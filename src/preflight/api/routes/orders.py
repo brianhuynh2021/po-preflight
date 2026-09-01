@@ -196,9 +196,11 @@ def get_order_detail(
 async def upload_order(
     file: UploadFile = File(..., description="Purchase order document file"),
     staged_review: bool = Query(False, description="Stage order in extraction_review state before running preflight rules"),
+    user: UserPrincipal = Depends(require_role(Role.VIEWER)),
     store: AuditStore = Depends(get_audit_store),
     catalog: dict[str, Product] = Depends(get_catalog),
 ) -> OrderDetailResponse:
+
     upload_dir = Path("runtime/uploads")
     upload_dir.mkdir(parents=True, exist_ok=True)
     prefix = uuid.uuid4().hex

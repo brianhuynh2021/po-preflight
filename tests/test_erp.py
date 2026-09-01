@@ -15,18 +15,21 @@ from preflight.erp.schemas import (
     ERPSyncPayload,
 )
 from preflight.erp.worker import OutboxSyncWorker
+from preflight.security.rate_limiter import global_rate_limiter
 
 
 class TestERPAndOutboxWorker(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(app)
+        cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
 
     def setUp(self):
+        global_rate_limiter.reset()
         self.outbox = OutboxStore(":memory:")
         self.sap_adapter = MockSAPAdapter()
         self.odoo_adapter = MockOdooAdapter()
         self.worker = OutboxSyncWorker(outbox_store=self.outbox, adapter=self.sap_adapter)
+
 
     def test_mock_sap_adapter(self):
         """Test Mock SAP Adapter returns SAP-SO reference."""

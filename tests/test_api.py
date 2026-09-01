@@ -11,13 +11,18 @@ from starlette.testclient import TestClient
 
 from preflight.api.app import app
 from preflight.api.deps import DEFAULT_CATALOG_PATH, DEFAULT_DB_PATH
+from preflight.security.rate_limiter import global_rate_limiter
 from preflight.store import AuditStore
 
 
 class TestFastAPIGateway(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(app)
+        cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
+
+    def setUp(self):
+        global_rate_limiter.reset()
+
 
     def test_health_endpoint(self):
         response = self.client.get("/health")

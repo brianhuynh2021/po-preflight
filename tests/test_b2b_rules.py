@@ -16,6 +16,7 @@ from preflight.models import (
     UOMConversion,
 )
 from preflight.rules import analyze_order
+from preflight.security.rate_limiter import global_rate_limiter
 from preflight.store import AuditStore
 
 
@@ -32,6 +33,7 @@ class TestB2BRules(unittest.TestCase):
                 base_uom="PCS",
                 moq=2,
                 pack_size=1,
+
             ),
             "CAB-CAT6-3M": Product(
                 sku="CAB-CAT6-3M",
@@ -44,7 +46,11 @@ class TestB2BRules(unittest.TestCase):
                 pack_size=5,
             ),
         }
-        cls.client = TestClient(app)
+        cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
+
+    def setUp(self):
+        global_rate_limiter.reset()
+
 
     # -----------------------------------------------------------------
     # Issue #72: Contract Price Lists & Volume Tier Discounts

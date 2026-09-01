@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import os
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from preflight.api.deps import get_store
 from preflight.api.events import event_bus
 from preflight.bot.schemas import BotConfigStatus, BotNotificationResult, TelegramUpdate
 from preflight.bot.telegram import TelegramBotService
 from preflight.bot.zalo import ZaloBotService
+from preflight.security.rbac import Role, UserPrincipal, require_role
 from preflight.store import AuditStore
 
 router = APIRouter(prefix="/api/v1/bot", tags=["Multi-Channel Approval Bots (Telegram & Zalo)"])
@@ -42,6 +43,7 @@ def get_bot_status() -> BotConfigStatus:
 def send_telegram_alert(
     order_id: int,
     request: Request,
+    user: UserPrincipal = Depends(require_role(Role.MANAGER)),
     store: AuditStore = Depends(get_store),
 ) -> BotNotificationResult:
     order = store.get_order(order_id)
@@ -61,6 +63,7 @@ def send_telegram_alert(
 def set_telegram_webhook(
     webhook_url: str,
     secret_token: str | None = None,
+    user: UserPrincipal = Depends(require_role(Role.ADMIN)),
     store: AuditStore = Depends(get_store),
 ) -> dict[str, Any]:
     bot_service = TelegramBotService(store=store)
@@ -76,8 +79,17 @@ async def telegram_webhook(
     request: Request,
     store: AuditStore = Depends(get_store),
 ) -> dict[str, Any]:
-    # Anti-Spoofing Guard: Verify Secret Token if configured
+    # Anti-Spoofing Guard: Verify Secret Token if configured or required in production
+    env_name = os.getenv("PREFLIGHT_ENV", "development").strip().lower()
+    is_production = env_name in ("production", "prod")
     expected_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET") or os.getenv("TELEGRAM_SECRET_TOKEN")
+
+    if is_production and not expected_secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Telegram webhook secret token is not configured in production environment.",
+        )
+
     if expected_secret:
         token_header = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
         if not token_header or token_header != expected_secret:
@@ -152,6 +164,7 @@ async def telegram_webhook(
 def send_zalo_alert(
     order_id: int,
     request: Request,
+    user: UserPrincipal = Depends(require_role(Role.MANAGER)),
     store: AuditStore = Depends(get_store),
 ) -> BotNotificationResult:
     order = store.get_order(order_id)
@@ -176,8 +189,21 @@ async def zalo_webhook(
     signature = request.headers.get("X-Zalo-Signature", "")
     timestamp = request.headers.get("X-Zalo-Timestamp", "")
 
+    env_name = os.getenv("PREFLIGHT_ENV", "development").strip().lower()
+    is_production = env_name in ("production", "prod")
+
     zalo_service = ZaloBotService(store=store)
-    if signature and not zalo_service.verify_webhook_signature(raw_body, timestamp, signature):
+
+    if is_production and not zalo_service.secret_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Zalo webhook secret key is not configured in production environment.",
+        )
+
+    if zalo_service.secret_key:
+        if not signature or not zalo_service.verify_webhook_signature(raw_body, timestamp, signature):
+            raise HTTPException(status_code=401, detail="Invalid or missing Zalo webhook signature.")
+    elif signature and not zalo_service.verify_webhook_signature(raw_body, timestamp, signature):
         raise HTTPException(status_code=401, detail="Invalid Zalo webhook signature.")
 
     try:
@@ -198,5 +224,6 @@ async def zalo_webhook(
         )
 
     return {"ok": True, "result": result}
+
 
 

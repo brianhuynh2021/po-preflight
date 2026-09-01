@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from preflight.agent.graph import build_preflight_graph
 from preflight.api.deps import get_audit_store, get_catalog
 from preflight.models import Product
+from preflight.security.rbac import Role, UserPrincipal, require_role
 from preflight.store import AuditStore
 
 from langgraph.checkpoint.memory import MemorySaver
@@ -53,6 +54,7 @@ class AgentResumeRequest(BaseModel):
 )
 def run_agent_workflow(
     payload: AgentRunRequest,
+    user: UserPrincipal = Depends(require_role(Role.MANAGER)),
     catalog: dict[str, Product] = Depends(get_catalog),
     store: AuditStore = Depends(get_audit_store),
 ) -> dict[str, Any]:
@@ -94,9 +96,11 @@ def run_agent_workflow(
 def resume_agent_workflow(
     thread_id: str,
     payload: AgentResumeRequest,
+    user: UserPrincipal = Depends(require_role(Role.MANAGER)),
     catalog: dict[str, Product] = Depends(get_catalog),
     store: AuditStore = Depends(get_audit_store),
 ) -> dict[str, Any]:
+
     config = {"configurable": {"thread_id": thread_id}}
     graph = _get_server_graph(catalog, store)
 

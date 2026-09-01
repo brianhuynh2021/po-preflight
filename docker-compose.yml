@@ -11,10 +11,16 @@ services:
       - "8001:8001"
     environment:
       - PORT=8001
-      - PREFLIGHT_AUTH_REQUIRED=false
+      - PREFLIGHT_ENV=development
+      - PREFLIGHT_AUTH_REQUIRED=true
+      - PREFLIGHT_ADMIN_KEY=pf_dev_adm_9901
+      - PREFLIGHT_MANAGER_KEY=pf_dev_mgr_8802
+      - PREFLIGHT_AUDITOR_KEY=pf_dev_aud_7703
+      - PREFLIGHT_VIEWER_KEY=pf_dev_view_6604
       - PREFLIGHT_DB_PATH=/app/runtime/data/preflight.db
       - TELEGRAM_DRY_RUN=true
       - ZALO_DRY_RUN=true
+
     volumes:
       - ./runtime/data:/app/runtime/data
       - ./runtime/uploads:/app/runtime/uploads

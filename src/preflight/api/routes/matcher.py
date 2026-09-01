@@ -7,6 +7,7 @@ from preflight.api.deps import get_audit_store, get_catalog
 from preflight.models import Product
 from preflight.rag.matcher import HybridSKUMatcher
 from preflight.rag.schemas import BatchResolveRequest, MatchResult, ResolveRequest
+from preflight.security.rbac import Role, UserPrincipal, require_role
 from preflight.store import AuditStore
 from pydantic import BaseModel, Field
 
@@ -30,6 +31,7 @@ class LearnAliasRequest(BaseModel):
 )
 def resolve_sku(
     payload: ResolveRequest,
+    user: UserPrincipal = Depends(require_role(Role.VIEWER)),
     catalog: dict[str, Product] = Depends(get_catalog),
     store: AuditStore = Depends(get_audit_store),
 ) -> MatchResult:
@@ -45,6 +47,7 @@ def resolve_sku(
 )
 def batch_resolve_skus(
     payload: BatchResolveRequest,
+    user: UserPrincipal = Depends(require_role(Role.VIEWER)),
     catalog: dict[str, Product] = Depends(get_catalog),
     store: AuditStore = Depends(get_audit_store),
 ) -> list[MatchResult]:
@@ -59,9 +62,11 @@ def batch_resolve_skus(
 )
 def learn_customer_alias(
     payload: LearnAliasRequest,
+    user: UserPrincipal = Depends(require_role(Role.MANAGER)),
     catalog: dict[str, Product] = Depends(get_catalog),
     store: AuditStore = Depends(get_audit_store),
 ) -> dict[str, Any]:
+
     matcher = HybridSKUMatcher(catalog, store=store)
     matcher.learn_alias(payload.customer_id, payload.raw_query, payload.target_sku)
     return {

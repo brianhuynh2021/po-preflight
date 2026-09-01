@@ -18,14 +18,19 @@ from preflight.ingestion.schemas import (
     ExtractorEngine,
 )
 from preflight.ingestion.verifier import SelfReflectionVerifier
+from preflight.security.rate_limiter import global_rate_limiter
 
 
 class TestIngestionAndVisionOCR(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(app)
+        cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
         cls.pipeline = IntelligentIngestionPipeline()
         cls.verifier = SelfReflectionVerifier()
+
+    def setUp(self):
+        global_rate_limiter.reset()
+
 
     def test_document_type_detection(self):
         """Test accurate classification of document types."""

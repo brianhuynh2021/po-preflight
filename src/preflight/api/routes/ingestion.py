@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from typing import Any
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from preflight.ingestion.pipeline import IntelligentIngestionPipeline
 from preflight.ingestion.schemas import ExtractedOrder
+from preflight.security.rbac import Role, UserPrincipal, require_role
 
 router = APIRouter(prefix="/api/v1/ingest", tags=["Multimodal Ingestion & Vision OCR"])
 
@@ -22,7 +23,9 @@ _INGESTION_PIPELINE = IntelligentIngestionPipeline()
 )
 async def extract_purchase_order(
     file: UploadFile = File(..., description="Purchase order document (PDF, PNG, JPG, CSV, JSON)"),
+    user: UserPrincipal = Depends(require_role(Role.VIEWER)),
 ) -> ExtractedOrder:
+
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No file uploaded.")
 
