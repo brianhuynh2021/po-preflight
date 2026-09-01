@@ -12,6 +12,19 @@ from preflight.store import AuditStore
 logger = logging.getLogger("PreflightBot")
 
 
+def format_currency(value: float | int | Decimal, currency: str = "VND") -> str:
+    """Format monetary values according to currency standards."""
+    curr_upper = (currency or "VND").upper()
+    num = float(value)
+    if curr_upper == "USD":
+        return f"${num:,.2f}"
+    if curr_upper == "EUR":
+        return f"€{num:,.2f}"
+    if curr_upper == "GBP":
+        return f"£{num:,.2f}"
+    return f"{num:,.0f} {curr_upper}"
+
+
 def format_telegram_po_card(order: dict[str, Any]) -> str:
     """Format rich HTML card for Telegram purchase order alerts."""
     po_num = order.get("po_number", "N/A")
@@ -38,7 +51,7 @@ def format_telegram_po_card(order: dict[str, Any]) -> str:
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"🆔 <b>Mã Đơn:</b> <code>{po_num}</code>\n"
         f"🏢 <b>Khách hàng:</b> <b>{cust}</b>\n"
-        f"💰 <b>Tổng giá trị:</b> <code>{total_val:,.0f} {curr}</code>\n"
+        f"💰 <b>Tổng giá trị:</b> <code>{format_currency(total_val, curr)}</code>\n"
         f"📊 <b>Trạng thái:</b> {status_badge}\n"
         f"🛡️ <b>Mức độ rủi ro:</b> {risk_emoji} <b>{risk}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -50,7 +63,7 @@ def format_telegram_po_card(order: dict[str, Any]) -> str:
         sku = item.get("sku", "N/A")
         qty = item.get("quantity", 0)
         price = item.get("unit_price", 0)
-        text += f"  {idx}. <code>{sku}</code> × {qty} (đơn giá: {price:,.0f})\n"
+        text += f"  {idx}. <code>{sku}</code> × {qty} (đơn giá: {format_currency(price, curr)})\n"
     if len(lines) > 3:
         text += f"  <i>...và {len(lines) - 3} sản phẩm khác</i>\n"
 

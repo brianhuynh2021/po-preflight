@@ -1,0 +1,9 @@
+{
+  "po_number": "PO-10433",
+  "customer": "Global Silicon Valley Corp",
+  "currency": "USD",
+  "items": [
+    {"sku": "LAPTOP-A14", "quantity": 3, "unit_price": 850},
+    {"sku": "DOCK-USBC", "quantity": 3, "unit_price": 120}
+  ]
+}
