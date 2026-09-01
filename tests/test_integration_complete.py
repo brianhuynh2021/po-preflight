@@ -21,6 +21,7 @@ from preflight.models import Analysis, LineItem, Order, Product
 from preflight.rag.matcher import HybridSKUMatcher
 from preflight.rules import analyze_order
 from preflight.security.audit_chain import AuditHashChain
+from preflight.security.rate_limiter import global_rate_limiter
 from preflight.store import AuditStore
 
 
@@ -35,14 +36,16 @@ class TestCompleteIntegrationSuite(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(app)
+        cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
         cls.catalog = get_catalog()
 
     def setUp(self):
+        global_rate_limiter.reset()
         self.tmp_dir = TemporaryDirectory()
         self.db_path = Path(self.tmp_dir.name) / "test_integration.db"
         self.store = AuditStore(self.db_path)
         self.outbox = OutboxStore(self.db_path)
+
 
     def tearDown(self):
         self.store.close()

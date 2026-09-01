@@ -8,13 +8,14 @@ from starlette.testclient import TestClient
 from preflight.api.app import app
 from preflight.bot.telegram import TelegramBotService, build_approval_inline_keyboard, format_telegram_po_card
 from preflight.bot.zalo import format_zalo_notification
+from preflight.security.rate_limiter import global_rate_limiter
 from preflight.store import AuditStore
 
 
 class TestBotServices(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(app)
+        cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
         cls.sample_order = {
             "id": 1,
             "po_number": "PO-TEST-99",
@@ -34,6 +35,10 @@ class TestBotServices(unittest.TestCase):
                 }
             ],
         }
+
+    def setUp(self):
+        global_rate_limiter.reset()
+
 
     def test_telegram_card_formatting(self):
         card = format_telegram_po_card(self.sample_order)

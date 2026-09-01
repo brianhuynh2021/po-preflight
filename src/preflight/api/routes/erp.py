@@ -11,6 +11,7 @@ from preflight.erp.adapters.sap import MockSAPAdapter
 from preflight.erp.outbox import BaseOutboxStore, OutboxStore, create_outbox_store
 from preflight.erp.schemas import ERPAdapterType, ERPSyncResponse, OutboxStats
 from preflight.erp.worker import OutboxSyncWorker
+from preflight.security.rbac import Role, UserPrincipal, require_role
 from preflight.store import AuditStore, BaseAuditStore
 
 router = APIRouter(prefix="/api/v1/erp", tags=["ERP Integration & Outbox Worker"])
@@ -29,9 +30,11 @@ def get_outbox_store(db_path: str = Depends(get_db_path)) -> BaseOutboxStore:
 def sync_order_to_erp(
     order_id: int,
     adapter_type: ERPAdapterType = Query(ERPAdapterType.MOCK_SAP, description="ERP target system"),
+    user: UserPrincipal = Depends(require_role(Role.MANAGER)),
     store: AuditStore = Depends(get_audit_store),
     outbox: OutboxStore = Depends(get_outbox_store),
 ) -> ERPSyncResponse:
+
     order = store.get_order(order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Order {order_id} not found.")
@@ -98,8 +101,10 @@ def sync_order_to_erp(
 def process_outbox_queue(
     limit: int = Query(10, ge=1, le=50, description="Max batch size"),
     adapter_type: ERPAdapterType = Query(ERPAdapterType.MOCK_SAP, description="ERP target adapter"),
+    user: UserPrincipal = Depends(require_role(Role.MANAGER)),
     outbox: OutboxStore = Depends(get_outbox_store),
 ) -> dict[str, Any]:
+
     adapter = MockOdooAdapter() if adapter_type == ERPAdapterType.MOCK_ODOO else MockSAPAdapter()
     worker = OutboxSyncWorker(outbox_store=outbox, adapter=adapter)
 

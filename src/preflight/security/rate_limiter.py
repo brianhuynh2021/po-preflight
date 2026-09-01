@@ -10,6 +10,9 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.responses import Response
 
 
+import os
+
+
 class SlidingWindowRateLimiter:
     """Thread-safe sliding window rate limiter for DDoS and abuse mitigation."""
 
@@ -18,6 +21,7 @@ class SlidingWindowRateLimiter:
         self.window_seconds = window_seconds
         self._history: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
+        self.enabled = os.getenv("PREFLIGHT_RATE_LIMIT_ENABLED", "true").lower() in ("true", "1", "yes")
 
         # Custom path limits
         self.path_limits: dict[str, int] = {
@@ -28,14 +32,12 @@ class SlidingWindowRateLimiter:
 
     def is_allowed(self, client_key: str, path: str = "") -> tuple[bool, int]:
         """Check if request is within rate limit. Returns (is_allowed, remaining_requests)."""
+        if not self.enabled:
+            return True, self.default_limit
+
         now = time.time()
         cutoff = now - self.window_seconds
-        
-        # In test harness with testclient (and no explicit API key), allow unlimited requests
-        if client_key == "testclient" and not path.startswith("/test-rl"):
-            limit = 10000
-        else:
-            limit = self.path_limits.get(path, self.default_limit)
+        limit = self.path_limits.get(path, self.default_limit)
 
         with self._lock:
             timestamps = self._history[client_key]
@@ -56,6 +58,7 @@ class SlidingWindowRateLimiter:
 
 
 global_rate_limiter = SlidingWindowRateLimiter()
+
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):

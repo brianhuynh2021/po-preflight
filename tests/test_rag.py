@@ -9,6 +9,7 @@ from preflight.api.app import app
 from preflight.models import Product
 from preflight.rag.matcher import HybridSKUMatcher
 from preflight.rag.schemas import ResolutionTier
+from preflight.security.rate_limiter import global_rate_limiter
 
 
 class TestHybridSKUMatcher(unittest.TestCase):
@@ -43,6 +44,13 @@ class TestHybridSKUMatcher(unittest.TestCase):
                 stock=150,
                 active=True,
             ),
+            "DESK-MAT-01": Product(
+                sku="DESK-MAT-01",
+                name="Premium Felt Desk Mat",
+                unit_price=Decimal("250000"),
+                stock=15,
+                active=True,
+            ),
             "HEADSET-PRO": Product(
                 sku="HEADSET-PRO",
                 name="Wireless Noise Cancelling Headset",
@@ -51,8 +59,12 @@ class TestHybridSKUMatcher(unittest.TestCase):
                 active=True,
             ),
         }
+
         cls.matcher = HybridSKUMatcher(cls.catalog)
-        cls.client = TestClient(app)
+        cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
+
+    def setUp(self):
+        global_rate_limiter.reset()
 
     def test_tier1_exact_match(self):
         # Exact SKU

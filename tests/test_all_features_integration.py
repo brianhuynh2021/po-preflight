@@ -8,17 +8,20 @@ from preflight.api.app import app
 from preflight.api.deps import get_audit_store, get_catalog
 from preflight.currency import fx_engine
 from preflight.rag.matcher import HybridSKUMatcher
+from preflight.security.rate_limiter import global_rate_limiter
 from preflight.store import AuditStore
 
 
 class TestAllFeaturesIntegration(unittest.TestCase):
     def setUp(self):
+        global_rate_limiter.reset()
         self.db_path = "runtime/test_all_features.db"
         Path(self.db_path).unlink(missing_ok=True)
         self.store = AuditStore(self.db_path)
         self.catalog = get_catalog()
         app.dependency_overrides[get_audit_store] = lambda: self.store
-        self.client = TestClient(app)
+        self.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
+
 
     def tearDown(self):
         app.dependency_overrides.clear()

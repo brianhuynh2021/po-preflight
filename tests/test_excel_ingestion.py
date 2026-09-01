@@ -11,12 +11,17 @@ from preflight.api.app import app
 from preflight.ingestion.excel_parser import ExcelExtractor
 from preflight.ingestion.pipeline import IntelligentIngestionPipeline
 from preflight.ingestion.schemas import DocumentType, ExtractorEngine
+from preflight.security.rate_limiter import global_rate_limiter
 
 
 class TestExcelIngestion(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(app)
+        cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
+
+    def setUp(self):
+        global_rate_limiter.reset()
+
 
     def _create_sample_excel_bytes(self) -> bytes:
         """Create a multi-sheet enterprise purchase order Excel file in memory."""

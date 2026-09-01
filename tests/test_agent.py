@@ -8,6 +8,7 @@ from starlette.testclient import TestClient
 from preflight.agent import build_preflight_graph
 from preflight.api.app import app
 from preflight.models import Product
+from preflight.security.rate_limiter import global_rate_limiter
 from preflight.store import AuditStore
 
 
@@ -37,11 +38,14 @@ class TestLangGraphAgent(unittest.TestCase):
                 active=True,
             ),
         }
-        cls.client = TestClient(app)
+        cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
+
 
     def setUp(self):
+        global_rate_limiter.reset()
         self.store = AuditStore(":memory:")
         self.graph = build_preflight_graph(self.catalog, self.store)
+
 
     def test_clean_order_auto_erp_sync(self):
         """Test clean order flows straight through to ERP without interruption."""

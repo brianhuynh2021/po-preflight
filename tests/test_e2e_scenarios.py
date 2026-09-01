@@ -13,7 +13,9 @@ from preflight.api.deps import get_audit_store, get_catalog, get_store
 from preflight.models import Analysis, LineItem, Order, Product
 from preflight.parsers import parse_order_content
 from preflight.rules import analyze_order
+from preflight.security.rate_limiter import global_rate_limiter
 from preflight.store import AuditStore
+
 
 
 class TestEndToEndScenarios(unittest.TestCase):
@@ -29,10 +31,13 @@ class TestEndToEndScenarios(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(app)
+        cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
         cls.catalog = get_catalog()
 
     def setUp(self):
+        self._orig_rl_enabled = global_rate_limiter.enabled
+        global_rate_limiter.enabled = False
+        global_rate_limiter.reset()
         self.tmp_dir = TemporaryDirectory()
         self.db_path = Path(self.tmp_dir.name) / "test_e2e.db"
         self.store = AuditStore(self.db_path)
@@ -44,9 +49,12 @@ class TestEndToEndScenarios(unittest.TestCase):
         app.dependency_overrides[get_store] = _override_store
 
     def tearDown(self):
+        global_rate_limiter.enabled = self._orig_rl_enabled
+        global_rate_limiter.reset()
         app.dependency_overrides.clear()
         self.store.close()
         self.tmp_dir.cleanup()
+
 
     def test_e2e_multi_format_ingestion(self):
         """Test intake across JSON, CSV, and Plaintext table formats."""

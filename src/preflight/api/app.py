@@ -75,10 +75,38 @@ def seed_initial_data() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("⚡ Starting PO Preflight REST Gateway...")
+
+    # Startup Security Auditing
+    env_name = os.getenv("PREFLIGHT_ENV", "development").strip().lower()
+    is_production = env_name in ("production", "prod")
+    auth_required = os.getenv("PREFLIGHT_AUTH_REQUIRED", "true").lower() in ("true", "1", "yes")
+
+    if is_production:
+        has_prod_key = any(
+            os.getenv(k)
+            for k in [
+                "PREFLIGHT_ADMIN_KEY",
+                "PREFLIGHT_MANAGER_KEY",
+                "PREFLIGHT_AUDITOR_KEY",
+                "PREFLIGHT_VIEWER_KEY",
+            ]
+        )
+        if not has_prod_key:
+            logger.error(
+                "SECURITY ALERT: Running in PRODUCTION mode with no PREFLIGHT_*_KEY configured! "
+                "All authenticated endpoints will reject requests."
+            )
+    elif not auth_required:
+        logger.warning(
+            "SECURITY NOTICE: Running in OPEN DEVELOPMENT mode (PREFLIGHT_AUTH_REQUIRED=false). "
+            "Anonymous requests will receive dev_admin privileges."
+        )
+
     seed_initial_data()
     logger.info("🚀 PO Preflight REST Gateway is ready! Swagger UI at http://localhost:8000/docs")
     yield
     logger.info("🛑 Shutting down PO Preflight REST Gateway...")
+
 
 
 app = FastAPI(

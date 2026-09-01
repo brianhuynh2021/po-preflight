@@ -24,23 +24,24 @@ class UserPrincipal:
 
 import secrets
 
-# Default dev keys for local development and test harness
+# Default dev keys for local development and test harness outside production
 DEFAULT_API_KEYS: dict[str, tuple[str, Role]] = {
     "pf_dev_adm_9901": ("system_administrator", Role.ADMIN),
     "pf_dev_mgr_8802": ("operations_manager", Role.MANAGER),
     "pf_dev_aud_7703": ("compliance_auditor", Role.AUDITOR),
     "pf_dev_view_6604": ("readonly_viewer", Role.VIEWER),
-    # Maintain compatibility with existing test suites
-    "pf_live_adm_9901": ("system_administrator", Role.ADMIN),
-    "pf_live_mgr_8802": ("operations_manager", Role.MANAGER),
-    "pf_live_aud_7703": ("compliance_auditor", Role.AUDITOR),
-    "pf_live_view_6604": ("readonly_viewer", Role.VIEWER),
 }
 
 
 def get_api_key_registry() -> dict[str, tuple[str, Role]]:
-    """Load API key registry from environment or fallback to defaults."""
-    registry = dict(DEFAULT_API_KEYS)
+    """Load API key registry. Dev keys are only available outside production."""
+    env_name = os.getenv("PREFLIGHT_ENV", "development").strip().lower()
+    is_production = env_name in ("production", "prod")
+
+    registry: dict[str, tuple[str, Role]] = {}
+    if not is_production:
+        registry.update(DEFAULT_API_KEYS)
+
     for env_key, role in [
         ("PREFLIGHT_ADMIN_KEY", Role.ADMIN),
         ("PREFLIGHT_MANAGER_KEY", Role.MANAGER),
@@ -58,7 +59,7 @@ def get_current_user(
     authorization: Optional[str] = Header(None),
 ) -> UserPrincipal:
     """Validate API Key or Bearer Token and return authenticated UserPrincipal."""
-    auth_required = os.getenv("PREFLIGHT_AUTH_REQUIRED", "false").lower() in ("true", "1", "yes")
+    auth_required = os.getenv("PREFLIGHT_AUTH_REQUIRED", "true").lower() in ("true", "1", "yes")
     registry = get_api_key_registry()
 
     token = None
@@ -77,7 +78,6 @@ def get_current_user(
             headers={"WWW-Authenticate": "ApiKey"},
         )
 
-
     if auth_required:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -85,12 +85,21 @@ def get_current_user(
             headers={"WWW-Authenticate": "ApiKey"},
         )
 
-    # In open development mode, default to Admin privileges
+    # Open development mode — never allowed in production
+    env_name = os.getenv("PREFLIGHT_ENV", "development").strip().lower()
+    if env_name in ("production", "prod"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required in production.",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
     return UserPrincipal(
         username="dev_admin",
         role=Role.ADMIN,
         api_key_id="dev_mode_open",
     )
+
 
 
 def require_role(min_role: Role) -> Callable[[UserPrincipal], UserPrincipal]:

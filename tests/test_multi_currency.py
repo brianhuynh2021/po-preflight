@@ -9,12 +9,17 @@ from starlette.testclient import TestClient
 from preflight.api.app import app
 from preflight.bot.telegram import format_currency, format_telegram_po_card
 from preflight.parsers import parse_order_content
+from preflight.security.rate_limiter import global_rate_limiter
 
 
 class TestMultiCurrencySupport(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(app)
+        cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
+
+    def setUp(self):
+        global_rate_limiter.reset()
+
 
     def test_currency_formatter(self):
         """Test formatting standards for different currencies."""
