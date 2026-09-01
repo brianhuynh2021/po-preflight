@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { money } from "@/app/lib/derive";
 
 export function LandingPageView() {
-  // Interactive Demo Video / Showcase State
+  // Auto-Playing Video Simulation State
   const [activeDemoTab, setActiveDemoTab] = useState<"intake" | "approval" | "merkle">("intake");
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [progress, setProgress] = useState(0);
 
   // Interactive Sandbox State
   const [testQuery, setTestQuery] = useState("dây mạng 3m bấm sẵn");
@@ -23,6 +25,30 @@ export function LandingPageView() {
   const [leadCompany, setLeadCompany] = useState("");
   const [leadPhone, setLeadPhone] = useState("");
   const [submitted, setSubmitted] = useState(false);
+
+  // Auto-play timer for video simulation
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          setActiveDemoTab((curr) => {
+            if (curr === "intake") return "approval";
+            if (curr === "approval") return "merkle";
+            return "intake";
+          });
+          return 0;
+        }
+        return prev + 2.5; // 4 seconds per cycle
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isPlaying, activeDemoTab]);
+
+  const selectTab = (tab: "intake" | "approval" | "merkle") => {
+    setActiveDemoTab(tab);
+    setProgress(0);
+  };
 
   // Quick preset queries for sandbox
   const presets = [
@@ -116,7 +142,7 @@ export function LandingPageView() {
         </div>
 
         <nav style={{ display: "flex", alignItems: "center", gap: "24px", fontSize: "13.5px", fontWeight: 500 }}>
-          <a href="#demo-video" style={{ color: "var(--muted)", textDecoration: "none", fontWeight: 600 }}>🎬 Video Demo Trực Quan</a>
+          <a href="#demo-video" style={{ color: "var(--muted)", textDecoration: "none", fontWeight: 600 }}>🎬 Video Demo Tự Động</a>
           <a href="#problem" style={{ color: "var(--muted)", textDecoration: "none" }}>Vấn Đề & Rủi Ro</a>
           <a href="#sandbox" style={{ color: "var(--muted)", textDecoration: "none" }}>Thử Nghiệm Khớp Mã</a>
           <a href="#roi" style={{ color: "var(--muted)", textDecoration: "none" }}>Bảng Tính ROI</a>
@@ -172,7 +198,7 @@ export function LandingPageView() {
             className="primary-button"
             style={{ fontSize: "15px", padding: "12px 24px", textDecoration: "none", fontWeight: 700 }}
           >
-            🎬 Xem Video Demo Trực Quan (3 Chế Độ)
+            🎬 Xem Video Demo Tự Động Chạy ↓
           </a>
           <a
             href="/overview"
@@ -184,7 +210,7 @@ export function LandingPageView() {
         </div>
       </section>
 
-      {/* 3. INTERACTIVE VISUAL DEMO & VIDEO SHOWCASE PLAYER */}
+      {/* 3. AUTO-PLAYING INTERACTIVE VIDEO DEMO SHOWCASE PLAYER */}
       <section id="demo-video" style={{ maxWidth: "1160px", margin: "0 auto 64px", padding: "0 24px" }}>
         <div
           className="clean-card"
@@ -198,39 +224,126 @@ export function LandingPageView() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", flexWrap: "wrap", gap: "12px" }}>
             <div>
-              <p className="eyebrow" style={{ margin: "0 0 2px" }}>LIVE PRODUCT DEMO SHOWCASE</p>
-              <h2 style={{ fontSize: "20px", fontWeight: 800, margin: 0, letterSpacing: "-0.01em" }}>
-                Trải Nghiệm Quy Trình Vận Hành Thực Tế
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span className="live-dot" />
+                <span className="eyebrow" style={{ margin: 0 }}>AUTO-PLAYING LIVE SIMULATION</span>
+              </div>
+              <h2 style={{ fontSize: "22px", fontWeight: 800, margin: "4px 0 0", letterSpacing: "-0.01em" }}>
+                Video Demo Tự Động Chạy — Quy Trình 3 Chặng Khép Kín
               </h2>
             </div>
 
-            {/* Interactive Mode Tabs */}
-            <div style={{ display: "flex", gap: "6px", background: "var(--canvas)", padding: "4px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <button
-                className={activeDemoTab === "intake" ? "primary-button" : "secondary-button"}
-                style={{ fontSize: "12.5px", padding: "6px 14px" }}
-                onClick={() => setActiveDemoTab("intake")}
+                className="secondary-button"
+                style={{ fontSize: "12px", padding: "6px 12px" }}
+                onClick={() => setIsPlaying(!isPlaying)}
               >
-                📄 1. Bóc Tách & Đối Chiếu Song Song
-              </button>
-              <button
-                className={activeDemoTab === "approval" ? "primary-button" : "secondary-button"}
-                style={{ fontSize: "12.5px", padding: "6px 14px" }}
-                onClick={() => setActiveDemoTab("approval")}
-              >
-                📱 2. Duyệt 1 Chạm Telegram / Zalo
-              </button>
-              <button
-                className={activeDemoTab === "merkle" ? "primary-button" : "secondary-button"}
-                style={{ fontSize: "12.5px", padding: "6px 14px" }}
-                onClick={() => setActiveDemoTab("merkle")}
-              >
-                🔒 3. Chứng Thư Merkle & SAP Sync
+                {isPlaying ? "⏸ Tạm Dừng" : "▶ Tiếp Tục Phát"}
               </button>
             </div>
           </div>
 
-          {/* Media Player Frame */}
+          {/* 3 Horizontal Progress Segment Tabs */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+            {/* Step 1 Tab */}
+            <div
+              onClick={() => selectTab("intake")}
+              style={{
+                cursor: "pointer",
+                padding: "10px 14px",
+                borderRadius: "8px",
+                background: activeDemoTab === "intake" ? "var(--canvas)" : "transparent",
+                border: activeDemoTab === "intake" ? "1px solid var(--green)" : "1px solid var(--line)",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ fontSize: "12px", fontWeight: 700, color: activeDemoTab === "intake" ? "var(--green)" : "var(--ink)" }}>
+                1. Bóc Tách & Đối Chiếu Song Song
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "2px" }}>OCR Vision + Đối chiếu kho &lt;15ms</div>
+              {activeDemoTab === "intake" && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    height: "3px",
+                    background: "var(--green)",
+                    width: `${progress}%`,
+                    transition: "width 0.1s linear",
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Step 2 Tab */}
+            <div
+              onClick={() => selectTab("approval")}
+              style={{
+                cursor: "pointer",
+                padding: "10px 14px",
+                borderRadius: "8px",
+                background: activeDemoTab === "approval" ? "var(--canvas)" : "transparent",
+                border: activeDemoTab === "approval" ? "1px solid var(--amber)" : "1px solid var(--line)",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ fontSize: "12px", fontWeight: 700, color: activeDemoTab === "approval" ? "var(--amber)" : "var(--ink)" }}>
+                2. Bắn Alert & Duyệt 1 Chạm Telegram
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "2px" }}>Dừng luồng HITL khi có rủi ro</div>
+              {activeDemoTab === "approval" && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    height: "3px",
+                    background: "var(--amber)",
+                    width: `${progress}%`,
+                    transition: "width 0.1s linear",
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Step 3 Tab */}
+            <div
+              onClick={() => selectTab("merkle")}
+              style={{
+                cursor: "pointer",
+                padding: "10px 14px",
+                borderRadius: "8px",
+                background: activeDemoTab === "merkle" ? "var(--canvas)" : "transparent",
+                border: activeDemoTab === "merkle" ? "1px solid var(--green)" : "1px solid var(--line)",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ fontSize: "12px", fontWeight: 700, color: activeDemoTab === "merkle" ? "var(--green)" : "var(--ink)" }}>
+                3. Chứng Thư Merkle & Đẩy SAP ERP
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "2px" }}>Niêm phong SHA-256 SOX 404</div>
+              {activeDemoTab === "merkle" && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    height: "3px",
+                    background: "var(--green)",
+                    width: `${progress}%`,
+                    transition: "width 0.1s linear",
+                  }}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Animated Media Frame */}
           <div
             style={{
               position: "relative",
@@ -259,7 +372,7 @@ export function LandingPageView() {
                     color: "#fff",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                     <div>
                       <span className="badge-clean badge-clean-success" style={{ marginBottom: "6px", display: "inline-block" }}>
                         CHẶNG 1 & 2: INGESTION & DUAL-PANE OCR
@@ -297,7 +410,7 @@ export function LandingPageView() {
                     color: "#fff",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                     <div>
                       <span className="badge-clean badge-clean-warning" style={{ marginBottom: "6px", display: "inline-block" }}>
                         CHẶNG 3 & 4: LANGGRAPH HITL & MOBILE BOT
@@ -335,7 +448,7 @@ export function LandingPageView() {
                     color: "#fff",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                     <div>
                       <span className="badge-clean badge-clean-success" style={{ marginBottom: "6px", display: "inline-block" }}>
                         CHẶNG 5 & 6: SOX 404 MERKLE ROOT & SAP OUTBOX
@@ -354,6 +467,38 @@ export function LandingPageView() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Live Telemetry Log Ticker below video frame */}
+          <div
+            style={{
+              marginTop: "14px",
+              padding: "10px 16px",
+              background: "var(--canvas)",
+              borderRadius: "8px",
+              border: "1px solid var(--line)",
+              fontSize: "12px",
+              fontFamily: "ui-monospace, monospace",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "8px",
+            }}
+          >
+            <div>
+              <span style={{ color: "var(--green)", fontWeight: 700 }}>● REAL-TIME ENGINE:</span>{" "}
+              {activeDemoTab === "intake" && (
+                <span>Ingested PO-10428.pdf ➔ Extracted 5 line items ➔ 0% price variance ➔ Confidence 99.4%</span>
+              )}
+              {activeDemoTab === "approval" && (
+                <span>Flagged INSUFFICIENT_STOCK on SKU: HEADSET-PRO ➔ Dispatched Telegram Alert to @manager ➔ Waiting callback</span>
+              )}
+              {activeDemoTab === "merkle" && (
+                <span>Generated Merkle Root: 7b3e1f9a12c4... ➔ Committed Transactional Outbox to SAP S/4HANA (SO-20268899)</span>
+              )}
+            </div>
+            <span style={{ color: "var(--muted)" }}>Tự động chuyển tiếp sau mỗi 4 giây</span>
           </div>
         </div>
       </section>
