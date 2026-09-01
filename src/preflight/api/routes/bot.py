@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from preflight.api.deps import get_store
+from preflight.api.events import event_bus
 from preflight.bot.schemas import BotConfigStatus, BotNotificationResult, TelegramUpdate
 from preflight.bot.telegram import TelegramBotService
 from preflight.bot.zalo import ZaloBotService
@@ -102,6 +103,17 @@ async def telegram_webhook(
             from_username=username,
             callback_query_id=cb_id,
         )
+
+        if result.get("success"):
+            event_bus.publish(
+                "order.decided",
+                {
+                    "order_id": str(result.get("order_id", "")),
+                    "decision": result.get("decision", ""),
+                    "actor": result.get("decided_by", ""),
+                },
+            )
+
         return {
             "ok": True,
             "handled_event": "callback_query",
