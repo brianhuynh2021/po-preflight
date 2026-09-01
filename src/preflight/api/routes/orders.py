@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from preflight.api.deps import get_audit_store, get_catalog
 from preflight.api.events import event_bus
@@ -364,4 +364,21 @@ def get_audit_certificate(
         po_number=po_number,
         order_data=row,
         decisions=decisions,
+    )
+
+
+@router.get(
+    "/events/stream",
+    summary="Order Real-Time Event Stream",
+    description="Subscribe to real-time Server-Sent Events for order lifecycle transitions.",
+)
+async def orders_events_stream() -> StreamingResponse:
+    return StreamingResponse(
+        event_bus.event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )

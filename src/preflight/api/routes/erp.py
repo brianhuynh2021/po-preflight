@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from preflight.api.deps import get_audit_store, get_db_path
+from preflight.api.events import event_bus
 from preflight.erp.adapters.odoo import MockOdooAdapter
 from preflight.erp.adapters.sap import MockSAPAdapter
 from preflight.erp.outbox import OutboxStore
@@ -59,9 +60,27 @@ def sync_order_to_erp(
     matching = next((r for r in results if r.idempotency_key == event_payload.idempotency_key), None)
 
     if matching:
+        event_bus.publish(
+            "erp.synced",
+            {
+                "order_id": order_id,
+                "po_number": po_number,
+                "transaction_id": matching.transaction_id,
+                "adapter": adapter_type.value,
+            },
+        )
         return matching
 
     # If already sent previously, return idempotent success
+    event_bus.publish(
+        "erp.synced",
+        {
+            "order_id": order_id,
+            "po_number": po_number,
+            "transaction_id": f"ERP-SO-{po_number}",
+            "adapter": adapter_type.value,
+        },
+    )
     return ERPSyncResponse(
         success=True,
         transaction_id=f"ERP-SO-{po_number}",
