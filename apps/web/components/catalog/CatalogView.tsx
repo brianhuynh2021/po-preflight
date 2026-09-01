@@ -1,9 +1,38 @@
 "use client";
 
+import { useMemo, useState } from "react";
+
+import { FilterSelect } from "@/components/common/FilterSelect";
+import { SearchFilter } from "@/components/common/SearchFilter";
 import { money } from "@/app/lib/derive";
 import { catalog } from "@/data/catalog";
 
+const STATUS_OPTIONS = [
+  { label: "All statuses", value: "all" },
+  { label: "Active", value: "active" },
+  { label: "Inactive", value: "inactive" },
+];
+
 export function CatalogView() {
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const rows = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return catalog.filter((item) => {
+      if (statusFilter === "active" && !item.active) {
+        return false;
+      }
+      if (statusFilter === "inactive" && item.active) {
+        return false;
+      }
+      if (!needle) {
+        return true;
+      }
+      return `${item.sku} ${item.name}`.toLowerCase().includes(needle);
+    });
+  }, [query, statusFilter]);
+
   return (
     <div className="page simple-page">
       <div className="page-heading">
@@ -16,10 +45,19 @@ export function CatalogView() {
       </div>
       <section className="content-card table-card">
         <div className="panel-toolbar">
-          <label className="search">
-            <span>⌕</span>
-            <input placeholder="Search SKU or product" />
-          </label>
+          <div className="toolbar-filters">
+            <SearchFilter
+              value={query}
+              onChange={setQuery}
+              placeholder="Search SKU or product"
+            />
+            <FilterSelect
+              ariaLabel="Filter by catalog status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={STATUS_OPTIONS}
+            />
+          </div>
           <span className="sync-state">
             <i /> Synced 4 minutes ago
           </span>
@@ -36,7 +74,7 @@ export function CatalogView() {
               </tr>
             </thead>
             <tbody>
-              {catalog.map((item) => (
+              {rows.map((item) => (
                 <tr key={item.sku}>
                   <td>
                     <strong>{item.sku}</strong>

@@ -1,6 +1,39 @@
 "use client";
 
+import { useMemo, useState } from "react";
+
+import { FilterSelect } from "@/components/common/FilterSelect";
+import { SearchFilter } from "@/components/common/SearchFilter";
+import { auditEntries } from "@/data/audit";
+import type { ActivityEventType } from "@/app/lib/types";
+
+type TypeFilter = "all" | ActivityEventType;
+
+const TYPE_OPTIONS = [
+  { label: "All events", value: "all" },
+  { label: "Human decisions", value: "human" },
+  { label: "System events", value: "system" },
+];
+
 export function AuditView() {
+  const [query, setQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+
+  const rows = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return auditEntries.filter((entry) => {
+      if (typeFilter !== "all" && entry.type !== typeFilter) {
+        return false;
+      }
+      if (!needle) {
+        return true;
+      }
+      return [entry.order, entry.actor, entry.event].some((field) =>
+        field.toLowerCase().includes(needle),
+      );
+    });
+  }, [query, typeFilter]);
+
   return (
     <div className="page simple-page">
       <div className="page-heading">
@@ -15,47 +48,20 @@ export function AuditView() {
       </div>
       <section className="content-card audit-card">
         <div className="panel-toolbar">
-          <label className="search">
-            <span>⌕</span>
-            <input placeholder="Search order, person, or event" />
-          </label>
-          <select>
-            <option>All events</option>
-            <option>Human decisions</option>
-            <option>System events</option>
-          </select>
+          <SearchFilter
+            value={query}
+            onChange={setQuery}
+            placeholder="Search order, person, or event"
+          />
+          <FilterSelect
+            ariaLabel="Filter by event type"
+            value={typeFilter}
+            onChange={(value) => setTypeFilter(value as TypeFilter)}
+            options={TYPE_OPTIONS}
+          />
         </div>
-        {[
-          {
-            time: "10:43 AM",
-            event: "Validation completed",
-            actor: "Preflight Rules",
-            order: "PO-10428",
-            detail: "2 findings generated",
-          },
-          {
-            time: "10:42 AM",
-            event: "Order submitted",
-            actor: "Olivia Park",
-            order: "PO-10428",
-            detail: "Web portal upload",
-          },
-          {
-            time: "9:19 AM",
-            event: "Order blocked",
-            actor: "Preflight Rules",
-            order: "PO-10431",
-            detail: "Unknown SKU DSK-404",
-          },
-          {
-            time: "Yesterday",
-            event: "Order approved",
-            actor: "Maya Chen",
-            order: "PO-10417",
-            detail: "No exceptions",
-          },
-        ].map((item) => (
-          <div className="audit-row" key={`${item.order}-${item.event}`}>
+        {rows.map((item) => (
+          <div className="audit-row" key={item.id}>
             <time>{item.time}</time>
             <span className="audit-dot" />
             <div>

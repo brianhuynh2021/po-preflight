@@ -41,3 +41,34 @@ test("renders the Orders view at /orders", async () => {
   assert.match(html, /Validation findings/);
   assert.match(html, /Activity/);
 });
+
+test("renders the Audit log view with working filters at /audit-log", async () => {
+  const response = await render("/audit-log");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+
+  assert.match(html, /Audit log/);
+  assert.match(html, /Search order, person, or event/);
+  assert.match(html, /All events/);
+  assert.match(html, /Human decisions/);
+  assert.match(html, /System events/);
+  assert.match(html, /Validation completed/);
+  assert.match(html, /Order submitted/);
+  assert.match(html, /Order blocked/);
+  assert.match(html, /Order approved/);
+});
+
+test("renders the Product catalog view with working filters at /catalog", async () => {
+  const response = await render("/catalog");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+
+  assert.match(html, /Product catalog/);
+  assert.match(html, /Search SKU or product/);
+  assert.match(html, /All statuses/);
+  assert.match(html, /Active/);
+  assert.match(html, /Inactive/);
+  assert.match(html, /Catalog price/);
+  assert.match(html, /Morrow task chair/);
+  assert.match(html, /CHR-110/);
+});

@@ -1074,6 +1074,13 @@ html.dark .decision-bar {
 .table-card {
   overflow: hidden;
 }
+.toolbar-filters {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
 .table-card .panel-toolbar {
   justify-content: space-between;
 }
