@@ -569,7 +569,7 @@ export function LandingPageView() {
           <div style={{ textAlign: "center", marginBottom: "36px" }}>
             <p className="eyebrow">TRẢI NGHIỆM TRÍ TUỆ KHỚP MÃ KHO</p>
             <h2 style={{ fontSize: "32px", fontWeight: 800, letterSpacing: "-0.02em", margin: "6px 0" }}>
-              Tự Động Hiểu "Tên Lóng" & Biệt Danh Hàng Hóa Của Khách
+              Tự Động Hiểu &quot;Tên Lóng&quot; &amp; Biệt Danh Hàng Hóa Của Khách
             </h2>
             <p style={{ color: "var(--muted)", maxWidth: "650px", margin: "0 auto" }}>
               Khách hàng ghi theo cách của họ (viết tắt, gõ sai chính tả, tiếng lóng) — Hệ thống tự động dịch sang đúng <strong>Mã SKU Kho Chuẩn</strong> của công ty bạn chỉ trong <strong>0.01 giây</strong> mà không bao giờ bị nhầm hàng.
@@ -587,7 +587,7 @@ export function LandingPageView() {
                     style={{ fontSize: "12px", padding: "6px 12px" }}
                     onClick={() => handleTestQuery(p.query)}
                   >
-                    {p.label}: <strong>"{p.query}"</strong>
+                    {p.label}: <strong>&quot;{p.query}&quot;</strong>
                   </button>
                 ))}
               </div>

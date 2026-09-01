@@ -26,7 +26,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     public statusText: string,
-    public data: any,
+    public data: unknown,
   ) {
     super(`API Error ${status} ${statusText}: ${JSON.stringify(data)}`);
     this.name = "ApiError";

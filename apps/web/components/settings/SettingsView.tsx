@@ -19,10 +19,10 @@ export function SettingsView() {
     <div className="page settings-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">CHANNELS & WEBHOOKS (ISSUE #8 & #43)</p>
-          <h1>Multi-Channel Integration & Policy Settings</h1>
+          <p className="eyebrow">TÍCH HỢP ĐA KÊNH &amp; WEBHOOKS (ISSUE #8 &amp; #43)</p>
+          <h1>Cấu hình Tích hợp Đa kênh &amp; Chính sách</h1>
           <p>
-            Configure mobile approval notification bots (Telegram & Zalo OA), anti-spoofing webhook secret tokens, and automated dispatch policies.
+            Cấu hình bot thông báo &amp; phê duyệt qua thiết bị di động (Telegram &amp; Zalo OA), mã bảo mật webhook chống giả mạo và chính sách tự động đẩy đơn sang ERP.
           </p>
         </div>
       </div>
@@ -39,7 +39,7 @@ export function SettingsView() {
             border: "1px solid rgba(25, 112, 76, 0.2)",
           }}
         >
-          ✔ Multi-channel settings updated and verified!
+          ✔ Đã cập nhật và xác thực cấu hình đa kênh thành công!
         </div>
       )}
 
@@ -49,14 +49,14 @@ export function SettingsView() {
           <div className="card-header-clean">
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "18px" }}>✈️</span>
-              <h3>Telegram Bot & Mobile Approvals</h3>
+              <h3>Telegram Bot &amp; Phê duyệt Di động</h3>
             </div>
-            <span className="badge-clean badge-clean-info">Live Connected</span>
+            <span className="badge-clean badge-clean-info">Đang kết nối trực tiếp</span>
           </div>
 
           <div style={{ marginBottom: "14px" }}>
             <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
-              Bot API Token
+              Mã Bot API Token
             </label>
             <input
               type="password"
@@ -68,7 +68,7 @@ export function SettingsView() {
 
           <div style={{ marginBottom: "14px" }}>
             <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
-              Management Chat / Group ID
+              ID Nhóm / Kênh Quản lý (Chat/Group ID)
             </label>
             <input
               type="text"
@@ -80,7 +80,7 @@ export function SettingsView() {
 
           <div style={{ marginBottom: "16px" }}>
             <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
-              Webhook Secret Token (Issue #43 Anti-Spoofing)
+              Mã bí mật Webhook (Chống giả mạo - Issue #43)
             </label>
             <input
               type="text"
@@ -90,7 +90,7 @@ export function SettingsView() {
               style={{ fontFamily: "ui-monospace, monospace" }}
             />
             <small style={{ color: "var(--muted)", display: "block", marginTop: "4px" }}>
-              Validated via <code>X-Telegram-Bot-Api-Secret-Token</code> header.
+              Xác thực an toàn qua tiêu đề <code>X-Telegram-Bot-Api-Secret-Token</code>.
             </small>
           </div>
         </div>
@@ -100,14 +100,14 @@ export function SettingsView() {
           <div className="card-header-clean">
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "18px" }}>💬</span>
-              <h3>Zalo Official Account (OA)</h3>
+              <h3>Zalo Official Account (Zalo OA)</h3>
             </div>
             <span className="badge-clean badge-clean-info">Zalo v4</span>
           </div>
 
           <div style={{ marginBottom: "16px" }}>
             <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
-              Zalo OA Access Token
+              Mã truy cập Zalo OA (Access Token)
             </label>
             <input
               type="password"
@@ -118,7 +118,7 @@ export function SettingsView() {
           </div>
 
           <div className="card-header-clean" style={{ marginTop: "24px" }}>
-            <h3>Automated Dispatch Policies</h3>
+            <h3>Chính sách Tự động Đẩy đơn (Dispatch Policy)</h3>
           </div>
 
           <label
@@ -139,13 +139,13 @@ export function SettingsView() {
               style={{ width: "16px", height: "16px" }}
             />
             <span>
-              Auto-dispatch to ERP when order status is <strong>READY</strong> (0 findings)
+              Tự động đẩy vào ERP khi trạng thái đơn hàng là <strong>READY</strong> (0 cảnh báo)
             </span>
           </label>
 
           <div style={{ marginTop: "20px" }}>
             <button className="primary-button" style={{ width: "100%", justifyContent: "center" }} onClick={handleSave}>
-              💾 Save Channel Configuration
+              💾 Lưu Cấu hình Đa kênh
             </button>
           </div>
         </div>

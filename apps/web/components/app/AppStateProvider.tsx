@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -49,25 +50,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [activity, setActivity] = useState<ActivityEvent[]>(initialActivity);
   const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
 
-  const refreshOrders = async () => {
+  const refreshOrders = useCallback(async () => {
     try {
       const res = await fetch("http://localhost:8001/api/v1/orders");
       if (res.ok) {
         const liveData = await res.json();
         if (Array.isArray(liveData) && liveData.length > 0) {
-          // Map backend summary to PurchaseOrder structure if needed, or merge with seed
           setIsLiveConnected(true);
         }
       }
     } catch {
-      // Graceful fallback to offline seed state
       setIsLiveConnected(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     // 1. Initial live check
-    refreshOrders();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refreshOrders();
 
     // 2. Connect to real-time SSE stream if in browser
     if (typeof window !== "undefined" && "EventSource" in window) {
@@ -108,11 +108,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         // SSE not reachable in test environment
       }
     }
-  }, []);
+  }, [refreshOrders]);
 
   const value = useMemo(
     () => ({ orders, setOrders, activity, setActivity, isLiveConnected, refreshOrders }),
-    [orders, activity, isLiveConnected],
+    [orders, activity, isLiveConnected, refreshOrders],
   );
 
   return (

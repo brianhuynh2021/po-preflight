@@ -118,8 +118,9 @@ test("renders the Settings view at /settings", async () => {
   const response = await render("/settings");
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /Multi-Channel Integration/);
+  assert.match(html, /Cấu hình Tích hợp Đa kênh/);
   assert.match(html, /Telegram Bot/);
+  assert.match(html, /Zalo Official Account/);
 });
 
 test("renders the Marketing Landing Page at /landing", async () => {
