@@ -197,7 +197,8 @@ async def upload_order(
 ) -> OrderDetailResponse:
     upload_dir = Path("runtime/uploads")
     upload_dir.mkdir(parents=True, exist_ok=True)
-    temp_path = upload_dir / (file.filename or "uploaded_order.tmp")
+    safe_name = Path(file.filename).name if file.filename else "uploaded_order.tmp"
+    temp_path = upload_dir / safe_name
 
     try:
         content = await file.read()

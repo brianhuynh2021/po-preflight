@@ -16,7 +16,7 @@ demo:
 
 test:
 	@echo "🧪 Chạy bộ kiểm thử tự động..."
-	PYTHONPATH=src python3 -m unittest discover -s tests
+	PYTHONPATH=src $(shell [ -f .venv/bin/python ] && echo .venv/bin/python || echo python3) -m unittest discover -s tests
 
 install:
 	@echo "📦 Cài đặt dependencies cho Python và Web..."
