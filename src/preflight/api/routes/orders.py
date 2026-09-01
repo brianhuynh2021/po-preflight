@@ -309,3 +309,28 @@ def record_decision(
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get(
+    "/{order_id}/audit-certificate",
+    summary="Cryptographic Compliance Audit Certificate",
+    description="Generate a tamper-evident SHA-256 Merkle-style audit certificate verifying complete event history integrity for SOX 404 & SOC2 Type II compliance.",
+)
+def get_audit_certificate(
+    order_id: str,
+    store: AuditStore = Depends(get_audit_store),
+) -> dict[str, Any]:
+    row = store.get_order(order_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Order {order_id} not found.")
+
+    po_number = row["po_number"]
+    decisions = row.get("decisions", [])
+
+    from preflight.security.audit_chain import AuditHashChain
+
+    return AuditHashChain.generate_compliance_certificate(
+        po_number=po_number,
+        order_data=row,
+        decisions=decisions,
+    )
