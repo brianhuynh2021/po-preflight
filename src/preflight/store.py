@@ -29,6 +29,16 @@ CREATE TABLE IF NOT EXISTS decisions (
     note TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS customer_aliases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id TEXT NOT NULL,
+    raw_query TEXT NOT NULL,
+    target_sku TEXT NOT NULL,
+    confidence REAL NOT NULL DEFAULT 1.0,
+    created_at TEXT NOT NULL,
+    UNIQUE(customer_id, raw_query)
+);
+CREATE INDEX IF NOT EXISTS idx_customer_aliases ON customer_aliases(customer_id, raw_query);
 """
 
 
@@ -226,4 +236,54 @@ class AuditStore:
             "decisions_count": decisions_count,
             "recent_orders": [dict(r) for r in recent_rows],
         }
+
+    def learn_alias(
+        self,
+        customer_id: str,
+        raw_query: str,
+        target_sku: str,
+        confidence: float = 1.0,
+    ) -> None:
+        """Record or update a learned customer-specific product alias for active learning."""
+        now = datetime.now(UTC).isoformat()
+        normalized_query = raw_query.strip().lower()
+        normalized_sku = target_sku.strip().upper()
+        self.connection.execute(
+            """
+            INSERT INTO customer_aliases (customer_id, raw_query, target_sku, confidence, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(customer_id, raw_query) DO UPDATE SET
+                target_sku = excluded.target_sku,
+                confidence = excluded.confidence,
+                created_at = excluded.created_at
+            """,
+            (customer_id.strip(), normalized_query, normalized_sku, confidence, now),
+        )
+        self.connection.commit()
+
+    def get_customer_alias(self, customer_id: str, raw_query: str) -> str | None:
+        """Lookup a learned alias for a specific customer."""
+        normalized_query = raw_query.strip().lower()
+        row = self.connection.execute(
+            """
+            SELECT target_sku FROM customer_aliases
+            WHERE customer_id = ? AND raw_query = ?
+            LIMIT 1
+            """,
+            (customer_id.strip(), normalized_query),
+        ).fetchone()
+        return str(row["target_sku"]) if row else None
+
+    def list_customer_aliases(self, customer_id: str | None = None) -> list[dict[str, Any]]:
+        """List learned customer aliases."""
+        if customer_id:
+            rows = self.connection.execute(
+                "SELECT * FROM customer_aliases WHERE customer_id = ? ORDER BY id DESC",
+                (customer_id.strip(),),
+            ).fetchall()
+        else:
+            rows = self.connection.execute(
+                "SELECT * FROM customer_aliases ORDER BY id DESC"
+            ).fetchall()
+        return [dict(r) for r in rows]
 

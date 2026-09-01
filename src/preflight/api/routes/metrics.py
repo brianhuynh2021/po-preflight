@@ -73,8 +73,32 @@ def readiness_probe(
     except Exception as exc:
         checks["storage"] = f"ERROR: {exc}"
 
+    all_healthy = all("OK" in str(v) for v in checks.values())
+
     return {
-        "status": "ready",
-        "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
+        "status": "ready" if all_healthy else "degraded",
         "checks": checks,
+        "database_type": "sqlite",
+        "catalog_skus": len(catalog),
+    }
+
+
+@router.get(
+    "/api/v1/currency/rate",
+    summary="Dynamic FX Currency Exchange Rate",
+    description="Retrieve live cached FX exchange rate between supported currencies (USD, VND, EUR) with offline fallback.",
+)
+def get_exchange_rate(
+    base: str = "USD",
+    target: str = "VND",
+) -> dict[str, Any]:
+    from preflight.currency import fx_engine
+
+    rate = fx_engine.get_rate(base, target)
+    return {
+        "base": base.upper(),
+        "target": target.upper(),
+        "rate": rate,
+        "sample_100_base_in_target": rate * 100.0,
+        "cached_engine": "DynamicFXEngine (12h TTL)",
     }

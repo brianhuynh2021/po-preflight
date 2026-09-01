@@ -72,3 +72,52 @@ test("renders the Product catalog view with working filters at /catalog", async 
   assert.match(html, /Morrow task chair/);
   assert.match(html, /CHR-110/);
 });
+
+test("renders the Staging Studio view at /staging", async () => {
+  const response = await render("/staging");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Extraction Review/);
+  assert.match(html, /Extracted Line Items/);
+});
+
+test("renders the LangGraph Visualizer view at /agent-graph", async () => {
+  const response = await render("/agent-graph");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /LangGraph Stateful Workflow Visualizer/);
+  assert.match(html, /Document Ingestion/);
+  assert.match(html, /4-Tier Hybrid RAG/);
+});
+
+test("renders the 4-Tier RAG Playground view at /rag-playground", async () => {
+  const response = await render("/rag-playground");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /4-Tier Hybrid SKU Resolution Playground/);
+  assert.match(html, /Interactive SKU Query Tester/);
+});
+
+test("renders the ERP Sync Outbox view at /erp-sync", async () => {
+  const response = await render("/erp-sync");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /ERP Synchronization/);
+  assert.match(html, /Transactional Outbox Messages/);
+});
+
+test("renders the Cryptographic Audit Certificate view at /audit-certificate", async () => {
+  const response = await render("/audit-certificate");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Cryptographic Audit Certificate Center/);
+  assert.match(html, /MERKLE ROOT HASH/);
+});
+
+test("renders the Settings view at /settings", async () => {
+  const response = await render("/settings");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Multi-Channel Integration/);
+  assert.match(html, /Telegram Bot/);
+});
