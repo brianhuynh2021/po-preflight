@@ -1,0 +1,24 @@
+---
+description: Git branching, commit messages, and PR standards
+globs: **/*
+---
+
+# PO Preflight — Git & Team Collaboration Rules
+
+## 1. Branching Strategy
+- `main`: Production-ready stable code.
+- `dev`: Primary integration branch (default branch for PRs).
+- Feature branches: `feat/<feature-name>` (e.g. `feat/fe-orders-queue`, `feat/be-fastapi-gateway`).
+- Bugfix branches: `fix/<bug-name>`.
+
+## 2. Commit Message Standards (Conventional Commits)
+- `feat:` New feature or capability.
+- `fix:` Bug fix.
+- `docs:` Documentation updates.
+- `refactor:` Code refactoring without behavioral change.
+- `test:` Adding or updating tests.
+- `chore:` Tooling, configuration, or dependency updates.
+
+## 3. Pull Request Guidelines
+- Always link the corresponding GitHub Issue number in the PR description (e.g., `Closes #2`).
+- Ensure all automated tests pass before requesting review.

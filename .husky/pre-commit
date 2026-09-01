@@ -1,0 +1,3 @@
+PATH="$(git rev-parse --show-toplevel)/apps/web/node_modules/.bin:$PATH"
+lint-staged
+npm --prefix apps/web test

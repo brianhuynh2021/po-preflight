@@ -1,6 +1,8 @@
-# OrderFlow AI
+# PO Preflight
 
-OrderFlow AI ingests purchase orders from files, validates them with deterministic business rules, and delivers review-ready results through OpenClaw, WebChat, or Slack.
+> 🇻🇳 **Tài liệu tiếng Việt đầy đủ:** Xem chi tiết kiến trúc Agentic AI, RAG và phê duyệt đa kênh tại [Mô tả dự án PO Preflight (Tiếng Việt)](docs/MO_TA_DU_AN.md).
+
+PO Preflight ingests purchase orders from files, validates them with deterministic business rules and intelligent RAG-assisted reasoning, and delivers review-ready results for instant approval through **Telegram, Zalo, Slack, WeChat, or WebChat**.
 
 ## MVP capabilities
 
@@ -20,23 +22,10 @@ OrderFlow AI ingests purchase orders from files, validates them with determinist
 Or run it directly:
 
 ```bash
-PYTHONPATH=src python3 -m orderflow \
+PYTHONPATH=src python3 -m preflight \
   --catalog examples/catalog.csv \
-  --db runtime/orderflow.db \
-  analyze examples/orders/po-price-and-stock.json
-```
-
-## Install into local OpenClaw
-
-```bash
-./scripts/install-openclaw.sh
-openclaw gateway restart
-```
-
-Then open WebChat and send:
-
-```text
-/orderflow analyze this purchase order
+  --db runtime/preflight.db \
+  analyze examples/orders/po-review.json
 ```
 
 ## PDF
@@ -47,36 +36,33 @@ Text-based PDFs require `pypdf`:
 python3 -m pip install '.[pdf]'
 ```
 
-Scanned PDFs require an OCR stage that is outside the current MVP. The MVP does not claim reliable extraction from scanned images.
+Scanned PDFs require an OCR stage (Gemini Flash / Vision) handled by the ingestion agent.
 
 ## Architecture
 
 ```text
-Slack/WebChat -> OpenClaw skill -> OrderFlow CLI
-                                    |-- parser
-                                    |-- catalog
-                                    |-- rule engine
-                                    `-- SQLite audit log
+Telegram / Zalo / Slack / Web -> FastAPI & LangGraph -> Preflight Engine
+                                                        |-- parser & vision OCR
+                                                        |-- hybrid SKU RAG
+                                                        |-- rule engine
+                                                        `-- SQLite / Postgres audit log
 ```
 
-See the [Product Requirements Document](docs/PRD.md), [architecture diagrams](docs/architecture.md), [UI specification](docs/ui-specification.md), [demo guide](docs/demo-guide.md), [product scope](docs/product-scope.md), and [security model](docs/security.md).
+See the [Vietnamese Specification (Mô tả chi tiết)](docs/MO_TA_DU_AN.md), [Frontend Backlog Tickets](docs/FE_BUSINESS_REQUIREMENTS_AND_TICKETS.md), [Agentic Roadmap](docs/ROADMAP.md), [Product Requirements Document](docs/PRD.md), and [architecture diagrams](docs/architecture.md).
 
-## Local web prototype
+## Web Dashboard
 
-The customer-facing prototype lives in `apps/web` and uses realistic synthetic order data. It demonstrates the order queue, validation findings, approval actions, upload flow, and audit timeline without requiring access to the raw OpenClaw dashboard.
+The customer-facing web dashboard lives in `apps/web`.
 
 ```bash
-cd apps/web
-npm install
 npm run dev
 ```
 
-The terminal prints the local URL. Open it in a browser to run the interactive demo.
+The terminal prints the local URL (e.g. `http://localhost:5173/`). Open it in a browser to run the interactive dashboard.
 
-## CI/CD and AWS
+## CI/CD and Cloud
 
-- Pull requests and pushes to `main` run the test and policy suite.
-- Pushes to `main` can deploy the OpenClaw skill to a bootstrapped EC2 instance.
-- Terraform provisions an encrypted Ubuntu EC2 host without exposing the Gateway port.
+- Pull requests and pushes to `dev` run the test and policy suite.
+- Terraform provisions an encrypted deployment topology on AWS.
 
 See [AWS deployment](docs/aws-deployment.md).

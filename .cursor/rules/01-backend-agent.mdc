@@ -1,0 +1,27 @@
+---
+description: Backend, FastAPI, Python, LangGraph, and RAG rules
+globs: src/**/*.py,apps/api/**/*.py,tests/**/*.py
+---
+
+# PO Preflight — Backend & Agent Coding Standards
+
+## 1. Python & Framework Standards
+- **Python Version:** Python 3.11+
+- **Type Annotations:** Required everywhere (`from __future__ import annotations`).
+- **Data Validation:** Use `pydantic.BaseModel` v2 with strict validation and decimal types for money (`Decimal`).
+- **API Framework:** FastAPI with async handlers, dependency injection for DB sessions and services, OpenAPI docstrings.
+
+## 2. Agentic Workflow (LangGraph)
+- Model workflows with `StateGraph(POState)`.
+- Use immutable state updates (return dictionaries with updated fields).
+- Implement `interrupt_before=["human_approval"]` with `PostgresSaver` / `MemorySaver`.
+- Keep business rules deterministic in pure Python (`src/preflight/rules.py`).
+
+## 3. RAG & Vector Search
+- Use `RapidFuzz` for typo/fuzzy SKU matching before calling vector search.
+- Use `ChromaDB` / `FastEmbed` with cosine similarity for semantic matching.
+- Always attach a `match_score` (0.0 - 1.0) and display confidence to the reviewer.
+
+## 4. Testing
+- Every parser, rule, and endpoint MUST have automated tests in `tests/`.
+- Run tests via `make test` or `PYTHONPATH=src python3 -m unittest discover -s tests`.

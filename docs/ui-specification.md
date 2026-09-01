@@ -1,10 +1,10 @@
-# OrderFlow AI UI Specification
+# PO Preflight UI Specification
 
 This specification defines the initial customer-facing experience and can be used as the source for a future Figma design file.
 
 ## Product experience
 
-OrderFlow should feel like an operations workspace: calm, precise, trustworthy, and fast. It should not look like a generic AI chat application. Users work with orders, findings, decisions, and evidence; AI remains a supporting capability.
+Preflight should feel like an operations workspace: calm, precise, trustworthy, and fast. It should not look like a generic AI chat application. Users work with orders, findings, decisions, and evidence; AI remains a supporting capability.
 
 ## Information architecture
 
@@ -61,16 +61,34 @@ OrderFlow should feel like an operations workspace: calm, precise, trustworthy, 
 
 ## Status language
 
-| Internal state | UI label | Meaning |
+> **Source of truth: [`FE_DATA_CONTRACT.md`](./FE_DATA_CONTRACT.md) §1.** The frontend uses
+> the display labels below as the literal `OrderStatus` values. Where this file and the
+> contract disagree, the contract wins.
+
+| `OrderStatus` (frontend) | Backend `rules.py` | Meaning |
 |---|---|---|
-| `PROCESSING` | Processing | Extraction or validation is running |
-| `EXTRACTION_REVIEW` | Check extraction | A user must confirm extracted fields |
-| `READY_FOR_APPROVAL` | Ready | No blocking validation findings |
-| `REVIEW_REQUIRED` | Review required | An authorized decision is required |
-| `BLOCKED` | Blocked | The order cannot be approved until corrected |
-| `APPROVED` | Approved | An authorized reviewer approved the order |
-| `CHANGES_REQUESTED` | Changes requested | The submitter must provide or correct information |
-| `REJECTED` | Rejected | The order will not continue |
+| `Ready` | `ready_for_approval` | No validation findings |
+| `Review required` | `review_required` | Warning-level findings only |
+| `Blocked` | `blocked` | At least one error-level finding |
+| `Approved` | *(human decision)* | An authorized reviewer approved the order |
+| `Changes requested` | *(human decision)* | The submitter must provide or correct information |
+| `Rejected` | *(human decision)* | The order will not continue |
+
+The first three are **derived from findings** — never assigned by hand. See
+`deriveStatus()` in `apps/web/app/lib/derive.ts`.
+
+### Removed from scope
+
+`PROCESSING` and `EXTRACTION_REVIEW` previously appeared here. Both were **removed** from the
+demo scope — see contract §7.2 and §7.3.
+
+- `EXTRACTION_REVIEW` is deliberate technical debt: the demo runs on static seed data, not
+  real OCR. It must be restored before real extraction is wired in.
+- `PROCESSING` lives in `UploadModal` component state. It is not an order status — nobody
+  filters a queue by it or makes a decision on it.
+
+The target-state machine in [`architecture.md`](./architecture.md) still models both; that
+file describes the complete system rather than the demo scope.
 
 ## Visual direction
 

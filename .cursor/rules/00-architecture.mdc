@@ -1,0 +1,41 @@
+---
+description: System Architecture, Domain Rules, and AI-Native Philosophy
+globs: **/*
+---
+
+# PO Preflight — Architecture & Domain Standards
+
+## 1. Domain Concept
+PO Preflight is the intelligent, controlled intake layer between customer Purchase Orders (files/messages) and downstream ERP systems (SAP, Odoo).
+
+## 2. The AI-Native Philosophy (Adapted from the Cursor Mindset)
+1. **High-Trust Grounding (Minh bạch tuyệt đối):**
+   - AI is NEVER a black box. Every validation finding must cite precise grounding evidence (e.g. *PO price 75k vs Contract Appendix 02 price 72k*).
+   - All math, stock checks, and duplicate PO lookups MUST be deterministic (0 tokens).
+2. **Proactive Background Processing (Xử lý ngầm chủ động - Zero Wait):**
+   - Ingestion, parsing, SKU matching, and rules validation happen asynchronously in background workers as soon as an order arrives via email/Zalo.
+   - When users open the app or chat notification, results and findings are instantly ready without waiting.
+3. **Frictionless Correction (Sửa lỗi không tốn sức):**
+   - 98% clean data is pre-populated. For the 2% of ambiguous lines, AI provides 1-click suggested resolutions rather than forcing manual retyping.
+4. **Context-Centric Reasoning (Hiểu sâu ngữ cảnh khách hàng):**
+   - Orders are evaluated within the full context of that customer's relationship: order history, credit limits, custom contract terms, and habitual naming conventions.
+5. **Human in Full Control (Con người làm chủ):**
+   - AI proposes, audits, and flags issues. ONLY an authenticated human reviewer can approve and trigger official ERP synchronization.
+
+## 3. Stanford Inner Loop + MIT Outer System
+- **Stanford Inner Loop (Agent Brain):**
+  - **Understand:** Extract structure from untrusted PO documents.
+  - **Retrieve:** Fetch context from Product Catalog & Customer Contracts via Hybrid RAG.
+  - **Plan & Act:** Validate deterministic business rules (SKU, Price, Inventory, Duplicates).
+  - **Verify & Reflect:** Self-verify line totals vs grand total; retry if extraction score is low.
+- **MIT Outer System (Governance & Action):**
+  - **Human-In-The-Loop:** Pause workflow and notify manager via Telegram/Zalo/Slack when risk is `REVIEW_REQUIRED` or `BLOCKED`.
+  - **Real-World Action:** Create ERP Sales Order ONLY upon explicit human approval (`APPROVED`).
+  - **Audit Trail:** Append-only log of all extractions, findings, and human decisions.
+
+## 4. Five Core Validation Codes
+- `PRICE_MISMATCH` (Warning): PO price differs from active catalog/contract price.
+- `INSUFFICIENT_STOCK` (Warning): Ordered quantity exceeds available stock.
+- `UNKNOWN_SKU` (Error): SKU not found in catalog.
+- `INACTIVE_SKU` (Error): Product is deactivated.
+- `DUPLICATE_PO` (Error): PO number already processed for this customer.

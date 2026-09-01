@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: orderflow-production
+  group: preflight-production
   cancel-in-progress: false
 
 permissions:
@@ -47,11 +47,11 @@ jobs:
         run: |
           set -euo pipefail
           port="${EC2_PORT:-22}"
-          tar -czf /tmp/orderflow-release.tgz \
+          tar -czf /tmp/preflight-release.tgz \
             src tests examples workspace scripts pyproject.toml
           scp -P "${port}" -i ~/.ssh/deploy_key \
-            /tmp/orderflow-release.tgz \
-            "${EC2_USER}@${EC2_HOST}:/tmp/orderflow-release.tgz"
+            /tmp/preflight-release.tgz \
+            "${EC2_USER}@${EC2_HOST}:/tmp/preflight-release.tgz"
 
       - name: Activate release
         env:
@@ -63,4 +63,4 @@ jobs:
           port="${EC2_PORT:-22}"
           ssh -p "${port}" -i ~/.ssh/deploy_key \
             "${EC2_USER}@${EC2_HOST}" \
-            'release_dir=$(mktemp -d) && tar -xzf /tmp/orderflow-release.tgz -C "$release_dir" && bash "$release_dir/scripts/deploy-remote.sh" "$release_dir"'
+            'release_dir=$(mktemp -d) && tar -xzf /tmp/preflight-release.tgz -C "$release_dir" && bash "$release_dir/scripts/deploy-remote.sh" "$release_dir"'

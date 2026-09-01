@@ -1,18 +1,67 @@
+# OS & Editor
 .DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.sublime-workspace
+
+# Environment & Secrets
 .env
-.venv/
-__pycache__/
-*.py[cod]
-*.db
-runtime/
-dist/
-build/
-!apps/web/build/
-!apps/web/build/sites-vite-plugin.ts
-*.egg-info/
+.env.local
+.env.*.local
 *.pem
 *.key
+*.cert
+
+# Python & Virtualenv
+.venv/
+env/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Runtime & Local DBs
+runtime/*.db
+runtime/*.sqlite
+runtime/*.sqlite3
+runtime/uploads/*
+!runtime/uploads/.gitkeep
+runtime/*.json
+!evals/ground_truth.json
+
+# Node & Frontend (Next.js / Vite / Vinext)
+node_modules/
+.next/
+.vinext/
+next-env.d.ts
+out/
+.wrangler/
+.turbo/
+.cache/
+coverage/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Terraform
 .terraform/
 terraform.tfstate*
 *.tfvars
 !*.tfvars.example
+
+# Custom whitelist
+!apps/web/build/
+!apps/web/build/sites-vite-plugin.ts
+

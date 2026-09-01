@@ -1,6 +1,6 @@
-# OrderFlow AI Architecture
+# PO Preflight Architecture
 
-This document describes the target architecture for the OrderFlow AI MVP and the path from a local demonstration to a secure AWS deployment.
+This document describes the target architecture for PO Preflight and the path from a local demonstration to an enterprise multi-agent & multi-channel deployment.
 
 ## 1. System context
 
@@ -9,58 +9,78 @@ flowchart LR
     Customer["Customer or Operations User"]
     Reviewer["Sales or Operations Manager"]
     Admin["System Administrator"]
-    Slack["Slack"]
-    Web["OrderFlow Web Portal"]
-    OrderFlow["OrderFlow AI"]
-    Catalog["Product Catalog and Inventory"]
-    ERP["ERP Adapter — Future Phase"]
+    MultiChannels["Channels: Telegram / Zalo / Slack / WeChat"]
+    Web["Preflight Web Portal"]
+    Preflight["PO Preflight (Agentic Brain + RAG)"]
+    Catalog["Product Catalog & Vector Index"]
+    ERP["ERP Adapter (Odoo / SAP)"]
 
-    Customer -->|Submit purchase order| Slack
+    Customer -->|Submit purchase order| MultiChannels
     Customer -->|Upload and review| Web
-    Reviewer -->|Approve, reject, request changes| Slack
-    Reviewer -->|Review exceptions| Web
-    Slack --> OrderFlow
-    Web --> OrderFlow
-    Admin -->|Configure rules and access| OrderFlow
-    Catalog -->|SKU, price, status, stock| OrderFlow
-    OrderFlow -.->|Approved orders only| ERP
+    Reviewer -->|Instant Approve / Reject / Request Info| MultiChannels
+    Reviewer -->|Review exceptions & audit| Web
+    MultiChannels --> Preflight
+    Web --> Preflight
+    Admin -->|Configure rules and access| Preflight
+    Catalog -->|SKU, price, status, vector search| Preflight
+    Preflight -.->|Approved orders only| ERP
 ```
 
-OrderFlow is the controlled intake layer between incoming purchase-order documents and downstream business systems. Slack and the web portal are interfaces to the same workflow and audit trail.
+Preflight is the controlled intake layer between incoming purchase-order documents and downstream business systems. Multi-channel bots (Telegram, Zalo, Slack, WeChat) and the web portal are interfaces to the same workflow and audit trail.
+
+### 1.1 AI-Native Design Philosophy (Adapted from the Cursor Mindset)
+
+Rather than rigid legacy automation, PO Preflight applies 5 core principles of modern AI-native systems to B2B order operations:
+
+1. **High-Trust Grounding Evidence:** AI is never a black box. Every validation finding provides explicit lineage and evidence (e.g., matching line 3 of the PO against Clause 2 of Customer Contract #2026-04).
+2. **Proactive Background Processing (Zero-Wait):** Documents sent via email, Zalo, or portal are ingested and analyzed asynchronously in the background. Reviewers see instant results without watching spinners.
+3. **Frictionless 1-Click Correction:** 98% of clean data is prepared automatically. For ambiguous lines, AI provides 1-click suggested corrections instead of forcing manual data re-entry.
+4. **Context-Centric Reasoning:** Orders are evaluated in the holistic context of customer historical orders, custom pricing agreements, and past nickname resolutions.
+5. **Human in Full Control:** AI acts as a tireless pre-flight co-pilot. Only an authenticated human decision triggers ERP synchronization.
 
 ## 2. Application containers
 
 ```mermaid
 flowchart TB
-    subgraph Channels["User channels"]
+    subgraph Channels["User Channels & Messaging"]
+        TelegramBot["Telegram Bot"]
+        ZaloOA["Zalo OA / ZNS"]
         SlackApp["Slack Application"]
+        WeChatBot["WeChat Work Bot"]
         WebApp["Next.js Web Portal"]
     end
 
-    subgraph Platform["OrderFlow Platform"]
-        API["FastAPI Application API"]
+    subgraph Platform["Preflight Platform (MIT Outer + Stanford Inner Loop)"]
+        API["FastAPI Gateway & Webhook Router"]
         Worker["Document Processing Worker"]
-        Rules["Deterministic Rule Engine"]
-        Orchestrator["OpenClaw Orchestration"]
-        Audit["Audit Service"]
+        AgentEngine["LangGraph Agentic Engine"]
+        RAGService["SKU & Contract RAG (ChromaDB)"]
+        Rules["Deterministic Zero-Token Rule Engine"]
+        Audit["Audit Trail Service"]
     end
 
     subgraph Data["Data services"]
-        DB[("PostgreSQL")]
-        Files[("S3 Document Store")]
+        DB[("PostgreSQL / SQLite")]
+        VectorStore[("ChromaDB Vector Store")]
+        Files[("S3 / Local Document Store")]
         Secrets["AWS Secrets Manager"]
     end
 
     subgraph External["Company systems"]
         CatalogAPI["Catalog and Inventory Source"]
-        ERPAPI["ERP Adapter — Disabled in MVP"]
+        ERPAPI["ERP Adapter — Human Approved Only"]
     end
 
+    TelegramBot --> API
+    ZaloOA --> API
     SlackApp --> API
+    WeChatBot --> API
     WebApp --> API
     API --> Worker
-    Worker --> Orchestrator
-    Worker --> Rules
+    Worker --> AgentEngine
+    AgentEngine --> RAGService
+    AgentEngine --> Rules
+    RAGService --> VectorStore
     Rules --> CatalogAPI
     API --> Audit
     Worker --> Audit
@@ -79,8 +99,8 @@ flowchart TB
 | Slack application | Submit orders and act on exception notifications | Planned |
 | FastAPI application | Authentication, workflow state, business API, and integration boundary | Planned |
 | Document worker | Extraction, normalization, validation orchestration, and retries | Local core available |
-| OrderFlow core | Parsers, deterministic rules, reports, and audit decisions | Implemented |
-| OpenClaw | AI-assisted extraction, explanation, channel orchestration, and skills | Local skill implemented |
+| Preflight core | Parsers, deterministic rules, reports, and audit decisions | Implemented |
+| LangGraph Agent Engine | AI-assisted extraction, hybrid SKU RAG, reflection, and channel orchestration | In progress |
 | PostgreSQL | Durable orders, findings, decisions, rules, and tenant data | Planned; SQLite used locally |
 | S3 | Original documents and generated artifacts | Planned for AWS |
 
@@ -91,7 +111,7 @@ sequenceDiagram
     autonumber
     actor User as Operations User
     participant UI as Slack or Web Portal
-    participant API as OrderFlow API
+    participant API as Preflight API
     participant Store as Document Store
     participant Extract as Extraction Worker
     participant Rules as Rule Engine
@@ -149,7 +169,7 @@ flowchart TB
     Web --> ALB
 
     subgraph VPC["Private AWS VPC"]
-        ALB --> API["OrderFlow API Service"]
+        ALB --> API["Preflight API Service"]
         API --> Worker["Processing Worker"]
         API --> RDS[("Encrypted PostgreSQL")]
         Worker --> RDS
@@ -177,15 +197,16 @@ The first internal deployment may use one private EC2 instance for cost and spee
 ## 7. Monorepo target
 
 ```text
-orderflow-ai/
+po-preflight/
 ├── apps/
 │   ├── api/                 # FastAPI product API
 │   └── web/                 # Next.js customer portal and prototype
 ├── packages/
-│   ├── orderflow-core/      # Parsing and deterministic validation
+│   ├── preflight-core/      # Parsing and deterministic validation
 │   └── contracts/           # Shared API and event schemas
 ├── integrations/
-│   ├── openclaw/
+│   ├── telegram/
+│   ├── zalo/
 │   ├── slack/
 │   └── erp/
 ├── infra/terraform/

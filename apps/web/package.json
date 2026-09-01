@@ -1,5 +1,5 @@
 {
-  "name": "orderflow-web-prototype",
+  "name": "preflight-web-prototype",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -10,7 +10,12 @@
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
+    "test:e2e": "playwright test",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "apps/web/app/**/*.{ts,tsx}": "eslint --fix --config apps/web/eslint.config.mjs"
   },
   "dependencies": {
     "next": "16.2.6",
@@ -19,6 +24,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
@@ -27,6 +33,9 @@
     "@vitejs/plugin-rsc": "0.5.26",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.4.1",
+    "prettier": "^3.9.6",
     "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",

@@ -11,7 +11,7 @@ rm -f "${db_path}"
 run_order() {
   local order_file="$1"
   set +e
-  PYTHONPATH="${repo_root}/src" python3 -m orderflow \
+  PYTHONPATH="${repo_root}/src" python3 -m preflight \
     --catalog "${repo_root}/examples/catalog.csv" \
     --db "${db_path}" \
     analyze "${repo_root}/${order_file}"
