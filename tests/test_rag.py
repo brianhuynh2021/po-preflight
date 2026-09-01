@@ -114,6 +114,15 @@ class TestHybridSKUMatcher(unittest.TestCase):
         self.assertIn("tier_used", data)
         self.assertIn("explanation", data)
 
+    def test_unresolved_garbage_query_returns_none(self):
+        # Query with complete garbage / nonsense must return UNRESOLVED without guessing first item
+        res = self.matcher.resolve("xyzzy-nonsense-99999")
+        self.assertEqual(res.tier_used, ResolutionTier.UNRESOLVED)
+        self.assertIsNone(res.matched_sku)
+        self.assertEqual(res.confidence_score, 0.0)
+        self.assertFalse(res.is_confident)
+
+
 
 if __name__ == "__main__":
     unittest.main()

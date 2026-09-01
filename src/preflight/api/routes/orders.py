@@ -409,11 +409,15 @@ def get_audit_certificate(
 
     from preflight.security.audit_chain import AuditHashChain
 
+    stored_blocks = store.get_audit_blocks(po_number)
+
     return AuditHashChain.generate_compliance_certificate(
         po_number=po_number,
         order_data=row,
         decisions=decisions,
+        stored_blocks=stored_blocks if stored_blocks else None,
     )
+
 
 
 @router.get(

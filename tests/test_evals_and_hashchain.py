@@ -57,6 +57,43 @@ class TestEvalsAndHashChain(unittest.TestCase):
             self.assertIn("CERT-", cert["certificate_id"])
             self.assertIn("SOX-404-ITGC", cert["standard_compliance"])
 
+    def test_persistent_db_audit_chain_tamper_detection(self):
+        """Test persistent DB audit_blocks table invalidation when rows are manually tampered."""
+        import tempfile
+        from decimal import Decimal
+        from preflight.store import AuditStore
+        from preflight.models import Order, LineItem, Analysis
+
+        with tempfile.NamedTemporaryFile(suffix=".db") as tf:
+            store = AuditStore(tf.name)
+            order = Order(
+                po_number="PO-TAMPER-01",
+                customer="Test Customer",
+                items=(LineItem(sku="LAPTOP-A14", quantity=1, unit_price=Decimal("18500000")),),
+            )
+
+            analysis = Analysis(order=order, findings=[], status="ready")
+            order_id = store.record_analysis(analysis, "test.pdf")
+            store.record_decision("PO-TAMPER-01", "approved", "manager_bob", "Approved test")
+
+            # 1. Check valid certificate from DB blocks
+            blocks = store.get_audit_blocks("PO-TAMPER-01")
+            self.assertEqual(len(blocks), 2)
+            cert = AuditHashChain.generate_compliance_certificate("PO-TAMPER-01", store.get_order(order_id), [], stored_blocks=blocks)
+            self.assertTrue(cert["chain_valid"])
+
+            # 2. Tamper directly with the database
+            store.connection.execute(
+                "UPDATE audit_blocks SET action = 'TAMPERED_ACTION' WHERE block_index = 0 AND po_number = 'PO-TAMPER-01'"
+            )
+            store.connection.commit()
+
+            # 3. Check tampered certificate detects corruption
+            tampered_blocks = store.get_audit_blocks("PO-TAMPER-01")
+            tampered_cert = AuditHashChain.generate_compliance_certificate("PO-TAMPER-01", store.get_order(order_id), [], stored_blocks=tampered_blocks)
+            self.assertFalse(tampered_cert["chain_valid"])
+
+
     def test_circuit_breaker_trip_and_recovery(self):
         """Test Circuit Breaker state machine (CLOSED -> OPEN -> HALF_OPEN -> CLOSED)."""
         cb = CircuitBreaker("test_service", failure_threshold=2, recovery_timeout_sec=0.1)
