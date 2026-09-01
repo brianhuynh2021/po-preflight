@@ -1,6 +1,6 @@
 "use client";
 
-import { rules } from "@/data/rules";
+import { rules } from "@/app/lib/seed";
 
 export function RulesView() {
   return (

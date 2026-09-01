@@ -145,3 +145,15 @@ export interface ActivityEvent {
   time: string;
   type: ActivityEventType;
 }
+
+/** A single row on the Audit log screen. */
+export interface AuditEntry {
+  id: string;
+  time: string;
+  event: string;
+  actor: string;
+  order: string;
+  detail: string;
+  type: ActivityEventType;
+}
+
