@@ -128,9 +128,6 @@ export interface Product {
 /* UI-only types used by the prototype. Not part of the backend data contract —
    they describe navigation and display-only surfaces. */
 
-/** Primary navigation / view switch in the prototype side bar. */
-export type Section = "Overview" | "Orders" | "Catalog" | "Rules" | "Audit log";
-
 /** A validation-rule control shown on the Rules screen. */
 export interface ValidationRule {
   name: string;
