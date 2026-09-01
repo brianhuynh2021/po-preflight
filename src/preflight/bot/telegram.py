@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import html
 import json
 import logging
 import os
 import urllib.request
+from decimal import Decimal
 from typing import Any
 
 from preflight.bot.schemas import BotNotificationResult
