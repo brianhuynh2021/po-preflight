@@ -10,6 +10,7 @@ from fastapi.responses import RedirectResponse
 
 from preflight.api.deps import get_catalog, get_db_path
 from preflight.api.logging_config import RequestLoggingMiddleware, logger
+from preflight.security.rate_limiter import RateLimitMiddleware
 from preflight.api.routes import (
     agent,
     bot,
@@ -19,6 +20,7 @@ from preflight.api.routes import (
     health,
     ingestion,
     matcher,
+    metrics,
     orders,
     rules,
 )
@@ -113,9 +115,11 @@ app.add_middleware(
 
 # Request Logging & Latency Middleware
 app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 # Mount Routers
 app.include_router(health.router)
+app.include_router(metrics.router)
 app.include_router(orders.router)
 app.include_router(dashboard.router)
 app.include_router(catalog.router)
