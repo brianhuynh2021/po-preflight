@@ -37,9 +37,10 @@ def seed_initial_data() -> None:
 
         catalog_data = get_catalog()
         samples = [
-            ("examples/orders/po-clean.json", "PO-2026-1001 (Ready)"),
-            ("examples/orders/po-review.json", "PO-2026-1002 (Review Required)"),
-            ("examples/orders/po-blocked.txt", "PO-2026-1003 (Blocked)"),
+            ("examples/orders/po-clean.json", "PO-2026-1001 (Ready - VND)"),
+            ("examples/orders/po-review.json", "PO-2026-1002 (Review Required - VND)"),
+            ("examples/orders/po-usd.json", "PO-10433 (Global Order - USD)"),
+            ("examples/orders/po-blocked.txt", "PO-2026-1003 (Blocked - VND)"),
         ]
 
         for filepath_str, name in samples:
