@@ -151,11 +151,52 @@ async def telegram_webhook(
 )
 def send_zalo_alert(
     order_id: int,
+    request: Request,
     store: AuditStore = Depends(get_store),
 ) -> BotNotificationResult:
     order = store.get_order(order_id)
     if not order:
         raise HTTPException(status_code=404, detail=f"Order #{order_id} not found.")
 
-    zalo_service = ZaloBotService()
-    return zalo_service.send_order_alert(order)
+    base_url = str(request.base_url).rstrip("/")
+    zalo_service = ZaloBotService(store=store)
+    return zalo_service.send_order_alert(order, web_base_url=base_url)
+
+
+@router.post(
+    "/zalo/webhook",
+    summary="Zalo OA Webhook Receiver",
+    description="Receive user button click events from Zalo OA with HMAC-SHA256 signature verification.",
+)
+async def zalo_webhook(
+    request: Request,
+    store: AuditStore = Depends(get_store),
+) -> dict[str, Any]:
+    raw_body = await request.body()
+    signature = request.headers.get("X-Zalo-Signature", "")
+    timestamp = request.headers.get("X-Zalo-Timestamp", "")
+
+    zalo_service = ZaloBotService(store=store)
+    if signature and not zalo_service.verify_webhook_signature(raw_body, timestamp, signature):
+        raise HTTPException(status_code=401, detail="Invalid Zalo webhook signature.")
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    result = zalo_service.process_webhook_event(body)
+
+    if result.get("status") == "success":
+        event_bus.publish(
+            "order.decided",
+            {
+                "order_id": result.get("po_number", ""),
+                "decision": result.get("action", ""),
+                "actor": "zalo_manager",
+            },
+        )
+
+    return {"ok": True, "result": result}
+
+
