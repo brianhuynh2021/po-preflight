@@ -1,5 +1,6 @@
 import os
 import unittest
+from decimal import Decimal
 from pathlib import Path
 from starlette.testclient import TestClient
 
@@ -141,6 +142,23 @@ class TestAllFeaturesIntegration(unittest.TestCase):
         self.assertEqual(payload["base"], "USD")
         self.assertEqual(payload["target"], "VND")
         self.assertGreater(payload["rate"], 20000.0)
+
+        # Test cross-currency order evaluation in rules engine (PO in USD vs Catalog in VND)
+        from preflight.models import Order, LineItem
+        from preflight.rules import analyze_order
+        usd_order = Order(
+            po_number="PO-USD-CROSS-BORDER",
+            customer="Global Retail Inc",
+            items=(
+                # 18.5M VND is approx $728 USD at 25.4k. If PO specifies $728, tolerance passes.
+                LineItem(sku="LAPTOP-A14", quantity=1, unit_price=Decimal("728.35")),
+            ),
+            currency="USD",
+        )
+        analysis = analyze_order(usd_order, self.catalog, price_tolerance_percent=Decimal("5"))
+        # Should be ready for approval without price mismatch error
+        self.assertEqual(analysis.status, "ready_for_approval")
+        self.assertEqual(len(analysis.findings), 0)
 
 
 if __name__ == "__main__":
