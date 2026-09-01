@@ -172,6 +172,43 @@ class TelegramBotService:
                 details=f"Telegram API Error: {str(exc)}",
             )
 
+    def set_webhook(
+        self,
+        webhook_url: str,
+        secret_token: str | None = None,
+        drop_pending_updates: bool = False,
+    ) -> dict[str, Any]:
+        """Configure webhook URL with optional anti-spoofing secret token on Telegram Bot API."""
+        secret = secret_token or os.getenv("TELEGRAM_WEBHOOK_SECRET") or os.getenv("TELEGRAM_SECRET_TOKEN")
+        if not self.is_configured:
+            logger.info(f"[TelegramBot (DRY RUN)] setWebhook called for {webhook_url} with secret_token={bool(secret)}")
+            return {
+                "ok": True,
+                "result": True,
+                "description": f"Webhook set to {webhook_url} (dry run)",
+            }
+
+        url = f"https://api.telegram.org/bot{self.token}/setWebhook"
+        payload: dict[str, Any] = {
+            "url": webhook_url,
+            "drop_pending_updates": drop_pending_updates,
+        }
+        if secret:
+            payload["secret_token"] = secret
+
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except Exception as exc:
+            logger.error(f"Failed to set Telegram webhook: {exc}")
+            return {"ok": False, "description": str(exc)}
+
     def handle_callback_action(
         self,
         callback_data: str,

@@ -53,6 +53,20 @@ def send_telegram_alert(
 
 
 @router.post(
+    "/telegram/set-webhook",
+    summary="Register Telegram Webhook",
+    description="Register public webhook URL and secret token with Telegram Bot API.",
+)
+def set_telegram_webhook(
+    webhook_url: str,
+    secret_token: str | None = None,
+    store: AuditStore = Depends(get_store),
+) -> dict[str, Any]:
+    bot_service = TelegramBotService(store=store)
+    return bot_service.set_webhook(webhook_url=webhook_url, secret_token=secret_token)
+
+
+@router.post(
     "/telegram/webhook",
     summary="Telegram Webhook Receiver",
     description="Receive updates from Telegram Bot API when managers click inline approval buttons or send commands.",
