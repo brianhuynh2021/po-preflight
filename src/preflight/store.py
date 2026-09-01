@@ -4,9 +4,11 @@ import abc
 import json
 import os
 import sqlite3
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
 
 from preflight.models import Analysis
 
@@ -23,7 +25,7 @@ CREATE TABLE IF NOT EXISTS analyses (
     findings_json TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_analyses_po ON analyses(po_number);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_analyses_po ON analyses(po_number);
 CREATE TABLE IF NOT EXISTS decisions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     po_number TEXT NOT NULL,
@@ -56,7 +58,8 @@ CREATE TABLE IF NOT EXISTS analyses (
     findings_json JSONB NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_pg_analyses_po ON analyses(po_number);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_pg_analyses_po ON analyses(po_number);
+
 
 CREATE TABLE IF NOT EXISTS decisions (
     id SERIAL PRIMARY KEY,
@@ -158,68 +161,117 @@ class AuditStore(BaseAuditStore):
     def __init__(self, path: str | Path = "runtime/preflight.db"):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.connection = sqlite3.connect(self.path, check_same_thread=False)
+        self._lock = threading.RLock()
+        self.connection = sqlite3.connect(self.path, check_same_thread=False, timeout=30.0)
         self.connection.row_factory = sqlite3.Row
-        self.connection.executescript(SQLITE_SCHEMA)
+        with self._lock:
+            try:
+                # Enable WAL mode for high concurrency
+                self.connection.execute("PRAGMA journal_mode=WAL;")
+                self.connection.execute("PRAGMA busy_timeout=30000;")
+                # Deduplicate legacy rows before applying unique constraint index
+                self.connection.execute(
+                    "DELETE FROM analyses WHERE id NOT IN (SELECT MAX(id) FROM analyses GROUP BY po_number)"
+                )
+                self.connection.commit()
+            except Exception:
+                pass
+            self.connection.executescript(SQLITE_SCHEMA)
 
     def close(self) -> None:
-        self.connection.close()
+        with self._lock:
+            self.connection.close()
 
     def has_po(self, po_number: str) -> bool:
-        row = self.connection.execute(
-            "SELECT 1 FROM analyses WHERE po_number = ? LIMIT 1", (po_number,)
-        ).fetchone()
-        return row is not None
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT 1 FROM analyses WHERE po_number = ? LIMIT 1", (po_number,)
+            ).fetchone()
+            return row is not None
 
     def record_analysis(self, analysis: Analysis, source_file: str) -> int:
-        cursor = self.connection.execute(
-            """
-            INSERT INTO analyses (
-                po_number, customer, status, total, source_file,
-                order_json, findings_json, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                analysis.order.po_number,
-                analysis.order.customer,
-                analysis.status,
-                str(analysis.order.total),
-                source_file,
-                json.dumps(analysis.order.to_dict(), ensure_ascii=False),
-                json.dumps(
-                    [finding.to_dict() for finding in analysis.findings],
-                    ensure_ascii=False,
-                ),
-                datetime.now(UTC).isoformat(),
-            ),
-        )
-        self.connection.commit()
-        analysis.analysis_id = int(cursor.lastrowid)
-        return analysis.analysis_id
+        with self._lock:
+            try:
+                cursor = self.connection.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO analyses (
+                        po_number, customer, status, total, source_file,
+                        order_json, findings_json, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        analysis.order.po_number,
+                        analysis.order.customer,
+                        analysis.status,
+                        str(analysis.order.total),
+                        source_file,
+                        json.dumps(analysis.order.to_dict(), ensure_ascii=False),
+                        json.dumps(
+                            [finding.to_dict() for finding in analysis.findings],
+                            ensure_ascii=False,
+                        ),
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+                self.connection.commit()
+                if cursor.lastrowid is not None:
+                    analysis.analysis_id = int(cursor.lastrowid)
+                    return analysis.analysis_id
+                existing = self.get_order(analysis.order.po_number)
+                if existing:
+                    analysis.analysis_id = int(existing["id"])
+                    return analysis.analysis_id
+                return 0
+            except (sqlite3.IntegrityError, sqlite3.OperationalError):
+                # Concurrent race condition: another thread/worker inserted the exact same PO number
+                existing = self.get_order(analysis.order.po_number)
+                if existing:
+                    dup_finding = {
+                        "code": "DUPLICATE_PO",
+                        "severity": "error",
+                        "message": f"PO {analysis.order.po_number} has already been processed.",
+                    }
+                    raw_findings = existing.get("findings_json") or "[]"
+                    findings_list = json.loads(raw_findings) if isinstance(raw_findings, str) else raw_findings
+                    if not any(isinstance(f, dict) and f.get("code") == "DUPLICATE_PO" for f in findings_list):
+                        findings_list.append(dup_finding)
+                    self.connection.execute(
+                        "UPDATE analyses SET status = 'blocked', findings_json = ? WHERE id = ?",
+                        (json.dumps(findings_list, ensure_ascii=False), existing["id"]),
+                    )
+                    self.connection.commit()
+                    analysis.analysis_id = int(existing["id"])
+                    analysis.status = "blocked"
+                    return analysis.analysis_id
+                raise
+
+
 
     def update_analysis(self, order_id: int, analysis: Analysis) -> None:
         """Update an existing analysis with confirmed order details and preflight findings."""
-        with self.connection:
-            self.connection.execute(
-                """
-                UPDATE analyses
-                SET po_number = ?, customer = ?, status = ?, total = ?,
-                    order_json = ?, findings_json = ?
-                WHERE id = ?
-                """,
-                (
-                    analysis.order.po_number,
-                    analysis.order.customer,
-                    analysis.status,
-                    str(analysis.order.total),
-                    json.dumps(analysis.order.to_dict(), ensure_ascii=False),
-                    json.dumps(
-                        [finding.to_dict() for finding in analysis.findings],
-                        ensure_ascii=False,
+        with self._lock:
+            with self.connection:
+                self.connection.execute(
+                    """
+                    UPDATE analyses
+                    SET po_number = ?, customer = ?, status = ?, total = ?,
+                        order_json = ?, findings_json = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        analysis.order.po_number,
+                        analysis.order.customer,
+                        analysis.status,
+                        str(analysis.order.total),
+                        json.dumps(analysis.order.to_dict(), ensure_ascii=False),
+                        json.dumps(
+                            [finding.to_dict() for finding in analysis.findings],
+                            ensure_ascii=False,
+                        ),
+                        order_id,
                     ),
-                    order_id,
-                ),
-            )
+                )
 
     def record_decision(
         self, po_number: str, decision: str, actor: str, note: str = ""
@@ -228,30 +280,36 @@ class AuditStore(BaseAuditStore):
             raise ValueError("Decision must be approved, rejected, or needs_changes")
         if not self.has_po(po_number):
             raise ValueError(f"PO {po_number} was not found")
-        cursor = self.connection.execute(
-            """
-            INSERT INTO decisions (po_number, decision, actor, note, created_at)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (po_number, decision, actor, note, datetime.now(UTC).isoformat()),
-        )
-        self.connection.commit()
-        return int(cursor.lastrowid)
+        with self._lock:
+            with self.connection:
+                cursor = self.connection.execute(
+                    """
+                    INSERT INTO decisions (po_number, decision, actor, note, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (po_number, decision, actor, note, datetime.now(UTC).isoformat()),
+                )
+                self.connection.execute(
+                    "UPDATE analyses SET status = ? WHERE po_number = ?",
+                    (decision, po_number),
+                )
+                return int(cursor.lastrowid)
 
     def history(self, po_number: str) -> dict[str, list[dict[str, object]]]:
-        analyses = [
-            dict(row)
-            for row in self.connection.execute(
-                "SELECT * FROM analyses WHERE po_number = ? ORDER BY id", (po_number,)
-            )
-        ]
-        decisions = [
-            dict(row)
-            for row in self.connection.execute(
-                "SELECT * FROM decisions WHERE po_number = ? ORDER BY id", (po_number,)
-            )
-        ]
-        return {"analyses": analyses, "decisions": decisions}
+        with self._lock:
+            analyses = [
+                dict(row)
+                for row in self.connection.execute(
+                    "SELECT * FROM analyses WHERE po_number = ? ORDER BY id", (po_number,)
+                )
+            ]
+            decisions = [
+                dict(row)
+                for row in self.connection.execute(
+                    "SELECT * FROM decisions WHERE po_number = ? ORDER BY id", (po_number,)
+                )
+            ]
+            return {"analyses": analyses, "decisions": decisions}
 
     def list_orders(
         self,
@@ -260,88 +318,91 @@ class AuditStore(BaseAuditStore):
         limit: int = 50,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
-        query = """
-            SELECT 
-                a.id,
-                a.po_number,
-                a.customer,
-                a.status,
-                a.total,
-                a.source_file,
-                a.order_json,
-                a.findings_json,
-                a.created_at,
-                (SELECT d.decision FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS latest_decision,
-                (SELECT d.actor FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS latest_actor,
-                (SELECT d.created_at FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS decided_at
-            FROM analyses a
-            WHERE 1=1
-        """
-        params: list[Any] = []
-        if status:
-            query += " AND a.status = ?"
-            params.append(status)
-        if search:
-            query += " AND (a.po_number LIKE ? OR a.customer LIKE ?)"
-            term = f"%{search}%"
-            params.extend([term, term])
+        with self._lock:
+            query = """
+                SELECT 
+                    a.id,
+                    a.po_number,
+                    a.customer,
+                    a.status,
+                    a.total,
+                    a.source_file,
+                    a.order_json,
+                    a.findings_json,
+                    a.created_at,
+                    (SELECT d.decision FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS latest_decision,
+                    (SELECT d.actor FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS latest_actor,
+                    (SELECT d.created_at FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS decided_at
+                FROM analyses a
+                WHERE 1=1
+            """
+            params: list[Any] = []
+            if status:
+                query += " AND a.status = ?"
+                params.append(status)
+            if search:
+                query += " AND (a.po_number LIKE ? OR a.customer LIKE ?)"
+                term = f"%{search}%"
+                params.extend([term, term])
 
-        query += " ORDER BY a.id DESC LIMIT ? OFFSET ?"
-        params.extend([limit, offset])
+            query += " ORDER BY a.id DESC LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
 
-        rows = self.connection.execute(query, params).fetchall()
-        return [dict(row) for row in rows]
+            rows = self.connection.execute(query, params).fetchall()
+            return [dict(row) for row in rows]
 
     def get_order(self, po_or_id: str | int) -> dict[str, Any] | None:
-        if isinstance(po_or_id, int) or str(po_or_id).isdigit():
-            row = self.connection.execute(
-                "SELECT * FROM analyses WHERE id = ? LIMIT 1", (int(po_or_id),)
-            ).fetchone()
-        else:
-            row = self.connection.execute(
-                "SELECT * FROM analyses WHERE po_number = ? ORDER BY id DESC LIMIT 1",
-                (str(po_or_id),),
-            ).fetchone()
-        if not row:
-            return None
-        data = dict(row)
-        data["decisions"] = [
-            dict(d)
-            for d in self.connection.execute(
-                "SELECT * FROM decisions WHERE po_number = ? ORDER BY id ASC",
-                (data["po_number"],),
-            ).fetchall()
-        ]
-        return data
+        with self._lock:
+            if isinstance(po_or_id, int) or str(po_or_id).isdigit():
+                row = self.connection.execute(
+                    "SELECT * FROM analyses WHERE id = ? LIMIT 1", (int(po_or_id),)
+                ).fetchone()
+            else:
+                row = self.connection.execute(
+                    "SELECT * FROM analyses WHERE po_number = ? ORDER BY id DESC LIMIT 1",
+                    (str(po_or_id),),
+                ).fetchone()
+            if not row:
+                return None
+            data = dict(row)
+            data["decisions"] = [
+                dict(d)
+                for d in self.connection.execute(
+                    "SELECT * FROM decisions WHERE po_number = ? ORDER BY id ASC",
+                    (data["po_number"],),
+                ).fetchall()
+            ]
+            return data
 
     def get_dashboard_stats(self) -> dict[str, Any]:
-        total_orders = self.connection.execute(
-            "SELECT COUNT(*) AS c FROM analyses"
-        ).fetchone()["c"]
-        status_counts = {
-            row["status"]: row["c"]
-            for row in self.connection.execute(
-                "SELECT status, COUNT(*) AS c FROM analyses GROUP BY status"
+        with self._lock:
+            total_orders = self.connection.execute(
+                "SELECT COUNT(*) AS c FROM analyses"
+            ).fetchone()["c"]
+            status_counts = {
+                row["status"]: row["c"]
+                for row in self.connection.execute(
+                    "SELECT status, COUNT(*) AS c FROM analyses GROUP BY status"
+                ).fetchall()
+            }
+            decisions_count = {
+                row["decision"]: row["c"]
+                for row in self.connection.execute(
+                    "SELECT decision, COUNT(*) AS c FROM decisions GROUP BY decision"
+                ).fetchall()
+            }
+            recent_rows = self.connection.execute(
+                """
+                SELECT id, po_number, customer, status, total, created_at 
+                FROM analyses ORDER BY id DESC LIMIT 5
+                """
             ).fetchall()
-        }
-        decisions_count = {
-            row["decision"]: row["c"]
-            for row in self.connection.execute(
-                "SELECT decision, COUNT(*) AS c FROM decisions GROUP BY decision"
-            ).fetchall()
-        }
-        recent_rows = self.connection.execute(
-            """
-            SELECT id, po_number, customer, status, total, created_at 
-            FROM analyses ORDER BY id DESC LIMIT 5
-            """
-        ).fetchall()
-        return {
-            "total_orders": total_orders,
-            "status_counts": status_counts,
-            "decisions_count": decisions_count,
-            "recent_orders": [dict(r) for r in recent_rows],
-        }
+            return {
+                "total_orders": total_orders,
+                "status_counts": status_counts,
+                "decisions_count": decisions_count,
+                "recent_orders": [dict(r) for r in recent_rows],
+            }
 
     def learn_alias(
         self,
@@ -354,44 +415,48 @@ class AuditStore(BaseAuditStore):
         now = datetime.now(UTC).isoformat()
         normalized_query = raw_query.strip().lower()
         normalized_sku = target_sku.strip().upper()
-        self.connection.execute(
-            """
-            INSERT INTO customer_aliases (customer_id, raw_query, target_sku, confidence, created_at)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(customer_id, raw_query) DO UPDATE SET
-                target_sku = excluded.target_sku,
-                confidence = excluded.confidence,
-                created_at = excluded.created_at
-            """,
-            (customer_id.strip(), normalized_query, normalized_sku, confidence, now),
-        )
-        self.connection.commit()
+        with self._lock:
+            self.connection.execute(
+                """
+                INSERT INTO customer_aliases (customer_id, raw_query, target_sku, confidence, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(customer_id, raw_query) DO UPDATE SET
+                    target_sku = excluded.target_sku,
+                    confidence = excluded.confidence,
+                    created_at = excluded.created_at
+                """,
+                (customer_id.strip(), normalized_query, normalized_sku, confidence, now),
+            )
+            self.connection.commit()
 
     def get_customer_alias(self, customer_id: str, raw_query: str) -> str | None:
         """Lookup a learned alias for a specific customer."""
         normalized_query = raw_query.strip().lower()
-        row = self.connection.execute(
-            """
-            SELECT target_sku FROM customer_aliases
-            WHERE customer_id = ? AND raw_query = ?
-            LIMIT 1
-            """,
-            (customer_id.strip(), normalized_query),
-        ).fetchone()
-        return str(row["target_sku"]) if row else None
+        with self._lock:
+            row = self.connection.execute(
+                """
+                SELECT target_sku FROM customer_aliases
+                WHERE customer_id = ? AND raw_query = ?
+                LIMIT 1
+                """,
+                (customer_id.strip(), normalized_query),
+            ).fetchone()
+            return str(row["target_sku"]) if row else None
 
     def list_customer_aliases(self, customer_id: str | None = None) -> list[dict[str, Any]]:
         """List learned customer aliases."""
-        if customer_id:
-            rows = self.connection.execute(
-                "SELECT * FROM customer_aliases WHERE customer_id = ? ORDER BY id DESC",
-                (customer_id.strip(),),
-            ).fetchall()
-        else:
-            rows = self.connection.execute(
-                "SELECT * FROM customer_aliases ORDER BY id DESC"
-            ).fetchall()
-        return [dict(r) for r in rows]
+        with self._lock:
+            if customer_id:
+                rows = self.connection.execute(
+                    "SELECT * FROM customer_aliases WHERE customer_id = ? ORDER BY id DESC",
+                    (customer_id.strip(),),
+                ).fetchall()
+            else:
+                rows = self.connection.execute(
+                    "SELECT * FROM customer_aliases ORDER BY id DESC"
+                ).fetchall()
+            return [dict(r) for r in rows]
+
 
 
 class PostgresAuditStore(BaseAuditStore):

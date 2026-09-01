@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import shutil
+import uuid
 from decimal import Decimal
 from pathlib import Path
+
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
@@ -23,7 +25,7 @@ from preflight.api.schemas import (
 )
 from preflight.models import Analysis, LineItem, Order, Product
 from preflight.parsers import parse_order
-from preflight.rules import analyze_order
+from preflight.rules import DecisionValidationError, analyze_order, validate_order_decision
 from preflight.security.rbac import Role, UserPrincipal, require_role
 from preflight.store import AuditStore
 
@@ -199,8 +201,11 @@ async def upload_order(
 ) -> OrderDetailResponse:
     upload_dir = Path("runtime/uploads")
     upload_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = Path(file.filename).name if file.filename else "uploaded_order.tmp"
+    prefix = uuid.uuid4().hex
+    raw_name = Path(file.filename).name if file.filename else "uploaded_order.tmp"
+    safe_name = f"{prefix}_{raw_name}"
     temp_path = upload_dir / safe_name
+
 
     try:
         content = await file.read()
@@ -322,6 +327,25 @@ def record_decision(
         raise HTTPException(status_code=404, detail=f"Order {order_id} not found.")
 
     po_number = row["po_number"]
+    current_status = row.get("status", "ready_for_approval")
+    findings_raw = row.get("findings_json") or "[]"
+    try:
+        findings_list = json.loads(findings_raw) if isinstance(findings_raw, str) else findings_raw
+    except Exception:
+        findings_list = []
+    error_count = sum(1 for f in findings_list if isinstance(f, dict) and f.get("severity") == "error")
+
+    # Enforce SOX 404 / SOC2 Type II business constraints
+    try:
+        validate_order_decision(
+            current_status=current_status,
+            decision=payload.decision,
+            note=payload.note,
+            error_count=error_count,
+        )
+    except DecisionValidationError as err:
+        raise HTTPException(status_code=err.status_code, detail=err.message)
+
     try:
         decision_id = store.record_decision(
             po_number=po_number,
@@ -353,6 +377,7 @@ def record_decision(
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
 
 
 @router.get(
