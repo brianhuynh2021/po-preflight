@@ -116,11 +116,11 @@ export function LandingPageView() {
         </div>
 
         <nav style={{ display: "flex", alignItems: "center", gap: "24px", fontSize: "13.5px", fontWeight: 500 }}>
-          <a href="#problem" style={{ color: "var(--muted)", textDecoration: "none" }}>Vấn Đề</a>
-          <a href="#sandbox" style={{ color: "var(--muted)", textDecoration: "none" }}>Thử Nghiệm RAG</a>
-          <a href="#roi" style={{ color: "var(--muted)", textDecoration: "none" }}>Tính ROI</a>
-          <a href="#security" style={{ color: "var(--muted)", textDecoration: "none" }}>Bảo Mật SOX 404</a>
-          <a href="#pricing" style={{ color: "var(--muted)", textDecoration: "none" }}>Bảng Giá</a>
+          <a href="#problem" style={{ color: "var(--muted)", textDecoration: "none" }}>Vấn Đề & Rủi Ro</a>
+          <a href="#sandbox" style={{ color: "var(--muted)", textDecoration: "none" }}>Thử Nghiệm Khớp Mã Kho</a>
+          <a href="#roi" style={{ color: "var(--muted)", textDecoration: "none" }}>Bảng Tính Tiết Kiệm (ROI)</a>
+          <a href="#security" style={{ color: "var(--muted)", textDecoration: "none" }}>Bảo Mật & Chống Gian Lận</a>
+          <a href="#pricing" style={{ color: "var(--muted)", textDecoration: "none" }}>Đăng Ký Dùng Thử</a>
         </nav>
 
         <div style={{ display: "flex", gap: "10px" }}>
@@ -287,22 +287,22 @@ export function LandingPageView() {
         </div>
       </section>
 
-      {/* 5. Live Interactive SKU Sandbox Widget */}
+      {/* 5. Live Interactive SKU Matching Sandbox Widget */}
       <section id="sandbox" style={{ background: "var(--paper)", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "64px 24px" }}>
         <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: "36px" }}>
-            <p className="eyebrow">TRẢI NGHIỆM THỰC TẾ TRỰC TIẾP</p>
+            <p className="eyebrow">TRẢI NGHIỆM TRÍ TUỆ KHỚP MÃ KHO</p>
             <h2 style={{ fontSize: "32px", fontWeight: 800, letterSpacing: "-0.02em", margin: "6px 0" }}>
-              Thử Nghiệm Thuật Toán 4-Tier RAG Ngay Tại Đây
+              Tự Động Hiểu "Tên Lóng" & Biệt Danh Hàng Hóa Của Khách
             </h2>
             <p style={{ color: "var(--muted)", maxWidth: "650px", margin: "0 auto" }}>
-              Gõ thử bất kỳ tên gọi thông tục, tiếng lóng Việt Nam hoặc từ khóa viết tắt để xem hệ thống map sang SKU chuẩn kho trong bao nhiêu mili-giây.
+              Khách hàng ghi theo cách của họ (viết tắt, gõ sai chính tả, tiếng lóng) — Hệ thống tự động dịch sang đúng <strong>Mã SKU Kho Chuẩn</strong> của công ty bạn chỉ trong <strong>0.01 giây</strong> mà không bao giờ bị nhầm hàng.
             </p>
           </div>
 
           <div className="clean-card" style={{ background: "var(--canvas)" }}>
             <div style={{ marginBottom: "16px" }}>
-              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>GỢI Ý TỪ KHÓA MẪU:</span>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>BẤM THỬ CÁC TÌNH HUỐNG THỰC TẾ:</span>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "6px" }}>
                 {presets.map((p, idx) => (
                   <button
@@ -320,7 +320,7 @@ export function LandingPageView() {
             <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "20px" }}>
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>
-                  Nhập Tên Hàng / Biệt Danh / SKU:
+                  Nhập Tên Hàng / Tên Viết Tắt Bất Kỳ:
                 </label>
                 <input
                   type="text"
@@ -330,20 +330,26 @@ export function LandingPageView() {
                   placeholder="Gõ thử: dây mạng 3m, laptop a14, dock chuyển đổi..."
                 />
                 <small style={{ color: "var(--muted)", display: "block", marginTop: "6px" }}>
-                  Hệ thống sử dụng cơ chế Hybrid RAG (Exact + Levenshtein + Character Trigram Vectors).
+                  💡 Cơ chế 4 lớp: Khớp mã chính xác $\rightarrow$ Tự sửa lỗi gõ sai $\rightarrow$ Hiểu ngôn ngữ thông tục tiếng Việt.
                 </small>
               </div>
 
               <div style={{ background: "var(--paper)", padding: "16px", borderRadius: "8px", border: "1px solid var(--line)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 700 }}>KẾT QUẢ MAP KHO</span>
-                  <span className="badge-clean badge-clean-success">{tierUsed}</span>
+                  <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 700 }}>MÃ SKU KHO TƯƠNG ỨNG</span>
+                  <span className="badge-clean badge-clean-success">
+                    {tierUsed === "TIER_1_EXACT"
+                      ? "Khớp Chính Xác 100%"
+                      : tierUsed === "TIER_2_FUZZY"
+                      ? "Tự Sửa Lỗi Chính Tả"
+                      : "Nhận Diện Ngữ Nghĩa"}
+                  </span>
                 </div>
                 <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--green)" }}>{matchedSku}</div>
                 <div style={{ display: "flex", gap: "16px", marginTop: "12px", fontSize: "12px", borderTop: "1px solid var(--line)", paddingTop: "8px" }}>
                   <div>Độ tin cậy: <strong>{(confidence * 100).toFixed(0)}%</strong></div>
-                  <div>Thời gian: <strong>{latency} ms</strong></div>
-                  <div>Chi phí: <strong>0 tokens</strong></div>
+                  <div>Tốc độ: <strong>{latency} ms</strong></div>
+                  <div>Chi phí AI: <strong>0 VNĐ (Miễn phí)</strong></div>
                 </div>
               </div>
             </div>
