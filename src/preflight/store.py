@@ -81,6 +81,30 @@ class AuditStore:
         analysis.analysis_id = int(cursor.lastrowid)
         return analysis.analysis_id
 
+    def update_analysis(self, order_id: int, analysis: Analysis) -> None:
+        """Update an existing analysis with confirmed order details and preflight findings."""
+        with self.connection:
+            self.connection.execute(
+                """
+                UPDATE analyses
+                SET po_number = ?, customer = ?, status = ?, total = ?,
+                    order_json = ?, findings_json = ?
+                WHERE id = ?
+                """,
+                (
+                    analysis.order.po_number,
+                    analysis.order.customer,
+                    analysis.status,
+                    str(analysis.order.total),
+                    json.dumps(analysis.order.to_dict(), ensure_ascii=False),
+                    json.dumps(
+                        [finding.to_dict() for finding in analysis.findings],
+                        ensure_ascii=False,
+                    ),
+                    order_id,
+                ),
+            )
+
     def record_decision(
         self, po_number: str, decision: str, actor: str, note: str = ""
     ) -> int:
