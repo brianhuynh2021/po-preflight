@@ -214,3 +214,20 @@ class RuleConfigResponse(BaseModel):
     stock_safety_margin: int = Field(0, description="Buffer quantity for inventory checks")
     allow_inactive_sku: bool = Field(False, description="Allow purchasing deactivated items")
     auto_approve_ready: bool = Field(False, description="Auto-sync orders with zero warnings to ERP")
+
+
+# ---------------------------------------------------------
+# Extraction Confirmation Schemas (Issue #16)
+# ---------------------------------------------------------
+class ConfirmExtractionItem(BaseModel):
+    sku: str = Field(..., description="Confirmed or corrected SKU code", example="LAPTOP-A14")
+    quantity: int = Field(..., description="Confirmed item quantity", example=2)
+    unit_price: Decimal = Field(..., description="Confirmed unit price", example=Decimal("18500000"))
+
+
+class ConfirmExtractionRequest(BaseModel):
+    po_number: str | None = Field(None, description="Optional edited PO number", example="PO-2026-1001")
+    customer: str | None = Field(None, description="Optional edited customer name", example="Acme Corp")
+    items: list[ConfirmExtractionItem] = Field(..., description="Confirmed line items table")
+    currency: str = Field("VND", description="Order currency", example="VND")
+

@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from preflight.api.deps import get_audit_store, get_catalog
 from preflight.api.logging_config import logger
 from preflight.api.schemas import (
+    ConfirmExtractionRequest,
     DecisionRequest,
     DecisionResponse,
     FindingResponse,
@@ -19,7 +20,7 @@ from preflight.api.schemas import (
     OrderDetailResponse,
     OrderSummaryResponse,
 )
-from preflight.models import Product
+from preflight.models import Analysis, LineItem, Order, Product
 from preflight.parsers import parse_order
 from preflight.rules import analyze_order
 from preflight.store import AuditStore
@@ -28,6 +29,8 @@ router = APIRouter(prefix="/api/v1/orders", tags=["Purchase Orders & Preflight O
 
 
 def _calculate_risk(status: str, error_count: int, warning_count: int) -> str:
+    if status == "extraction_review":
+        return "LOW"
     if status == "blocked" or error_count > 0:
         return "HIGH"
     if status in {"review_required", "needs_changes"} or warning_count > 0:
@@ -184,10 +187,11 @@ def get_order_detail(
     response_model=OrderDetailResponse,
     status_code=201,
     summary="Upload & Preflight PO Document",
-    description="Upload a PO file (PDF, JSON, CSV, or TXT), parse items, run deterministic rules, and persist to audit store.",
+    description="Upload a PO file (PDF, JSON, CSV, or TXT), parse items, optionally stage in extraction_review, or run deterministic rules.",
 )
 async def upload_order(
     file: UploadFile = File(..., description="Purchase order document file"),
+    staged_review: bool = Query(False, description="Stage order in extraction_review state before running preflight rules"),
     store: AuditStore = Depends(get_audit_store),
     catalog: dict[str, Product] = Depends(get_catalog),
 ) -> OrderDetailResponse:
@@ -203,8 +207,12 @@ async def upload_order(
         order = parse_order(temp_path)
         duplicate = store.has_po(order.po_number)
 
-        # Run preflight rules
-        analysis = analyze_order(order, catalog, duplicate=duplicate)
+        if staged_review:
+            # Stage in extraction_review state without rules evaluation
+            analysis = Analysis(order=order, findings=[], status="extraction_review")
+        else:
+            # Run preflight rules immediately
+            analysis = analyze_order(order, catalog, duplicate=duplicate)
 
         # Persist to database
         analysis_id = store.record_analysis(analysis, str(file.filename))
@@ -214,6 +222,52 @@ async def upload_order(
     except Exception as exc:
         logger.error(f"Failed to process PO file: {exc}", exc_info=True)
         raise HTTPException(status_code=400, detail=f"Failed to process PO file: {exc}")
+
+
+@router.post(
+    "/{order_id}/confirm-extraction",
+    response_model=OrderDetailResponse,
+    summary="Confirm or Edit Extracted PO Data and Run Preflight Rules",
+    description="Submit reviewed/corrected line items from the extraction review step. Evaluates preflight rules and transitions to ready_for_approval/review_required/blocked.",
+)
+def confirm_extraction(
+    order_id: str,
+    payload: ConfirmExtractionRequest,
+    store: AuditStore = Depends(get_audit_store),
+    catalog: dict[str, Product] = Depends(get_catalog),
+) -> OrderDetailResponse:
+    row = store.get_order(order_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Order {order_id} not found.")
+
+    po_number = payload.po_number or row["po_number"]
+    customer = payload.customer or row["customer"]
+
+    items = tuple(
+        LineItem(
+            sku=it.sku.strip().upper(),
+            quantity=it.quantity,
+            unit_price=it.unit_price,
+        )
+        for it in payload.items
+    )
+    if not items:
+        raise HTTPException(status_code=400, detail="Order must have at least one line item.")
+
+    updated_order = Order(
+        po_number=po_number,
+        customer=customer,
+        items=items,
+        currency=payload.currency,
+    )
+
+    # Run deterministic preflight rules on confirmed order
+    analysis = analyze_order(updated_order, catalog, duplicate=False)
+
+    # Update database record
+    store.update_analysis(int(row["id"]), analysis)
+
+    return get_order_detail(str(row["id"]), store=store, catalog=catalog)
 
 
 @router.post(
