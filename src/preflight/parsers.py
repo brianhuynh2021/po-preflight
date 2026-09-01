@@ -152,3 +152,43 @@ def parse_order(path: str | Path) -> Order:
     if suffix == ".pdf":
         return parse_pdf(source)
     raise OrderParseError(f"Unsupported file format: {suffix or '(no extension)'}")
+
+
+def parse_order_content(content: str, suffix: str = ".json") -> Order:
+    """Parse raw text/JSON/CSV content into a domain Order."""
+    import io
+
+    suffix = suffix.lower()
+    if suffix == ".json":
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise OrderParseError(f"Invalid JSON: {exc}") from exc
+        if not isinstance(data, dict):
+            raise OrderParseError("The JSON root must be an object")
+        return _order_from_mapping(data)
+
+    if suffix == ".csv":
+        handle = io.StringIO(content)
+        rows = list(csv.DictReader(handle))
+        if not rows:
+            raise OrderParseError("CSV contains no line items")
+        first = rows[0]
+        return _order_from_mapping(
+            {
+                "po_number": first.get("po_number"),
+                "customer": first.get("customer"),
+                "currency": first.get("currency", "VND"),
+                "items": [
+                    {
+                        "sku": row.get("sku"),
+                        "quantity": row.get("quantity"),
+                        "unit_price": row.get("unit_price"),
+                    }
+                    for row in rows
+                ],
+            }
+        )
+
+    return parse_text(content)
+
