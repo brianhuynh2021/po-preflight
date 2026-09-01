@@ -281,6 +281,19 @@ def confirm_extraction(
     # Run deterministic preflight rules on confirmed order
     analysis = analyze_order(updated_order, catalog, duplicate=False)
 
+    # Active Learning Feedback Loop: Persist customer nickname/alias mappings when human corrects SKUs
+    try:
+        orig_order_json = json.loads(row.get("order_json", "{}"))
+        orig_items = orig_order_json.get("items", [])
+        for idx, confirmed_item in enumerate(payload.items):
+            canonical_sku = confirmed_item.sku.strip().upper()
+            if idx < len(orig_items):
+                raw_orig = str(orig_items[idx].get("sku", "")).strip()
+                if raw_orig and raw_orig.upper() != canonical_sku:
+                    store.learn_alias(customer_id=customer, raw_query=raw_orig, target_sku=canonical_sku)
+    except Exception as exc:
+        logger.warning(f"Failed to learn customer alias during extraction confirmation: {exc}")
+
     # Update database record
     store.update_analysis(int(row["id"]), analysis)
 

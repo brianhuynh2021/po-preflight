@@ -96,6 +96,36 @@ class TestAllFeaturesIntegration(unittest.TestCase):
         aliases = res_aliases.json()
         self.assertTrue(any(a["target_sku"] == "DOCK-USBC" for a in aliases))
 
+        # 5. Confirm-extraction automated alias learning
+        from preflight.models import Order, LineItem
+        from preflight.rules import analyze_order
+        sample_order = Order(
+            po_number="PO-ALIAS-LEARN-1",
+            customer="VinGroup",
+            items=(LineItem(sku="dây mạng 3m bấm sẵn", quantity=5, unit_price=72000),),
+            currency="VND",
+        )
+        analysis = analyze_order(sample_order, self.catalog, duplicate=False)
+        order_id = self.store.record_analysis(analysis, "test.json")
+
+        confirm_payload = {
+            "po_number": "PO-ALIAS-LEARN-1",
+            "customer": "VinGroup",
+            "currency": "VND",
+            "items": [
+                {"sku": "CAB-CAT6-3M", "quantity": 5, "unit_price": 72000}
+            ],
+        }
+        res_confirm = self.client.post(
+            f"/api/v1/orders/{order_id}/confirm-extraction",
+            json=confirm_payload,
+        )
+        self.assertEqual(res_confirm.status_code, 200)
+
+        # Assert alias was learned into store
+        learned_cable = self.store.get_customer_alias("VinGroup", "dây mạng 3m bấm sẵn")
+        self.assertEqual(learned_cable, "CAB-CAT6-3M")
+
     def test_issue_46_dynamic_fx_engine(self):
         """Test dynamic currency exchange rate caching and fallback."""
         rate = fx_engine.get_rate("USD", "VND")
