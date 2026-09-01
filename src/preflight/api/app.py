@@ -10,7 +10,18 @@ from fastapi.responses import RedirectResponse
 
 from preflight.api.deps import get_catalog, get_db_path
 from preflight.api.logging_config import RequestLoggingMiddleware, logger
-from preflight.api.routes import agent, bot, catalog, dashboard, health, ingestion, matcher, orders, rules
+from preflight.api.routes import (
+    agent,
+    bot,
+    catalog,
+    dashboard,
+    erp,
+    health,
+    ingestion,
+    matcher,
+    orders,
+    rules,
+)
 from preflight.parsers import parse_order
 from preflight.rules import analyze_order
 from preflight.store import AuditStore
@@ -112,6 +123,7 @@ app.include_router(matcher.router)
 app.include_router(agent.router)
 app.include_router(bot.router)
 app.include_router(ingestion.router)
+app.include_router(erp.router)
 
 
 @app.get("/", include_in_schema=False)
