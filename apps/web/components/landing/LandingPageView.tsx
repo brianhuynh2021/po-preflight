@@ -128,7 +128,7 @@ export function LandingPageView() {
             Mở App Dashboard →
           </a>
           <a href="#pilot" className="primary-button" style={{ fontSize: "13px", padding: "8px 16px", textDecoration: "none" }}>
-            Đăng Ký Pilot 30 Ngày
+            Trải Nghiệm 14 Ngày
           </a>
         </div>
       </header>
@@ -479,10 +479,10 @@ export function LandingPageView() {
           <div style={{ textAlign: "center", marginBottom: "28px" }}>
             <p className="eyebrow">CHƯƠNG TRÌNH TRẢI NGHIỆM DOANH NGHIỆP</p>
             <h2 style={{ fontSize: "28px", fontWeight: 800, letterSpacing: "-0.02em", margin: "6px 0" }}>
-              Đăng Ký Chương Trình Pilot Dùng Thử 30 Ngày
+              Đăng Ký Trải Nghiệm Pilot 14 Ngày (Miễn Phí 100 Đơn)
             </h2>
             <p style={{ color: "var(--muted)", maxWidth: "550px", margin: "0 auto", fontSize: "14px" }}>
-              Trải nghiệm tích hợp thử nghiệm cho 1 chi nhánh hoặc 1 nhóm Sales Admin. Miễn phí thiết lập và đào tạo ban đầu.
+              Trải nghiệm tích hợp thử nghiệm cho 1 chi nhánh hoặc 1 nhóm Sales Admin trong 14 ngày. Miễn phí thiết lập và đào tạo ban đầu.
             </p>
           </div>
 
@@ -556,7 +556,7 @@ export function LandingPageView() {
                   className="primary-button"
                   style={{ width: "100%", padding: "12px", fontSize: "15px", fontWeight: 700, justifyContent: "center" }}
                 >
-                  🚀 Nhận Quyền Truy Cập Pilot Miễn Phí 30 Ngày
+                  🚀 Kích Hoạt 14 Ngày Trải Nghiệm Miễn Phí
                 </button>
               </div>
             </form>
