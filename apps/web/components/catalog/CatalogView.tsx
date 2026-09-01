@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { FilterSelect } from "@/components/common/FilterSelect";
 import { SearchFilter } from "@/components/common/SearchFilter";
 import { money } from "@/app/lib/derive";
-import { catalog } from "@/data/catalog";
+import { catalog } from "@/app/lib/seed";
 
 const STATUS_OPTIONS = [
   { label: "All statuses", value: "all" },

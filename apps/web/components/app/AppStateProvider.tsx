@@ -11,7 +11,7 @@ import {
 } from "react";
 
 import type { ActivityEvent, PurchaseOrder } from "@/app/lib/types";
-import { seedOrders } from "../../data/orders";
+import { seedOrders } from "@/app/lib/seed";
 
 interface AppState {
   orders: PurchaseOrder[];

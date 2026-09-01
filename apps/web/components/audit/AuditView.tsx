@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { FilterSelect } from "@/components/common/FilterSelect";
 import { SearchFilter } from "@/components/common/SearchFilter";
-import { auditEntries } from "@/data/audit";
+import { auditEntries } from "@/app/lib/seed";
 import type { ActivityEventType } from "@/app/lib/types";
 
 type TypeFilter = "all" | ActivityEventType;
