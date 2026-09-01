@@ -5,160 +5,235 @@ import React, { useState } from "react";
 interface NodeState {
   id: string;
   name: string;
+  category: "INGEST" | "RAG" | "RULES" | "HITL" | "ERP";
+  status: "COMPLETED" | "ACTIVE" | "PENDING" | "PAUSED";
+  latencyMs: number;
   description: string;
-  status: "idle" | "running" | "completed" | "interrupted" | "skipped";
-  latency?: string;
+  outputPayload?: Record<string, any>;
 }
 
 export function AgentGraphVisualizer() {
-  const [activeThread, setActiveThread] = useState<string>("thread-live-01");
-  const [selectedNode, setSelectedNode] = useState<string>("human_approval");
+  const [selectedThread, setSelectedThread] = useState("thread-demo-8899");
+  const [activeStep, setActiveStep] = useState<string>("human_approval");
+  const [isResumed, setIsResumed] = useState(false);
 
-  const [nodes, setNodes] = useState<NodeState[]>([
-    { id: "ingest", name: "1. Document Ingestion", description: "Parse PO file (PDF/JSON/CSV) & run Self-Reflection Math", status: "completed", latency: "1.2ms" },
-    { id: "sku_matching", name: "2. 4-Tier Hybrid RAG", description: "Cascade: Exact -> Fuzzy -> Vector -> LLM Context", status: "completed", latency: "3.4ms" },
-    { id: "rules_eval", name: "3. Deterministic Rules", description: "Evaluate stock availability, price tolerance (2%), MOQ", status: "completed", latency: "0.4ms" },
-    { id: "human_approval", name: "4. Human In The Loop", description: "HITL Checkpoint: Interrupt & Dispatch Telegram/Zalo card", status: "interrupted", latency: "Awaiting decision" },
-    { id: "erp_sync", name: "5. Transactional Outbox", description: "Idempotent delivery to SAP S/4HANA & Odoo adapters", status: "idle" },
-    { id: "audit_seal", name: "6. Merkle Audit Seal", description: "SHA-256 Merkle tree certificate generation", status: "idle" },
-  ]);
+  const nodes: NodeState[] = [
+    {
+      id: "document_ingestion",
+      name: "Document Ingestion & OCR",
+      category: "INGEST",
+      status: "COMPLETED",
+      latencyMs: 142,
+      description: "Cascading OCR engine: extracts header, line items, and performs zero-hallucination math grounding.",
+      outputPayload: {
+        po_number: "PO-2026-8899",
+        customer: "Vingroup Retail",
+        declared_total: 108440000,
+        math_check: "PASS (100% matched)",
+      },
+    },
+    {
+      id: "hybrid_sku_rag",
+      name: "4-Tier Hybrid RAG Matcher",
+      category: "RAG",
+      status: "COMPLETED",
+      latencyMs: 12,
+      description: "Waterfall resolution: Tier 0 Alias -> Tier 1 Exact -> Tier 2 Fuzzy -> Tier 3 Vector.",
+      outputPayload: {
+        resolved_skus: 3,
+        tier_breakdown: { tier_1: 1, tier_2: 1, tier_3: 1 },
+      },
+    },
+    {
+      id: "deterministic_rules",
+      name: "Deterministic Policy Engine",
+      category: "RULES",
+      status: "COMPLETED",
+      latencyMs: 4,
+      description: "Evaluates pricing tolerance (2%), inventory availability, and duplicate order signatures.",
+      outputPayload: {
+        findings_count: 2,
+        blocking_errors: 1,
+        severity: "BLOCKED",
+      },
+    },
+    {
+      id: "human_approval",
+      name: "HITL Checkpoint Interruption",
+      category: "HITL",
+      status: isResumed ? "COMPLETED" : "PAUSED",
+      latencyMs: isResumed ? 1200 : 0,
+      description: "StateGraph checkpoint saves execution state and pushes mobile approval request to Telegram / Webhook.",
+      outputPayload: isResumed
+        ? { decision: "APPROVED", actor: "Operations Director", note: "VIP customer override" }
+        : { checkpoint: "paused_before_node", pending_approval: true },
+    },
+    {
+      id: "erp_outbox_dispatch",
+      name: "Transactional Outbox Sync",
+      category: "ERP",
+      status: isResumed ? "COMPLETED" : "PENDING",
+      latencyMs: isResumed ? 48 : 0,
+      description: "Atomic idempotency delivery into SAP S/4HANA / Odoo without duplicate order risk.",
+      outputPayload: isResumed
+        ? { erp_reference: "SAP-SO-20268899", idempotency_key: "373a8527101d02ec" }
+        : { status: "awaiting_approval" },
+    },
+  ];
 
-  const runSimulation = () => {
-    // Reset and step through
-    setNodes((prev) => prev.map((n) => ({ ...n, status: "running" })));
-    setTimeout(() => {
-      setNodes((prev) =>
-        prev.map((n) =>
-          n.id === "human_approval"
-            ? { ...n, status: "interrupted" }
-            : n.id === "erp_sync" || n.id === "audit_seal"
-            ? { ...n, status: "idle" }
-            : { ...n, status: "completed" }
-        )
-      );
-    }, 800);
-  };
+  const selectedNode = nodes.find((n) => n.id === activeStep) || nodes[0];
 
-  const resumeSimulation = () => {
-    setNodes((prev) =>
-      prev.map((n) => (n.id === "human_approval" ? { ...n, status: "completed", latency: "Approved by Manager" } : n))
-    );
-    setTimeout(() => {
-      setNodes((prev) =>
-        prev.map((n) => ({ ...n, status: "completed" }))
-      );
-    }, 600);
+  const handleSimulateResume = () => {
+    setIsResumed(true);
   };
 
   return (
     <div className="page agent-graph-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">AGENTIC ORCHESTRATION ENGINE</p>
-          <h1>LangGraph Stateful Workflow Visualizer (Issue #39)</h1>
+          <p className="eyebrow">LANGGRAPH MULTI-AGENT WORKFLOW (ISSUE #39)</p>
+          <h1>LangGraph Stateful Workflow Visualizer</h1>
           <p>
-            Real-time DAG visualization of stateful AI agent graph transitions, interrupt checkpoints, and transactional outbox state recovery.
+            Real-time inspection of cyclical agent StateGraph execution, checkpoint persistence, and Human-in-the-Loop interruptions.
           </p>
         </div>
         <div style={{ display: "flex", gap: "10px" }}>
-          <button className="secondary-button" onClick={runSimulation}>
-            ▶ Run Step-by-Step Simulation
-          </button>
-          <button className="primary-button" onClick={resumeSimulation}>
-            ✅ Simulate Manager Approve & Resume
-          </button>
+          {!isResumed && (
+            <button className="primary-button" onClick={handleSimulateResume}>
+              ▶ Resume StateGraph Execution
+            </button>
+          )}
+          {isResumed && (
+            <button className="secondary-button" onClick={() => setIsResumed(false)}>
+              ↺ Reset Checkpoint
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="workspace-grid" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "24px" }}>
-        {/* Visual Graph Canvas */}
-        <div className="panel" style={{ background: "var(--surface-color, #1e1e2d)", padding: "24px", borderRadius: "10px", border: "1px solid var(--border-color, #333)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
-            <span style={{ fontSize: "14px", fontWeight: "bold", color: "#818cf8" }}>Graph Execution Pipeline: StateGraph(OrderState)</span>
-            <span className="badge" style={{ background: "#312e81", color: "#c7d2fe" }}>Active Checkpointer: MemorySaver</span>
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "20px" }}>
+        {/* Left: DAG Pipeline Canvas */}
+        <div className="clean-card">
+          <div className="card-header-clean">
+            <div>
+              <h3>Active Execution DAG: {selectedThread}</h3>
+              <small style={{ color: "var(--muted)" }}>Checkpointer: MemorySaver (Thread State Anchored)</small>
+            </div>
+            <span
+              className={`badge-clean ${
+                isResumed ? "badge-clean-success" : "badge-clean-warning"
+              }`}
+            >
+              {isResumed ? "● COMPLETED" : "⏸ INTERRUPTED (HITL)"}
+            </span>
           </div>
 
-          <div className="graph-nodes-flow" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            {nodes.map((node, idx) => {
-              const isSelected = selectedNode === node.id;
-              const colorMap = {
-                completed: { border: "#10b981", bg: "#064e3b33", badge: "#34d399", text: "COMPLETED" },
-                interrupted: { border: "#f59e0b", bg: "#78350f33", badge: "#fbbf24", text: "PAUSED (WAITING HITL)" },
-                running: { border: "#3b82f6", bg: "#1e3a8a33", badge: "#60a5fa", text: "RUNNING" },
-                idle: { border: "#4b5563", bg: "#1f293733", badge: "#9ca3af", text: "PENDING" },
-                skipped: { border: "#6b7280", bg: "#11182733", badge: "#6b7280", text: "SKIPPED" },
-              };
-              const style = colorMap[node.status];
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px", padding: "10px 0" }}>
+            {nodes.map((node, index) => {
+              const isSelected = activeStep === node.id;
+              const isCurrentPause = node.id === "human_approval" && !isResumed;
 
               return (
-                <div key={node.id}>
-                  <div
-                    onClick={() => setSelectedNode(node.id)}
-                    style={{
-                      border: `2px solid ${isSelected ? "#818cf8" : style.border}`,
-                      background: style.bg,
-                      padding: "16px",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      boxShadow: isSelected ? "0 0 15px #818cf844" : "none",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: "bold", fontSize: "15px", color: "#fff" }}>{node.name}</div>
-                      <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: "4px" }}>{node.description}</div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <span style={{ fontSize: "11px", fontWeight: "bold", padding: "4px 8px", borderRadius: "4px", background: "#00000066", color: style.badge }}>
-                        {style.text}
+                <div
+                  key={node.id}
+                  className={`dag-node ${isSelected ? "active-step" : ""}`}
+                  style={{
+                    cursor: "pointer",
+                    borderLeft: isCurrentPause ? "4px solid var(--amber)" : undefined,
+                  }}
+                  onClick={() => setActiveStep(node.id)}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: "24px",
+                          height: "24px",
+                          borderRadius: "50%",
+                          background: node.status === "COMPLETED" ? "var(--green-soft)" : isCurrentPause ? "var(--amber-soft)" : "var(--canvas)",
+                          color: node.status === "COMPLETED" ? "var(--green)" : isCurrentPause ? "var(--amber)" : "var(--muted)",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {index + 1}
                       </span>
-                      {node.latency && <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px" }}>{node.latency}</div>}
+                      <strong style={{ fontSize: "14px", color: "var(--ink)" }}>{node.name}</strong>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span className="code-snippet">{node.latencyMs}ms</span>
+                      <span
+                        className={`badge-clean ${
+                          node.status === "COMPLETED"
+                            ? "badge-clean-success"
+                            : node.status === "PAUSED"
+                            ? "badge-clean-warning"
+                            : "badge-clean-info"
+                        }`}
+                      >
+                        {node.status}
+                      </span>
                     </div>
                   </div>
-                  {idx < nodes.length - 1 && (
-                    <div style={{ textAlign: "center", color: "#4b5563", fontSize: "16px", margin: "4px 0" }}>
-                      ↓
-                    </div>
-                  )}
+                  <p style={{ margin: "8px 0 0", fontSize: "12.5px", color: "var(--muted)" }}>
+                    {node.description}
+                  </p>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* State Inspector Sidebar */}
-        <div className="panel" style={{ background: "var(--surface-color, #1e1e2d)", padding: "20px", borderRadius: "10px", border: "1px solid var(--border-color, #333)" }}>
-          <h3 style={{ fontSize: "15px", color: "#fff", marginBottom: "12px" }}>Graph State & Memory Snapshot</h3>
-          <div style={{ fontSize: "12px", color: "#9ca3af", marginBottom: "16px" }}>
-            Thread ID: <code style={{ color: "#818cf8" }}>{activeThread}</code>
+        {/* Right: State Inspector & Telemetry */}
+        <div className="clean-card">
+          <div className="card-header-clean">
+            <h3>State Inspector: {selectedNode.name}</h3>
+            <span className="code-snippet">{selectedNode.category}</span>
           </div>
 
-          <div style={{ background: "#0d1117", padding: "14px", borderRadius: "6px", fontFamily: "monospace", fontSize: "12px", color: "#e6edf3", maxHeight: "400px", overflowY: "auto" }}>
-            <div style={{ color: "#7ee787" }}>// Current State Payload:</div>
-            {JSON.stringify(
-              {
-                thread_id: activeThread,
-                current_node: selectedNode,
-                checkpoint_status: nodes.find((n) => n.id === selectedNode)?.status,
-                variables: {
-                  order_id: "PO-2026-8899",
-                  findings_count: 2,
-                  risk_level: "HIGH",
-                  currency: "VND",
-                  interrupt_nodes: ["human_approval"],
-                  outbox_synced: nodes.find((n) => n.id === "erp_sync")?.status === "completed",
-                },
-              },
-              null,
-              2
-            )}
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", fontSize: "11px", color: "var(--muted)", fontWeight: 600, marginBottom: "4px" }}>
+              STEP SUMMARY
+            </label>
+            <p style={{ fontSize: "13px", color: "var(--ink)", margin: 0, lineHeight: 1.5 }}>
+              {selectedNode.description}
+            </p>
           </div>
 
-          <div style={{ marginTop: "16px", padding: "12px", background: "#1e1e38", borderRadius: "6px", fontSize: "12px", color: "#a5b4fc" }}>
-            💡 <strong>LangGraph Checkpoint:</strong> Trạng thái workflow được lưu vào SQLite/MemorySaver. Khi Manager bấm Duyệt trên Telegram hoặc Web, luồng sẽ phục hồi ngay lập tức từ checkpoint mà không phải chạy lại từ đầu!
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", fontSize: "11px", color: "var(--muted)", fontWeight: 600, marginBottom: "6px" }}>
+              STATE PAYLOAD (JSON)
+            </label>
+            <pre
+              style={{
+                background: "var(--canvas)",
+                padding: "12px",
+                borderRadius: "8px",
+                border: "1px solid var(--line)",
+                fontSize: "12px",
+                fontFamily: "ui-monospace, monospace",
+                overflowX: "auto",
+                margin: 0,
+                color: "var(--ink)",
+              }}
+            >
+              {JSON.stringify(selectedNode.outputPayload, null, 2)}
+            </pre>
+          </div>
+
+          <div style={{ borderTop: "1px solid var(--line)", paddingTop: "14px", marginTop: "14px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--muted)" }}>
+              <span>Execution Engine:</span>
+              <strong style={{ color: "var(--ink)" }}>LangGraph Core v0.2</strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--muted)", marginTop: "6px" }}>
+              <span>State Reducer:</span>
+              <strong style={{ color: "var(--ink)" }}>Immutable Append</strong>
+            </div>
           </div>
         </div>
       </div>

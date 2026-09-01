@@ -171,8 +171,8 @@ Hệ thống tự động cộng dồn $\sum(\text{Quantity} \times \text{Unit P
 ---
 
 ### 🤝 KÊU GỌI HÀNH ĐỘNG (NEXT STEPS):
-* **Xem Trực Tiếp Bản Demo**: Truy cập `http://localhost:5173` để trải nghiệm bóc tách và duyệt đơn trực tiếp.
-* **Đăng Ký Trải Nghiệm Thí Điểm (Pilot Program)**: Miễn phí 30 ngày tích hợp vào hệ thống ERP nội bộ.
+* **Xem Trực Tiếp Bản Demo**: Truy cập `http://localhost:3001/landing` để trải nghiệm bóc tách và duyệt đơn trực tiếp.
+* **Đăng Ký Trải Nghiệm Thí Điểm (Pilot Program)**: Miễn phí 14 ngày trải nghiệm (hoặc 100 đơn hàng đầu tiên).
 * **Liên Hệ Đội Ngũ Sáng Lập**: `contact@popreflight.com` | Hotline: `090x-xxx-xxx`.
 
 ---

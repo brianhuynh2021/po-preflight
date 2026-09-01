@@ -121,3 +121,14 @@ test("renders the Settings view at /settings", async () => {
   assert.match(html, /Multi-Channel Integration/);
   assert.match(html, /Telegram Bot/);
 });
+
+test("renders the Marketing Landing Page at /landing", async () => {
+  const response = await render("/landing");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Cổng Kiểm Soát An Toàn Tự Động Cho Đơn Đặt Hàng B2B/);
+  assert.match(html, /Bảng Tính Lợi Nhuận Hoàn Vốn/);
+  assert.match(html, /Tự Động Hiểu &quot;Tên Lóng&quot;/);
+  assert.match(html, /Đăng Ký Trải Nghiệm Pilot 14 Ngày/);
+});
+

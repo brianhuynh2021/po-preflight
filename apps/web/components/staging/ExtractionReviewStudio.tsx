@@ -1,11 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { useAppState } from "@/components/app/AppStateProvider";
 import { money } from "@/app/lib/derive";
 
 export function ExtractionReviewStudio() {
-  const { orders, setOrders } = useAppState();
   const [selectedPoNumber, setSelectedPoNumber] = useState<string>("PO-10431");
   const [customerName, setCustomerName] = useState("Acme Global Distributors");
   const [currency, setCurrency] = useState("VND");
@@ -28,6 +26,8 @@ export function ExtractionReviewStudio() {
     }, 1000);
   };
 
+  const totalValue = lineItems.reduce((acc, it) => acc + it.quantity * it.unitPrice, 0);
+
   return (
     <div className="page staging-page">
       <div className="page-heading">
@@ -38,48 +38,69 @@ export function ExtractionReviewStudio() {
             Human-in-the-Loop staging environment to audit OCR bounding boxes, correct line items, and resolve SKU ambiguities before rule evaluation.
           </p>
         </div>
+        <div>
+          <button className="primary-button" onClick={handleConfirmExtraction}>
+            ✓ Confirm & Run Preflight Rules
+          </button>
+        </div>
       </div>
 
       {statusMessage && (
-        <div style={{ padding: "12px 16px", background: "#064e3b", color: "#34d399", borderRadius: "8px", marginBottom: "16px", fontWeight: "bold" }}>
+        <div
+          style={{
+            padding: "12px 16px",
+            background: "var(--green-soft)",
+            color: "var(--green)",
+            borderRadius: "8px",
+            marginBottom: "16px",
+            fontWeight: 600,
+            border: "1px solid rgba(25, 112, 76, 0.2)",
+          }}
+        >
           {statusMessage}
         </div>
       )}
 
-      <div className="workspace-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: "24px" }}>
-        {/* Left Card: Document Meta */}
-        <div className="panel" style={{ background: "var(--surface-color, #1e1e2d)", padding: "20px", borderRadius: "10px", border: "1px solid var(--border-color, #333)" }}>
-          <h3 style={{ marginBottom: "16px", fontSize: "16px", color: "var(--text-color, #fff)" }}>Staged Document Properties</h3>
-          
-          <div style={{ marginBottom: "12px" }}>
-            <label style={{ display: "block", fontSize: "12px", color: "#888", marginBottom: "4px" }}>PO NUMBER</label>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: "20px" }}>
+        {/* Left Card: Document Properties */}
+        <div className="clean-card">
+          <div className="card-header-clean">
+            <h3>Staged Document Properties</h3>
+            <span className="badge-clean badge-clean-info">Extraction Staged</span>
+          </div>
+
+          <div style={{ marginBottom: "14px" }}>
+            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
+              PO NUMBER
+            </label>
             <input
               type="text"
+              className="input-clean"
               value={selectedPoNumber}
               onChange={(e) => setSelectedPoNumber(e.target.value)}
-              className="text-input"
-              style={{ width: "100%", padding: "8px", borderRadius: "6px", background: "#111", border: "1px solid #444", color: "#fff" }}
             />
           </div>
 
-          <div style={{ marginBottom: "12px" }}>
-            <label style={{ display: "block", fontSize: "12px", color: "#888", marginBottom: "4px" }}>CUSTOMER ENTITY</label>
+          <div style={{ marginBottom: "14px" }}>
+            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
+              CUSTOMER ENTITY
+            </label>
             <input
               type="text"
+              className="input-clean"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              className="text-input"
-              style={{ width: "100%", padding: "8px", borderRadius: "6px", background: "#111", border: "1px solid #444", color: "#fff" }}
             />
           </div>
 
-          <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", fontSize: "12px", color: "#888", marginBottom: "4px" }}>CURRENCY</label>
+          <div style={{ marginBottom: "18px" }}>
+            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
+              CURRENCY
+            </label>
             <select
+              className="input-clean"
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              className="text-input"
-              style={{ width: "100%", padding: "8px", borderRadius: "6px", background: "#111", border: "1px solid #444", color: "#fff" }}
             >
               <option value="VND">VND (Vietnamese Dong)</option>
               <option value="USD">USD (US Dollar)</option>
@@ -87,82 +108,107 @@ export function ExtractionReviewStudio() {
             </select>
           </div>
 
-          <div style={{ padding: "12px", background: "#111827", borderRadius: "6px", fontSize: "12px", color: "#9ca3af" }}>
-            <div><strong>OCR Vision Engine:</strong> Gemini 2.0 Flash Vision</div>
-            <div><strong>Processing Pipeline:</strong> Cascading Parser + Self-Reflection Math</div>
-            <div><strong>Confidence Score:</strong> <span style={{ color: "#34d399", fontWeight: "bold" }}>96.5% Overall</span></div>
+          <div
+            style={{
+              padding: "14px",
+              background: "var(--canvas)",
+              borderRadius: "8px",
+              border: "1px solid var(--line)",
+              fontSize: "12px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "6px",
+            }}
+          >
+            <div>
+              <span style={{ color: "var(--muted)" }}>OCR Vision Engine:</span>{" "}
+              <strong>Gemini 2.0 Flash Vision</strong>
+            </div>
+            <div>
+              <span style={{ color: "var(--muted)" }}>Processing Pipeline:</span>{" "}
+              <strong>Cascading Parser + Self-Reflection Math</strong>
+            </div>
+            <div>
+              <span style={{ color: "var(--muted)" }}>Confidence Score:</span>{" "}
+              <span className="badge-clean badge-clean-success" style={{ marginLeft: "4px" }}>
+                96.5% Overall
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Right Card: Line Items Table & Editor */}
-        <div className="panel" style={{ background: "var(--surface-color, #1e1e2d)", padding: "20px", borderRadius: "10px", border: "1px solid var(--border-color, #333)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-            <h3 style={{ fontSize: "16px", color: "var(--text-color, #fff)" }}>Extracted Line Items (Editable)</h3>
-            <span style={{ fontSize: "12px", color: "#60a5fa" }}>{lineItems.length} items parsed</span>
+        <div className="clean-card">
+          <div className="card-header-clean">
+            <h3>Extracted Line Items (Editable)</h3>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--green)" }}>
+              Total: {money(totalValue, currency)}
+            </span>
           </div>
 
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid #444", color: "#888", textAlign: "left" }}>
-                <th style={{ padding: "8px" }}>SKU</th>
-                <th style={{ padding: "8px" }}>Description</th>
-                <th style={{ padding: "8px" }}>Qty</th>
-                <th style={{ padding: "8px" }}>Unit Price</th>
-                <th style={{ padding: "8px" }}>Confidence</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lineItems.map((item, idx) => (
-                <tr key={idx} style={{ borderBottom: "1px solid #2d2d3a" }}>
-                  <td style={{ padding: "8px" }}>
-                    <input
-                      type="text"
-                      value={item.sku}
-                      onChange={(e) => updateItem(idx, "sku", e.target.value)}
-                      style={{ width: "100px", padding: "4px", background: "#111", border: "1px solid #444", color: "#60a5fa", borderRadius: "4px" }}
-                    />
-                  </td>
-                  <td style={{ padding: "8px" }}>
-                    <input
-                      type="text"
-                      value={item.product}
-                      onChange={(e) => updateItem(idx, "product", e.target.value)}
-                      style={{ width: "160px", padding: "4px", background: "#111", border: "1px solid #444", color: "#fff", borderRadius: "4px" }}
-                    />
-                  </td>
-                  <td style={{ padding: "8px" }}>
-                    <input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(idx, "quantity", Number(e.target.value))}
-                      style={{ width: "60px", padding: "4px", background: "#111", border: "1px solid #444", color: "#fff", borderRadius: "4px" }}
-                    />
-                  </td>
-                  <td style={{ padding: "8px" }}>
-                    <input
-                      type="number"
-                      value={item.unitPrice}
-                      onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))}
-                      style={{ width: "110px", padding: "4px", background: "#111", border: "1px solid #444", color: "#fff", borderRadius: "4px" }}
-                    />
-                  </td>
-                  <td style={{ padding: "8px" }}>
-                    <span style={{ color: item.ocrConfidence > 0.8 ? "#34d399" : "#fbbf24", fontWeight: "bold", fontSize: "11px" }}>
-                      {(item.ocrConfidence * 100).toFixed(0)}%
-                    </span>
-                  </td>
+          <div className="table-wrap">
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+              <thead>
+                <tr style={{ background: "var(--canvas)", borderBottom: "1px solid var(--line)", textAlign: "left" }}>
+                  <th style={{ padding: "8px 12px" }}>SKU</th>
+                  <th style={{ padding: "8px 12px" }}>DESCRIPTION</th>
+                  <th style={{ padding: "8px 12px" }}>QTY</th>
+                  <th style={{ padding: "8px 12px" }}>UNIT PRICE</th>
+                  <th style={{ padding: "8px 12px" }}>OCR CONF.</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-            <button className="secondary-button" onClick={() => setLineItems([...lineItems, { sku: "NEW-SKU", product: "New Item", quantity: 1, unitPrice: 1000000, ocrConfidence: 1.0 }])}>
-              ＋ Add Line Item
-            </button>
-            <button className="primary-button" onClick={handleConfirmExtraction} style={{ background: "linear-gradient(135deg, #2563eb, #1d4ed8)" }}>
-              🚀 Confirm Extraction & Run Preflight Rules
-            </button>
+              </thead>
+              <tbody>
+                {lineItems.map((item, idx) => (
+                  <tr key={idx} style={{ borderBottom: "1px solid var(--line)" }}>
+                    <td style={{ padding: "8px 12px" }}>
+                      <input
+                        type="text"
+                        className="input-clean"
+                        style={{ padding: "4px 8px", fontSize: "12px", fontWeight: 600 }}
+                        value={item.sku}
+                        onChange={(e) => updateItem(idx, "sku", e.target.value)}
+                      />
+                    </td>
+                    <td style={{ padding: "8px 12px" }}>
+                      <input
+                        type="text"
+                        className="input-clean"
+                        style={{ padding: "4px 8px", fontSize: "12px" }}
+                        value={item.product}
+                        onChange={(e) => updateItem(idx, "product", e.target.value)}
+                      />
+                    </td>
+                    <td style={{ padding: "8px 12px", width: "70px" }}>
+                      <input
+                        type="number"
+                        className="input-clean"
+                        style={{ padding: "4px 8px", fontSize: "12px" }}
+                        value={item.quantity}
+                        onChange={(e) => updateItem(idx, "quantity", Number(e.target.value))}
+                      />
+                    </td>
+                    <td style={{ padding: "8px 12px", width: "120px" }}>
+                      <input
+                        type="number"
+                        className="input-clean"
+                        style={{ padding: "4px 8px", fontSize: "12px" }}
+                        value={item.unitPrice}
+                        onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))}
+                      />
+                    </td>
+                    <td style={{ padding: "8px 12px" }}>
+                      <span
+                        className={`badge-clean ${
+                          item.ocrConfidence >= 0.9 ? "badge-clean-success" : "badge-clean-warning"
+                        }`}
+                      >
+                        {(item.ocrConfidence * 100).toFixed(0)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
