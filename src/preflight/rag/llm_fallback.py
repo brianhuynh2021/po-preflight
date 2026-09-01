@@ -46,27 +46,6 @@ class LLMContextResolver:
                             )
                             break
 
-        # Fallback to general catalog heuristic if no customer history matched
-        if not matched_sku:
-            # Pick first active product as low-confidence proposal
-            first_prod = next(iter(self.catalog.values())) if self.catalog else None
-            if first_prod:
-                return MatchResult(
-                    raw_query=raw_query,
-                    matched_sku=first_prod.sku,
-                    name=first_prod.name,
-                    unit_price=first_prod.unit_price,
-                    stock=first_prod.stock,
-                    active=first_prod.active,
-                    confidence_score=0.40,
-                    tier_used=ResolutionTier.TIER_4_LLM_CONTEXT,
-                    is_confident=False,
-                    explanation=(
-                        f"Low-confidence proposal: '{raw_query}' is ambiguous and has no exact, fuzzy, "
-                        f"or vector match. Proposing '{first_prod.sku}' for manual reviewer confirmation."
-                    ),
-                    candidates=[],
-                )
 
         if matched_sku and matched_sku in self.catalog:
             prod = self.catalog[matched_sku]

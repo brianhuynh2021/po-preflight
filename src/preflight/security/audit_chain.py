@@ -111,31 +111,46 @@ class AuditHashChain:
         po_number: str,
         order_data: dict[str, Any],
         decisions: list[dict[str, Any]],
+        stored_blocks: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        """Generate a cryptographically signed compliance audit certificate."""
-        events = [
-            {
-                "timestamp": time.time() - 60,
-                "po_number": po_number,
-                "action": "ORDER_INGESTED",
-                "actor": "system:ingestion_pipeline",
-                "payload": {"total": order_data.get("total"), "status": order_data.get("status")},
-            }
-        ]
-        for d in decisions:
-            events.append(
+        """Generate a cryptographically signed compliance audit certificate from persistent or derived event chain."""
+        if stored_blocks:
+            blocks = [
+                AuditBlock(
+                    index=int(b["index"]),
+                    timestamp=float(b["timestamp"]),
+                    po_number=str(b["po_number"]),
+                    action=str(b["action"]),
+                    actor=str(b["actor"]),
+                    payload_hash=str(b["payload_hash"]),
+                    previous_hash=str(b["previous_hash"]),
+                    block_hash=str(b["block_hash"]),
+                )
+                for b in stored_blocks
+            ]
+        else:
+            events = [
                 {
-                    "timestamp": time.time(),
+                    "timestamp": time.time() - 60,
                     "po_number": po_number,
-                    "action": f"DECISION_{d.get('decision', 'UNKNOWN').upper()}",
-                    "actor": d.get("actor", "system"),
-                    "payload": d,
+                    "action": "ORDER_INGESTED",
+                    "actor": "system:ingestion_pipeline",
+                    "payload": {"total": order_data.get("total"), "status": order_data.get("status")},
                 }
-            )
+            ]
+            for d in decisions:
+                events.append(
+                    {
+                        "timestamp": time.time(),
+                        "po_number": po_number,
+                        "action": f"DECISION_{d.get('decision', 'UNKNOWN').upper()}",
+                        "actor": d.get("actor", "system"),
+                        "payload": d,
+                    }
+                )
+            blocks = cls.build_chain(events)
 
-        blocks = cls.build_chain(events)
         is_valid, msg = cls.verify_chain(blocks)
-
         root_hash = blocks[-1].block_hash if blocks else cls.GENESIS_PREV_HASH
 
         return {
@@ -149,3 +164,4 @@ class AuditHashChain:
             "verification_message": msg,
             "blocks": [b.to_dict() for b in blocks],
         }
+

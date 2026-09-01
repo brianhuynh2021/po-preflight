@@ -12,19 +12,31 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: "pip"
+      - name: Set up Node.js for Web Frontend
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[test,pdf]"
+          npm --prefix apps/web ci
+      - name: Smoke import check
+        run: |
+          python -c "import preflight.api.app; import preflight.agent.graph; import preflight.rag.matcher"
       - name: Run tests and policy checks
         run: ./scripts/test.sh
+
 
   terraform:
     runs-on: ubuntu-latest

@@ -5,12 +5,14 @@ import json
 import os
 import sqlite3
 import threading
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-
 from preflight.models import Analysis
+from preflight.security.audit_chain import calculate_hash, compute_payload_hash
+
 
 
 SQLITE_SCHEMA = """
@@ -44,6 +46,19 @@ CREATE TABLE IF NOT EXISTS customer_aliases (
     UNIQUE(customer_id, raw_query)
 );
 CREATE INDEX IF NOT EXISTS idx_customer_aliases ON customer_aliases(customer_id, raw_query);
+
+CREATE TABLE IF NOT EXISTS audit_blocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    block_index INTEGER NOT NULL,
+    timestamp REAL NOT NULL,
+    po_number TEXT NOT NULL,
+    action TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
+    previous_hash TEXT NOT NULL,
+    block_hash TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_audit_blocks_po ON audit_blocks(po_number);
 """
 
 POSTGRES_SCHEMA = """
@@ -80,7 +95,21 @@ CREATE TABLE IF NOT EXISTS customer_aliases (
     UNIQUE(customer_id, raw_query)
 );
 CREATE INDEX IF NOT EXISTS idx_pg_customer_aliases ON customer_aliases(customer_id, raw_query);
+
+CREATE TABLE IF NOT EXISTS audit_blocks (
+    id SERIAL PRIMARY KEY,
+    block_index INTEGER NOT NULL,
+    timestamp DOUBLE PRECISION NOT NULL,
+    po_number VARCHAR(128) NOT NULL,
+    action VARCHAR(64) NOT NULL,
+    actor VARCHAR(255) NOT NULL,
+    payload_hash VARCHAR(64) NOT NULL,
+    previous_hash VARCHAR(64) NOT NULL,
+    block_hash VARCHAR(64) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pg_audit_blocks_po ON audit_blocks(po_number);
 """
+
 
 
 class BaseAuditStore(abc.ABC):
@@ -154,6 +183,22 @@ class BaseAuditStore(abc.ABC):
     def list_customer_aliases(self, customer_id: str | None = None) -> list[dict[str, Any]]:
         pass
 
+    @abc.abstractmethod
+    def append_audit_block(
+        self,
+        po_number: str,
+        action: str,
+        actor: str,
+        payload: dict[str, Any],
+        timestamp: float | None = None,
+    ) -> dict[str, Any]:
+        pass
+
+    @abc.abstractmethod
+    def get_audit_blocks(self, po_number: str) -> list[dict[str, Any]]:
+        pass
+
+
 
 class AuditStore(BaseAuditStore):
     """SQLite implementation with Write-Ahead Logging (WAL) mode for local development."""
@@ -215,6 +260,12 @@ class AuditStore(BaseAuditStore):
                     ),
                 )
                 self.connection.commit()
+                self.append_audit_block(
+                    analysis.order.po_number,
+                    "ORDER_INGESTED",
+                    "system:ingestion_pipeline",
+                    {"total": str(analysis.order.total), "status": analysis.status},
+                )
                 if cursor.lastrowid is not None:
                     analysis.analysis_id = int(cursor.lastrowid)
                     return analysis.analysis_id
@@ -293,7 +344,14 @@ class AuditStore(BaseAuditStore):
                     "UPDATE analyses SET status = ? WHERE po_number = ?",
                     (decision, po_number),
                 )
+                self.append_audit_block(
+                    po_number,
+                    f"DECISION_{decision.upper()}",
+                    actor,
+                    {"decision": decision, "note": note, "actor": actor},
+                )
                 return int(cursor.lastrowid)
+
 
     def history(self, po_number: str) -> dict[str, list[dict[str, object]]]:
         with self._lock:
@@ -456,6 +514,58 @@ class AuditStore(BaseAuditStore):
                     "SELECT * FROM customer_aliases ORDER BY id DESC"
                 ).fetchall()
             return [dict(r) for r in rows]
+
+    def append_audit_block(
+        self,
+        po_number: str,
+        action: str,
+        actor: str,
+        payload: dict[str, Any],
+        timestamp: float | None = None,
+    ) -> dict[str, Any]:
+        with self._lock:
+            t = timestamp if timestamp is not None else time.time()
+            last_row = self.connection.execute(
+                "SELECT * FROM audit_blocks WHERE po_number = ? ORDER BY block_index DESC LIMIT 1",
+                (po_number,),
+            ).fetchone()
+            if last_row:
+                idx = last_row["block_index"] + 1
+                prev_hash = last_row["block_hash"]
+            else:
+                idx = 0
+                prev_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+
+            p_hash = compute_payload_hash(payload)
+            b_hash = calculate_hash(idx, t, po_number, action, actor, p_hash, prev_hash)
+
+            self.connection.execute(
+                """
+                INSERT INTO audit_blocks (block_index, timestamp, po_number, action, actor, payload_hash, previous_hash, block_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (idx, t, po_number, action, actor, p_hash, prev_hash, b_hash),
+            )
+            self.connection.commit()
+            return {
+                "index": idx,
+                "timestamp": t,
+                "po_number": po_number,
+                "action": action,
+                "actor": actor,
+                "payload_hash": p_hash,
+                "previous_hash": prev_hash,
+                "block_hash": b_hash,
+            }
+
+    def get_audit_blocks(self, po_number: str) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self.connection.execute(
+                "SELECT block_index as [index], timestamp, po_number, action, actor, payload_hash, previous_hash, block_hash FROM audit_blocks WHERE po_number = ? ORDER BY block_index ASC",
+                (po_number,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
 
 
 
@@ -748,6 +858,71 @@ class PostgresAuditStore(BaseAuditStore):
                 return [dict(r) for r in cur.fetchall()]
         finally:
             self._pool.putconn(conn)
+
+    def append_audit_block(
+        self,
+        po_number: str,
+        action: str,
+        actor: str,
+        payload: dict[str, Any],
+        timestamp: float | None = None,
+    ) -> dict[str, Any]:
+        if self._fallback_sqlite:
+            return self._fallback_sqlite.append_audit_block(po_number, action, actor, payload, timestamp)
+        conn = self._pool.getconn()
+        try:
+            t = timestamp if timestamp is not None else time.time()
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT block_index, block_hash FROM audit_blocks WHERE po_number = %s ORDER BY block_index DESC LIMIT 1",
+                    (po_number,),
+                )
+                last_row = cur.fetchone()
+                if last_row:
+                    idx = last_row[0] + 1
+                    prev_hash = last_row[1]
+                else:
+                    idx = 0
+                    prev_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+
+                p_hash = compute_payload_hash(payload)
+                b_hash = calculate_hash(idx, t, po_number, action, actor, p_hash, prev_hash)
+
+                cur.execute(
+                    """
+                    INSERT INTO audit_blocks (block_index, timestamp, po_number, action, actor, payload_hash, previous_hash, block_hash)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (idx, t, po_number, action, actor, p_hash, prev_hash, b_hash),
+                )
+            conn.commit()
+            return {
+                "index": idx,
+                "timestamp": t,
+                "po_number": po_number,
+                "action": action,
+                "actor": actor,
+                "payload_hash": p_hash,
+                "previous_hash": prev_hash,
+                "block_hash": b_hash,
+            }
+        finally:
+            self._pool.putconn(conn)
+
+    def get_audit_blocks(self, po_number: str) -> list[dict[str, Any]]:
+        if self._fallback_sqlite:
+            return self._fallback_sqlite.get_audit_blocks(po_number)
+        conn = self._pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT block_index as index, timestamp, po_number, action, actor, payload_hash, previous_hash, block_hash FROM audit_blocks WHERE po_number = %s ORDER BY block_index ASC",
+                    (po_number,),
+                )
+                return [dict(r) for r in cur.fetchall()]
+        finally:
+            self._pool.putconn(conn)
+
 
 
 def create_audit_store(database_url_or_path: str | Path | None = None) -> BaseAuditStore:

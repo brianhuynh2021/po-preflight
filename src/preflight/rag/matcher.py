@@ -1,6 +1,6 @@
-from __future__ import annotations
-
+from typing import Any
 from preflight.models import Product
+
 from preflight.rag.exact import ExactMatcher
 from preflight.rag.fuzzy import FuzzyLexicalMatcher
 from preflight.rag.llm_fallback import LLMContextResolver
