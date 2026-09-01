@@ -14,10 +14,13 @@ def detect_document_type(file_bytes: bytes, filename: str = "document") -> Docum
         return DocumentType.STRUCTURED_JSON
     if name_lower.endswith(".csv"):
         return DocumentType.DELIMITED_CSV
+    if any(name_lower.endswith(ext) for ext in [".xlsx", ".xls", ".xlsm", ".xlsb"]):
+        return DocumentType.SPREADSHEET_EXCEL
     if name_lower.endswith(".txt"):
         return DocumentType.PLAIN_TEXT
     if any(name_lower.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp", ".tiff", ".bmp"]):
         return DocumentType.IMAGE_RASTER
+
 
     # Check for PDF
     if name_lower.endswith(".pdf") or file_bytes.startswith(b"%PDF"):

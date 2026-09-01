@@ -12,11 +12,13 @@ class DocumentType(str, Enum):
     IMAGE_RASTER = "IMAGE_RASTER"
     STRUCTURED_JSON = "STRUCTURED_JSON"
     DELIMITED_CSV = "DELIMITED_CSV"
+    SPREADSHEET_EXCEL = "SPREADSHEET_EXCEL"
     PLAIN_TEXT = "PLAIN_TEXT"
 
 
 class ExtractorEngine(str, Enum):
     DETERMINISTIC_PARSER = "DETERMINISTIC_PARSER"
+    EXCEL_PARSER = "EXCEL_PARSER"
     GEMINI_FLASH_VISION = "GEMINI_FLASH_VISION"
     HYBRID_FALLBACK = "HYBRID_FALLBACK"
 
@@ -27,6 +29,8 @@ class ExtractedLineItem(BaseModel):
     quantity: int = Field(..., description="Ordered quantity")
     unit_price: Decimal = Field(..., description="Unit price per item")
     amount: Decimal = Field(..., description="Line total amount (quantity * unit_price)")
+    uom: str = Field(default="PCS", description="Declared Unit of Measure")
+
 
 
 class ExtractedOrderHeader(BaseModel):
