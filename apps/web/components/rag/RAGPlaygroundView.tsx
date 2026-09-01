@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { money } from "@/app/lib/derive";
 
 interface MatchCandidate {
   sku: string;
@@ -119,7 +118,7 @@ export function RAGPlaygroundView() {
                   style={{ fontSize: "12px", padding: "4px 10px" }}
                   onClick={() => setQuery(preset.text)}
                 >
-                  {preset.label}: <strong>"{preset.text}"</strong>
+                  {preset.label}: <strong>&quot;{preset.text}&quot;</strong>
                 </button>
               ))}
             </div>

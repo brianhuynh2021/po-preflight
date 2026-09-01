@@ -9,11 +9,11 @@ interface NodeState {
   status: "COMPLETED" | "ACTIVE" | "PENDING" | "PAUSED";
   latencyMs: number;
   description: string;
-  outputPayload?: Record<string, any>;
+  outputPayload?: Record<string, unknown>;
 }
 
 export function AgentGraphVisualizer() {
-  const [selectedThread, setSelectedThread] = useState("thread-demo-8899");
+  const [selectedThread] = useState("thread-demo-8899");
   const [activeStep, setActiveStep] = useState<string>("human_approval");
   const [isResumed, setIsResumed] = useState(false);
 

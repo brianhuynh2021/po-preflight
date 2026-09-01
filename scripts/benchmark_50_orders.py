@@ -16,6 +16,9 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+# Ensure src/ is in sys.path automatically
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+
 # ANSI Colors
 BOLD = "\033[1m"
 GREEN = "\033[32m"

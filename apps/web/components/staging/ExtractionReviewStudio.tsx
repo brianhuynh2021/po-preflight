@@ -13,7 +13,7 @@ export function ExtractionReviewStudio() {
   ]);
   const [statusMessage, setStatusMessage] = useState<string>("");
 
-  const updateItem = (index: number, field: string, value: any) => {
+  const updateItem = (index: number, field: string, value: string | number) => {
     setLineItems((prev) =>
       prev.map((item, idx) => (idx === index ? { ...item, [field]: value } : item))
     );
