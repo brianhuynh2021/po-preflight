@@ -13,6 +13,7 @@ from preflight.api.logging_config import RequestLoggingMiddleware, logger
 from preflight.security.rate_limiter import RateLimitMiddleware
 from preflight.api.routes import (
     agent,
+    b2b,
     bot,
     catalog,
     dashboard,
@@ -25,6 +26,7 @@ from preflight.api.routes import (
     orders,
     rules,
 )
+
 from preflight.parsers import parse_order
 from preflight.rules import analyze_order
 from preflight.store import AuditStore
@@ -136,7 +138,9 @@ app.include_router(dashboard.router)
 app.include_router(catalog.router)
 app.include_router(rules.router)
 app.include_router(matcher.router)
+app.include_router(b2b.router)
 app.include_router(agent.router)
+
 app.include_router(bot.router)
 app.include_router(ingestion.router)
 app.include_router(erp.router)
