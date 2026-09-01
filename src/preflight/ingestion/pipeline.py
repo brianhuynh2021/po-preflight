@@ -32,7 +32,19 @@ class IntelligentIngestionPipeline:
         doc_type = detect_document_type(file_bytes, filename)
 
         # -------------------------------------------------------------
-        # 1. Zero-Token Deterministic Path (JSON / CSV / TXT / Digital PDF)
+        # 1. Native Excel Spreadsheets (.xlsx / .xls / .xlsm)
+        # -------------------------------------------------------------
+        if doc_type == DocumentType.SPREADSHEET_EXCEL:
+            try:
+                from preflight.ingestion.excel_parser import ExcelExtractor
+
+                extractor = ExcelExtractor()
+                return extractor.extract(file_bytes, filename)
+            except Exception:
+                pass  # Fallback to Vision OCR
+
+        # -------------------------------------------------------------
+        # 2. Zero-Token Deterministic Path (JSON / CSV / TXT / Digital PDF)
         # -------------------------------------------------------------
         if doc_type in [
             DocumentType.STRUCTURED_JSON,
@@ -43,6 +55,7 @@ class IntelligentIngestionPipeline:
             try:
                 text_content = file_bytes.decode("utf-8", errors="ignore")
                 domain_order = parse_order_content(text_content, suffix=Path(filename).suffix)
+
 
                 if domain_order.items:
                     items = [
