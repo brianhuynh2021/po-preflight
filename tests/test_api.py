@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import unittest
+import uuid
 from pathlib import Path
+
 from tempfile import TemporaryDirectory
 
 from starlette.testclient import TestClient
@@ -96,25 +98,36 @@ class TestFastAPIGateway(unittest.TestCase):
         self.assertIn("price_tolerance_percent", data)
 
     def test_upload_order_file(self):
-        sample_path = Path("examples/orders/po-clean.json")
-        with sample_path.open("rb") as f:
-            response = self.client.post(
-                "/api/v1/orders/upload",
-                files={"file": ("po-clean-upload-test.json", f, "application/json")},
-            )
+        uid = uuid.uuid4().hex[:6]
+        po_payload = {
+            "po_number": f"PO-TEST-{uid}",
+            "customer": "Clean Enterprise",
+            "currency": "VND",
+            "total": 18500000,
+            "items": [{"sku": "LAPTOP-A14", "quantity": 1, "unit_price": 18500000}],
+        }
+        response = self.client.post(
+            "/api/v1/orders/upload",
+            files={"file": (f"po-clean-{uid}.json", json.dumps(po_payload).encode("utf-8"), "application/json")},
+        )
         self.assertEqual(response.status_code, 201)
         data = response.json()
-        self.assertEqual(data["po_number"], "PO-2026-1001")
+        self.assertEqual(data["po_number"], f"PO-TEST-{uid}")
         self.assertIn("items", data)
 
     def test_record_human_decision(self):
-        # Upload a PO to decide on
-        sample_path = Path("examples/orders/po-review.json")
-        with sample_path.open("rb") as f:
-            upload_res = self.client.post(
-                "/api/v1/orders/upload",
-                files={"file": ("po-review-decision-test.json", f, "application/json")},
-            )
+        uid = uuid.uuid4().hex[:6]
+        po_payload = {
+            "po_number": f"PO-REV-{uid}",
+            "customer": "Review Customer",
+            "currency": "VND",
+            "total": 20000000,
+            "items": [{"sku": "LAPTOP-A14", "quantity": 1, "unit_price": 20000000}],
+        }
+        upload_res = self.client.post(
+            "/api/v1/orders/upload",
+            files={"file": (f"po-rev-{uid}.json", json.dumps(po_payload).encode("utf-8"), "application/json")},
+        )
         self.assertEqual(upload_res.status_code, 201)
         order_id = upload_res.json()["id"]
 
@@ -130,6 +143,93 @@ class TestFastAPIGateway(unittest.TestCase):
         self.assertEqual(data["decision"], "approved")
         self.assertEqual(data["actor"], "lead_reviewer@company.com")
 
+    def test_cannot_approve_blocked_order_returns_409(self):
+        uid = uuid.uuid4().hex[:6]
+        po_payload = {
+            "po_number": f"PO-BLOCK-{uid}",
+            "customer": "Blocked Customer",
+            "currency": "VND",
+            "total": 1000000,
+            "items": [{"sku": "NON-EXISTENT-SKU-9999", "quantity": 1, "unit_price": 1000000}],
+        }
+        upload_res = self.client.post(
+            "/api/v1/orders/upload",
+            files={"file": (f"po-block-{uid}.json", json.dumps(po_payload).encode("utf-8"), "application/json")},
+        )
+        self.assertEqual(upload_res.status_code, 201)
+        order_id = upload_res.json()["id"]
+        self.assertEqual(upload_res.json()["status"], "blocked")
+
+        # Attempt to approve a blocked order
+        res = self.client.post(
+            f"/api/v1/orders/{order_id}/decide",
+            json={"decision": "approved", "actor": "attacker", "note": "Bypassing checks"},
+        )
+        self.assertEqual(res.status_code, 409)
+        self.assertIn("blocked order", res.json()["detail"].lower())
+
+    def test_review_required_note_enforcement_returns_422(self):
+        uid = uuid.uuid4().hex[:6]
+        po_payload = {
+            "po_number": f"PO-WARN-{uid}",
+            "customer": "Warning Customer",
+            "currency": "VND",
+            "total": 25000000,
+            "items": [{"sku": "LAPTOP-A14", "quantity": 1, "unit_price": 25000000}],
+        }
+        upload_res = self.client.post(
+            "/api/v1/orders/upload",
+            files={"file": (f"po-warn-{uid}.json", json.dumps(po_payload).encode("utf-8"), "application/json")},
+        )
+        self.assertEqual(upload_res.status_code, 201)
+        order_id = upload_res.json()["id"]
+        self.assertEqual(upload_res.json()["status"], "review_required")
+
+        # Note empty -> 422
+        res_empty = self.client.post(
+            f"/api/v1/orders/{order_id}/decide",
+            json={"decision": "approved", "actor": "manager", "note": ""},
+        )
+        self.assertEqual(res_empty.status_code, 422)
+
+        # Note too short (<10 chars) -> 422
+        res_short = self.client.post(
+            f"/api/v1/orders/{order_id}/decide",
+            json={"decision": "approved", "actor": "manager", "note": "ok"},
+        )
+        self.assertEqual(res_short.status_code, 422)
+
+    def test_redecision_on_decided_order_returns_409(self):
+        uid = uuid.uuid4().hex[:6]
+        po_payload = {
+            "po_number": f"PO-REDEC-{uid}",
+            "customer": "Clean Customer",
+            "currency": "VND",
+            "total": 18500000,
+            "items": [{"sku": "LAPTOP-A14", "quantity": 1, "unit_price": 18500000}],
+        }
+        upload_res = self.client.post(
+            "/api/v1/orders/upload",
+            files={"file": (f"po-redec-{uid}.json", json.dumps(po_payload).encode("utf-8"), "application/json")},
+        )
+        order_id = upload_res.json()["id"]
+
+        # First approval
+        res1 = self.client.post(
+            f"/api/v1/orders/{order_id}/decide",
+            json={"decision": "approved", "actor": "manager", "note": "Legitimate approval"},
+        )
+        self.assertEqual(res1.status_code, 200)
+
+        # Second approval on already approved order -> 409
+        res2 = self.client.post(
+            f"/api/v1/orders/{order_id}/decide",
+            json={"decision": "approved", "actor": "manager2", "note": "Duplicate approval attempt"},
+        )
+        self.assertEqual(res2.status_code, 409)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+

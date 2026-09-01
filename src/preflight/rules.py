@@ -116,3 +116,54 @@ def analyze_order(
     else:
         status = "ready_for_approval"
     return Analysis(order=order, findings=findings, status=status)
+
+
+class DecisionValidationError(Exception):
+    """Raised when an approval/rejection decision violates SOX 404/governance constraints."""
+
+    def __init__(self, message: str, status_code: int = 400):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+
+
+def validate_order_decision(
+    current_status: str,
+    decision: str,
+    note: str | None = None,
+    error_count: int = 0,
+) -> None:
+    """Enforce financial control and governance constraints for PO decisions:
+    1. A Blocked order (with error findings) can NEVER be approved -> HTTP 409
+    2. An already decided order (approved/rejected) cannot be re-decided -> HTTP 409
+    3. Rejection, changes requested, or approval over warnings requires an exception note (min 10 chars) -> HTTP 422
+    """
+    normalized_decision = decision.lower().strip()
+    normalized_status = current_status.lower().strip()
+    clean_note = (note or "").strip()
+
+    if normalized_status in {"approved", "rejected"}:
+        raise DecisionValidationError(
+            f"Order has already been decided ({current_status}). Re-decision is not permitted.",
+            status_code=409,
+        )
+
+    if normalized_decision == "approved":
+        if normalized_status == "blocked" or error_count > 0:
+            raise DecisionValidationError(
+                "A blocked order with validation errors cannot be approved. Resolve all blocking findings before approving.",
+                status_code=409,
+            )
+        if normalized_status in {"review_required", "warning"}:
+            if len(clean_note) < 10:
+                raise DecisionValidationError(
+                    "Approving an order with review findings requires an exception note of at least 10 characters.",
+                    status_code=422,
+                )
+    elif normalized_decision in {"rejected", "needs_changes"}:
+        if len(clean_note) < 10:
+            raise DecisionValidationError(
+                f"A justification note of at least 10 characters is required to {normalized_decision.replace('_', ' ')}.",
+                status_code=422,
+            )
+
