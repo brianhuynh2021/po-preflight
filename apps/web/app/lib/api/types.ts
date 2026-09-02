@@ -342,3 +342,14 @@ export interface UOMConversion {
   conversion_factor: number;
 }
 
+export interface CustomerMaster {
+  id?: number | null;
+  code: string;
+  name: string;
+  normalized_name?: string;
+  tax_code?: string | null;
+  tier?: "VIP" | "PLATINUM" | "GOLD" | "STANDARD" | string;
+  aliases?: string[];
+  created_at?: string | null;
+}
+

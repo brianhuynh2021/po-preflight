@@ -6,7 +6,8 @@ import unittest
 from fastapi.testclient import TestClient
 
 from preflight.api.app import app
-from preflight.models import LineItem, Order, Product
+from preflight.api.deps import get_audit_store
+from preflight.models import CustomerMaster, LineItem, Order, Product
 from preflight.rules import analyze_order
 from preflight.rules_context import RuleContext
 from preflight.store import AuditStore
@@ -36,7 +37,12 @@ class TestRevisionsAndDuplicates(unittest.TestCase):
                 stock=100,
             ),
         }
-        self.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
+        app.dependency_overrides[get_audit_store] = lambda: self.store
+        self.client = TestClient(app, headers={"X-API-Key": "pf_dev_mgr_8802"})
+
+        self.store.create_customer(CustomerMaster(code="CUST-ALPHA", name="Alpha Corp"))
+        self.store.create_customer(CustomerMaster(code="CUST-BETA", name="Beta Corp"))
+        self.store.create_customer(CustomerMaster(code="CUST-GAMMA", name="Gamma Corp"))
 
     def test_compute_order_diff(self):
         old_order = Order(

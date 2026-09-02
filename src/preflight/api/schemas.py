@@ -236,3 +236,39 @@ class ConfirmExtractionRequest(BaseModel):
     items: list[ConfirmExtractionItem] = Field(..., description="Confirmed line items table")
     currency: str = Field("VND", description="Order currency", example="VND")
 
+
+# ---------------------------------------------------------
+# Customer Master Schemas (Issue Prompt B5)
+# ---------------------------------------------------------
+class CustomerCreateRequest(BaseModel):
+    code: str = Field(..., description="Unique customer code identifier", example="CUST-VIN-001")
+    name: str = Field(..., description="Full legal customer company name", example="Công ty Cổ phần Vingroup")
+    tax_code: str | None = Field(None, description="Tax identification code (MST)", example="0101245486")
+    tier: str = Field("STANDARD", description="Customer priority tier (VIP, PLATINUM, STANDARD)", example="VIP")
+    aliases: list[str] = Field(default_factory=list, description="Alternative names and spelling variants")
+
+
+class CustomerUpdateRequest(BaseModel):
+    name: str | None = Field(None, description="Full legal customer company name")
+    tax_code: str | None = Field(None, description="Tax identification code (MST)")
+    tier: str | None = Field(None, description="Customer priority tier (VIP, PLATINUM, STANDARD)")
+    aliases: list[str] | None = Field(None, description="Alternative names and spelling variants")
+
+
+class CustomerResponse(BaseModel):
+    id: int | None = Field(None, description="Internal customer record ID")
+    code: str = Field(..., description="Unique customer code identifier")
+    name: str = Field(..., description="Full legal customer company name")
+    normalized_name: str = Field(..., description="Normalized search key")
+    tax_code: str | None = Field(None, description="Tax identification code (MST)")
+    tier: str = Field("STANDARD", description="Customer priority tier")
+    aliases: list[str] = Field(default_factory=list, description="Alternative recognized aliases")
+    created_at: str | None = Field(None, description="Creation timestamp")
+
+
+class CustomerDetailResponse(CustomerResponse):
+    pricing: list[dict[str, Any]] = Field(default_factory=list, description="Active contract price agreements")
+    credit: dict[str, Any] | None = Field(None, description="Customer credit and debt profile")
+    recent_orders: list[dict[str, Any]] = Field(default_factory=list, description="Recent purchase orders")
+
+

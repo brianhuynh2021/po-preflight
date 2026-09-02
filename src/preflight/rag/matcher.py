@@ -25,7 +25,7 @@ class HybridSKUMatcher:
         self.tier1_exact = ExactMatcher(catalog)
         self.tier2_fuzzy = FuzzyLexicalMatcher(catalog, threshold=0.75)
         self.tier3_vector = VectorSemanticMatcher(catalog, threshold=0.35)
-        self.tier4_llm = LLMContextResolver(catalog)
+        self.tier4_llm = LLMContextResolver(catalog, store=store)
 
     def learn_alias(self, customer_id: str, raw_query: str, target_sku: str) -> None:
         """Learn and persist a customer-specific nickname/alias mapping."""

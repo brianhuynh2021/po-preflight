@@ -7,6 +7,8 @@ export type FindingCode =
   | "DUPLICATE_PO"
   | "CUSTOMER_BLOCKED"
   | "CUSTOMER_ON_HOLD"
+  | "CUSTOMER_FUZZY_MATCHED"
+  | "CUSTOMER_UNRESOLVED"
   | "OVERDUE_DEBT_BLOCKED"
   | "CREDIT_LIMIT_EXCEEDED"
   | "INVALID_QUANTITY"
@@ -29,7 +31,7 @@ export type FindingCode =
 
 export type FindingSeverity = "Info" | "Warning" | "Error";
 
-export type FindingCategory = "catalog" | "price" | "stock" | "credit" | "document" | "duplicate" | "fx";
+export type FindingCategory = "catalog" | "price" | "stock" | "credit" | "document" | "duplicate" | "fx" | "customer";
 
 export interface FindingMetadata {
   code: FindingCode;
@@ -60,6 +62,20 @@ export const FINDINGS_REGISTRY: Record<FindingCode, FindingMetadata> = {
     titleVi: 'Khách hàng đang tạm giữ tín dụng',
     descriptionVi: 'Khách hàng đang trong trạng thái tạm giữ công nợ (ON_HOLD), cần quản lý xem xét.',
     category: "credit",
+  },
+  "CUSTOMER_FUZZY_MATCHED": {
+    code: "CUSTOMER_FUZZY_MATCHED",
+    defaultSeverity: "Warning",
+    titleVi: 'Khớp khách hàng gần đúng',
+    descriptionVi: 'Tên khách hàng trên PO được nhận diện theo thuật toán so khớp gần đúng (fuzzy match).',
+    category: "customer",
+  },
+  "CUSTOMER_UNRESOLVED": {
+    code: "CUSTOMER_UNRESOLVED",
+    defaultSeverity: "Error",
+    titleVi: 'Không xác định được khách hàng',
+    descriptionVi: 'Tên khách hàng hoặc mã số thuế trên PO không khớp với hồ sơ khách hàng nào trong hệ thống.',
+    category: "customer",
   },
   "OVERDUE_DEBT_BLOCKED": {
     code: "OVERDUE_DEBT_BLOCKED",
@@ -200,6 +216,8 @@ export const FINDING_TITLE: Record<FindingCode, string> = {
   "DUPLICATE_PO": 'Trùng lặp mã đơn hàng',
   "CUSTOMER_BLOCKED": 'Khách hàng bị khóa tài khoản',
   "CUSTOMER_ON_HOLD": 'Khách hàng đang tạm giữ tín dụng',
+  "CUSTOMER_FUZZY_MATCHED": 'Khớp khách hàng gần đúng',
+  "CUSTOMER_UNRESOLVED": 'Không xác định được khách hàng',
   "OVERDUE_DEBT_BLOCKED": 'Nợ quá hạn vượt giới hạn cho phép',
   "CREDIT_LIMIT_EXCEEDED": 'Vượt hạn mức tín dụng công nợ',
   "INVALID_QUANTITY": 'Số lượng không hợp lệ',
@@ -225,6 +243,8 @@ export const SEVERITY_BY_CODE: Record<FindingCode, FindingSeverity> = {
   "DUPLICATE_PO": "Error",
   "CUSTOMER_BLOCKED": "Error",
   "CUSTOMER_ON_HOLD": "Warning",
+  "CUSTOMER_FUZZY_MATCHED": "Warning",
+  "CUSTOMER_UNRESOLVED": "Error",
   "OVERDUE_DEBT_BLOCKED": "Error",
   "CREDIT_LIMIT_EXCEEDED": "Warning",
   "INVALID_QUANTITY": "Error",

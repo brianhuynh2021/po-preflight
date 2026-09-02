@@ -20,7 +20,10 @@ class TestGeminiRAG(unittest.TestCase):
 
     def test_customer_historical_context_resolution(self):
         """Test customer memory matching prior purchase nicknames."""
-        resolver = LLMContextResolver(self.catalog)
+        from preflight.store import AuditStore
+        store = AuditStore(":memory:")
+        store.learn_alias("Northstar Distribution", "máy tính xách tay", "LAPTOP-A14")
+        resolver = LLMContextResolver(self.catalog, store=store)
         res = resolver.match("máy tính xách tay", customer_id="Northstar Distribution")
         self.assertEqual(res.matched_sku, "LAPTOP-A14")
         self.assertEqual(res.tier_used, ResolutionTier.TIER_4_LLM_CONTEXT)

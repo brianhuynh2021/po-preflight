@@ -146,6 +146,22 @@ export interface Product {
   barcode?: string | null;
 }
 
+// ------------------------------------------------------------- customer master
+
+export interface CustomerMaster {
+  id?: number | null;
+  code: string;
+  name: string;
+  normalized_name?: string;
+  normalizedName?: string;
+  tax_code?: string | null;
+  taxCode?: string | null;
+  tier?: "VIP" | "PLATINUM" | "GOLD" | "STANDARD" | string;
+  aliases?: string[];
+  created_at?: string | null;
+  createdAt?: string | null;
+}
+
 // ------------------------------------------------------------- prototype UI
 
 /* UI-only types used by the prototype. Not part of the backend data contract —

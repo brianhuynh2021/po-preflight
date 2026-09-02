@@ -22,6 +22,13 @@ class TestFastAPIGateway(unittest.TestCase):
         cls._tmp_dir = TemporaryDirectory()
         cls._db_path = Path(cls._tmp_dir.name) / "test_api.db"
         os.environ["DATABASE_URL"] = f"sqlite:///{cls._db_path}"
+        from preflight.models import CustomerMaster
+        store = AuditStore(cls._db_path)
+        store.create_customer(CustomerMaster(code="CUST-REV", name="Review Customer"))
+        store.create_customer(CustomerMaster(code="CUST-BLK", name="Blocked Customer"))
+        store.create_customer(CustomerMaster(code="CUST-WARN", name="Warning Customer"))
+        store.create_customer(CustomerMaster(code="CUST-CLEAN", name="Clean Customer"))
+        store.close()
         cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
 
     @classmethod

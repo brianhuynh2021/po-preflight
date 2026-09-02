@@ -18,6 +18,7 @@ from preflight.api.routes import (
     b2b,
     bot,
     catalog,
+    customers,
     dashboard,
     erp,
     events,
@@ -177,6 +178,7 @@ app.include_router(dashboard.router)
 app.include_router(catalog.router)
 app.include_router(rules.router)
 app.include_router(matcher.router)
+app.include_router(customers.router)
 app.include_router(b2b.router)
 app.include_router(agent.router)
 

@@ -287,3 +287,28 @@ class RulePolicy:
             "credit_hold_behaviour": self.credit_hold_behaviour,
             "version": self.version,
         }
+
+
+@dataclass
+class CustomerMaster:
+    code: str
+    name: str
+    normalized_name: str = ""
+    tax_code: str | None = None
+    tier: str = "STANDARD"
+    aliases: list[str] = field(default_factory=list)
+    id: int | None = None
+    created_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "code": self.code,
+            "name": self.name,
+            "normalized_name": self.normalized_name,
+            "tax_code": self.tax_code,
+            "tier": self.tier,
+            "aliases": self.aliases,
+            "created_at": self.created_at,
+        }
+

@@ -167,7 +167,7 @@ class TestEndToEndScenarios(unittest.TestCase):
         for idx in range(1, 31):
             po_payload = {
                 "po_number": f"PO-BATCH-{idx:03d}",
-                "customer": f"Enterprise Partner {idx}",
+                "customer": "Northstar Retail",
                 "currency": "VND",
                 "items": [
                     {"sku": "LAPTOP-A14", "quantity": 1, "unit_price": 18500000},

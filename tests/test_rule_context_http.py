@@ -27,6 +27,10 @@ class TestRuleContextHTTP(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = Path(self.temp_dir.name) / "test_rule_context.db"
         self.store = AuditStore(self.db_path)
+        from preflight.models import CustomerMaster
+        self.store.create_customer(CustomerMaster(code="CUST-KH-01", name="Khách Vãng Lai"))
+        self.store.create_customer(CustomerMaster(code="CUST-NET-01", name="Công ty Thiết Bị Mạng"))
+        self.store.create_customer(CustomerMaster(code="CUST-US-01", name="US Global Client"))
 
         self.catalog = {
             "LAPTOP-A14": Product(

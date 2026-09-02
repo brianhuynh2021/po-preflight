@@ -15,10 +15,12 @@ from preflight.api.errors import ConfigurationError
 from preflight.models import (
     Analysis,
     CustomerCreditProfile,
+    CustomerMaster,
     CustomerPriceAgreement,
     RulePolicy,
     UOMConversion,
 )
+from preflight.utils.text import normalize_vietnamese_name
 
 from preflight.security.audit_chain import calculate_hash, compute_payload_hash
 
@@ -143,6 +145,29 @@ CREATE TABLE IF NOT EXISTS rule_policies (
     updated_at TEXT NOT NULL,
     updated_by TEXT NOT NULL DEFAULT 'system'
 );
+
+CREATE TABLE IF NOT EXISTS customers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    normalized_name TEXT NOT NULL,
+    tax_code TEXT,
+    tier TEXT NOT NULL DEFAULT 'STANDARD',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_customers_code ON customers(code);
+CREATE INDEX IF NOT EXISTS idx_customers_norm_name ON customers(normalized_name);
+CREATE INDEX IF NOT EXISTS idx_customers_tax ON customers(tax_code);
+
+CREATE TABLE IF NOT EXISTS customer_aliases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id TEXT NOT NULL,
+    alias TEXT NOT NULL,
+    normalized_alias TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(customer_id, normalized_alias)
+);
+CREATE INDEX IF NOT EXISTS idx_customer_aliases_norm ON customer_aliases(normalized_alias);
 """
 
 
@@ -269,6 +294,29 @@ CREATE TABLE IF NOT EXISTS rule_policies (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(255) NOT NULL DEFAULT 'system'
 );
+
+CREATE TABLE IF NOT EXISTS customers (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    normalized_name VARCHAR(255) NOT NULL,
+    tax_code VARCHAR(64),
+    tier VARCHAR(32) NOT NULL DEFAULT 'STANDARD',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pg_customers_code ON customers(code);
+CREATE INDEX IF NOT EXISTS idx_pg_customers_norm_name ON customers(normalized_name);
+CREATE INDEX IF NOT EXISTS idx_pg_customers_tax ON customers(tax_code);
+
+CREATE TABLE IF NOT EXISTS customer_aliases (
+    id SERIAL PRIMARY KEY,
+    customer_id VARCHAR(64) NOT NULL,
+    alias VARCHAR(255) NOT NULL,
+    normalized_alias VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(customer_id, normalized_alias)
+);
+CREATE INDEX IF NOT EXISTS idx_pg_customer_aliases_norm ON customer_aliases(normalized_alias);
 """
 
 
@@ -463,6 +511,46 @@ class BaseAuditStore(abc.ABC):
     def list_leads(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
         pass
 
+    @abc.abstractmethod
+    def create_customer(self, customer: CustomerMaster) -> CustomerMaster:
+        pass
+
+    @abc.abstractmethod
+    def get_customer(self, code: str) -> CustomerMaster | None:
+        pass
+
+    @abc.abstractmethod
+    def get_customer_by_id(self, customer_id: int) -> CustomerMaster | None:
+        pass
+
+    @abc.abstractmethod
+    def get_customer_by_tax_code(self, tax_code: str) -> CustomerMaster | None:
+        pass
+
+    @abc.abstractmethod
+    def get_customer_by_normalized_name(self, norm_name: str) -> CustomerMaster | None:
+        pass
+
+    @abc.abstractmethod
+    def list_customers(self, search: str | None = None, limit: int = 50, offset: int = 0) -> list[CustomerMaster]:
+        pass
+
+    @abc.abstractmethod
+    def update_customer(self, code: str, data: dict[str, Any]) -> CustomerMaster | None:
+        pass
+
+    @abc.abstractmethod
+    def delete_customer(self, code: str) -> bool:
+        pass
+
+    @abc.abstractmethod
+    def add_customer_alias(self, customer_id: str, alias: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def list_customer_master_aliases(self, customer_id: str | None = None) -> list[dict[str, Any]]:
+        pass
+
 
 
 
@@ -518,6 +606,10 @@ class AuditStore(BaseAuditStore):
             except Exception:
                 pass
             self.connection.commit()
+            try:
+                self.seed_default_customers()
+            except Exception:
+                pass
 
 
     def close(self) -> None:
@@ -1012,6 +1104,12 @@ class AuditStore(BaseAuditStore):
                 ),
             )
             self.connection.commit()
+            if not self.get_customer(pricing.customer_id) and not self.get_customer_by_normalized_name(pricing.customer_id):
+                self.create_customer(CustomerMaster(
+                    code=pricing.customer_id,
+                    name=pricing.customer_id,
+                    normalized_name=normalize_vietnamese_name(pricing.customer_id),
+                ))
 
     def get_customer_pricing(self, customer_id: str) -> list[CustomerPriceAgreement]:
         with self._lock:
@@ -1102,6 +1200,12 @@ class AuditStore(BaseAuditStore):
                 ),
             )
             self.connection.commit()
+            if not self.get_customer(credit.customer_id) and not self.get_customer_by_normalized_name(credit.customer_id):
+                self.create_customer(CustomerMaster(
+                    code=credit.customer_id,
+                    name=credit.customer_id,
+                    normalized_name=normalize_vietnamese_name(credit.customer_id),
+                ))
 
     def get_customer_credit(self, customer_id: str) -> CustomerCreditProfile | None:
         with self._lock:
@@ -1238,6 +1342,229 @@ class AuditStore(BaseAuditStore):
                 (limit, offset),
             ).fetchall()
             return [dict(r) for r in rows]
+
+    def create_customer(self, customer: CustomerMaster) -> CustomerMaster:
+        with self._lock:
+            norm_name = customer.normalized_name or normalize_vietnamese_name(customer.name)
+            now = datetime.now(UTC).isoformat()
+            cursor = self.connection.cursor()
+            cursor.execute(
+                """
+                INSERT INTO customers (code, name, normalized_name, tax_code, tier, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (customer.code.strip(), customer.name.strip(), norm_name, customer.tax_code, customer.tier, now),
+            )
+            cust_id = cursor.lastrowid
+            self.connection.commit()
+
+            # Insert aliases
+            for alias in customer.aliases:
+                if alias and alias.strip():
+                    self.add_customer_alias(customer.code, alias.strip())
+
+            return CustomerMaster(
+                id=cust_id,
+                code=customer.code.strip(),
+                name=customer.name.strip(),
+                normalized_name=norm_name,
+                tax_code=customer.tax_code,
+                tier=customer.tier,
+                aliases=list(customer.aliases),
+                created_at=now,
+            )
+
+    def add_customer_alias(self, customer_id: str, alias: str) -> None:
+        with self._lock:
+            norm_alias = normalize_vietnamese_name(alias)
+            now = datetime.now(UTC).isoformat()
+            try:
+                self.connection.execute(
+                    """
+                    INSERT INTO customer_aliases (customer_id, alias, normalized_alias, created_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(customer_id, normalized_alias) DO UPDATE SET
+                        alias = excluded.alias,
+                        created_at = excluded.created_at
+                    """,
+                    (customer_id.strip(), alias.strip(), norm_alias, now),
+                )
+                self.connection.commit()
+            except Exception:
+                pass
+
+    def get_customer(self, code: str) -> CustomerMaster | None:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT * FROM customers WHERE code = ? OR id = ? LIMIT 1",
+                (code.strip(), int(code) if code.isdigit() else -1),
+            ).fetchone()
+            if not row:
+                return None
+            aliases = [
+                r["alias"]
+                for r in self.connection.execute(
+                    "SELECT alias FROM customer_aliases WHERE customer_id = ?",
+                    (row["code"],),
+                ).fetchall()
+            ]
+            return CustomerMaster(
+                id=row["id"],
+                code=row["code"],
+                name=row["name"],
+                normalized_name=row["normalized_name"],
+                tax_code=row["tax_code"],
+                tier=row["tier"],
+                aliases=aliases,
+                created_at=row["created_at"],
+            )
+
+    def get_customer_by_id(self, customer_id: int) -> CustomerMaster | None:
+        return self.get_customer(str(customer_id))
+
+    def get_customer_by_tax_code(self, tax_code: str) -> CustomerMaster | None:
+        with self._lock:
+            clean = tax_code.strip().replace(" ", "").replace("-", "")
+            row = self.connection.execute(
+                "SELECT * FROM customers WHERE tax_code = ? LIMIT 1",
+                (clean,),
+            ).fetchone()
+            if not row:
+                return None
+            return self.get_customer(row["code"])
+
+    def get_customer_by_normalized_name(self, norm_name: str) -> CustomerMaster | None:
+        with self._lock:
+            clean = norm_name.strip()
+            # 1. Exact match on normalized_name
+            row = self.connection.execute(
+                "SELECT * FROM customers WHERE normalized_name = ? LIMIT 1",
+                (clean,),
+            ).fetchone()
+            if row:
+                return self.get_customer(row["code"])
+            
+            # 2. Exact match on customer_aliases
+            alias_row = self.connection.execute(
+                "SELECT customer_id FROM customer_aliases WHERE normalized_alias = ? LIMIT 1",
+                (clean,),
+            ).fetchone()
+            if alias_row:
+                return self.get_customer(alias_row["customer_id"])
+            return None
+
+    def list_customers(self, search: str | None = None, limit: int = 50, offset: int = 0) -> list[CustomerMaster]:
+        with self._lock:
+            if search:
+                pattern = f"%{search.strip()}%"
+                rows = self.connection.execute(
+                    """
+                    SELECT DISTINCT c.* FROM customers c
+                    LEFT JOIN customer_aliases a ON a.customer_id = c.code
+                    WHERE c.name LIKE ? OR c.code LIKE ? OR c.tax_code LIKE ? OR c.normalized_name LIKE ? OR a.alias LIKE ?
+                    ORDER BY c.id DESC LIMIT ? OFFSET ?
+                    """,
+                    (pattern, pattern, pattern, pattern, pattern, limit, offset),
+                ).fetchall()
+            else:
+                rows = self.connection.execute(
+                    "SELECT * FROM customers ORDER BY id DESC LIMIT ? OFFSET ?",
+                    (limit, offset),
+                ).fetchall()
+
+            result = []
+            for r in rows:
+                cust = self.get_customer(r["code"])
+                if cust:
+                    result.append(cust)
+            return result
+
+    def update_customer(self, code: str, data: dict[str, Any]) -> CustomerMaster | None:
+        with self._lock:
+            cust = self.get_customer(code)
+            if not cust:
+                return None
+            new_name = data.get("name", cust.name).strip()
+            new_norm = normalize_vietnamese_name(new_name)
+            new_tax = data.get("tax_code", cust.tax_code)
+            new_tier = data.get("tier", cust.tier)
+
+            self.connection.execute(
+                """
+                UPDATE customers SET name = ?, normalized_name = ?, tax_code = ?, tier = ?
+                WHERE code = ?
+                """,
+                (new_name, new_norm, new_tax, new_tier, cust.code),
+            )
+            self.connection.commit()
+
+            if "aliases" in data:
+                self.connection.execute("DELETE FROM customer_aliases WHERE customer_id = ?", (cust.code,))
+                for a in data["aliases"]:
+                    if a and a.strip():
+                        self.add_customer_alias(cust.code, a.strip())
+
+            return self.get_customer(cust.code)
+
+    def delete_customer(self, code: str) -> bool:
+        with self._lock:
+            cust = self.get_customer(code)
+            if not cust:
+                return False
+            self.connection.execute("DELETE FROM customers WHERE code = ?", (cust.code,))
+            self.connection.execute("DELETE FROM customer_aliases WHERE customer_id = ?", (cust.code,))
+            self.connection.commit()
+            return True
+
+    def list_customer_master_aliases(self, customer_id: str | None = None) -> list[dict[str, Any]]:
+        with self._lock:
+            if customer_id:
+                rows = self.connection.execute(
+                    "SELECT * FROM customer_aliases WHERE customer_id = ? ORDER BY id DESC",
+                    (customer_id.strip(),),
+                ).fetchall()
+            else:
+                rows = self.connection.execute(
+                    "SELECT * FROM customer_aliases ORDER BY id DESC"
+                ).fetchall()
+            return [dict(r) for r in rows]
+
+    def seed_default_customers(self) -> None:
+        with self._lock:
+            count = self.connection.execute("SELECT COUNT(*) AS c FROM customers").fetchone()["c"]
+            if count == 0:
+                defaults = [
+                    CustomerMaster(
+                        code="CUST-001",
+                        name="Tập đoàn Vingroup",
+                        tax_code="0101245486",
+                        tier="VIP",
+                        aliases=["Vingroup", "Vingroup JSC", "CTY CP Vingroup"],
+                    ),
+                    CustomerMaster(
+                        code="CUST-002",
+                        name="Northstar Retail",
+                        tax_code="0109876543",
+                        tier="PLATINUM",
+                        aliases=["Northstar", "Northstar Store", "Northstar Distribution"],
+                    ),
+                    CustomerMaster(
+                        code="CUST-003",
+                        name="Acme Corp",
+                        tax_code="0308765432",
+                        tier="STANDARD",
+                        aliases=["Acme", "Acme Vietnam", "Acme Corporation"],
+                    ),
+                    CustomerMaster(
+                        code="CUST-004",
+                        name="Alpha Technology",
+                        tax_code="0312345678",
+                        tier="STANDARD",
+                        aliases=["Alpha Tech", "CTY TNHH Alpha", "Alpha Corp"],
+                    ),
+                ]
+                for d in defaults:
+                    self.create_customer(d)
 
 
 
@@ -1916,6 +2243,176 @@ class PostgresAuditStore(BaseAuditStore):
                         d["created_at"] = d["created_at"].isoformat()
                     result.append(d)
                 return result
+
+    def create_customer(self, customer: CustomerMaster) -> CustomerMaster:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                norm_name = customer.normalized_name or normalize_vietnamese_name(customer.name)
+                cur.execute(
+                    """
+                    INSERT INTO customers (code, name, normalized_name, tax_code, tier)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id, code, name, normalized_name, tax_code, tier, created_at
+                    """,
+                    (customer.code.strip(), customer.name.strip(), norm_name, customer.tax_code, customer.tier),
+                )
+                row = cur.fetchone()
+                conn.commit()
+                for alias in customer.aliases:
+                    if alias and alias.strip():
+                        self.add_customer_alias(customer.code, alias.strip())
+                res = dict(row)
+                if isinstance(res.get("created_at"), datetime):
+                    res["created_at"] = res["created_at"].isoformat()
+                return CustomerMaster(
+                    id=res["id"],
+                    code=res["code"],
+                    name=res["name"],
+                    normalized_name=res["normalized_name"],
+                    tax_code=res.get("tax_code"),
+                    tier=res["tier"],
+                    aliases=list(customer.aliases),
+                    created_at=res["created_at"],
+                )
+
+    def add_customer_alias(self, customer_id: str, alias: str) -> None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                norm_alias = normalize_vietnamese_name(alias)
+                cur.execute(
+                    """
+                    INSERT INTO customer_aliases (customer_id, alias, normalized_alias)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT(customer_id, normalized_alias) DO UPDATE SET
+                        alias = EXCLUDED.alias,
+                        created_at = CURRENT_TIMESTAMP
+                    """,
+                    (customer_id.strip(), alias.strip(), norm_alias),
+                )
+            conn.commit()
+
+    def get_customer(self, code: str) -> CustomerMaster | None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                if str(code).isdigit():
+                    cur.execute("SELECT * FROM customers WHERE code = %s OR id = %s LIMIT 1", (str(code).strip(), int(code)))
+                else:
+                    cur.execute("SELECT * FROM customers WHERE code = %s LIMIT 1", (str(code).strip(),))
+                row = cur.fetchone()
+                if not row:
+                    return None
+                cur.execute("SELECT alias FROM customer_aliases WHERE customer_id = %s", (row["code"],))
+                alias_rows = cur.fetchall()
+                aliases = [r["alias"] for r in alias_rows]
+                created_at = row["created_at"].isoformat() if isinstance(row.get("created_at"), datetime) else str(row.get("created_at"))
+                return CustomerMaster(
+                    id=row["id"],
+                    code=row["code"],
+                    name=row["name"],
+                    normalized_name=row["normalized_name"],
+                    tax_code=row.get("tax_code"),
+                    tier=row["tier"],
+                    aliases=aliases,
+                    created_at=created_at,
+                )
+
+    def get_customer_by_id(self, customer_id: int) -> CustomerMaster | None:
+        return self.get_customer(str(customer_id))
+
+    def get_customer_by_tax_code(self, tax_code: str) -> CustomerMaster | None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                clean = tax_code.strip().replace(" ", "").replace("-", "")
+                cur.execute("SELECT code FROM customers WHERE tax_code = %s LIMIT 1", (clean,))
+                row = cur.fetchone()
+                if not row:
+                    return None
+                return self.get_customer(row["code"])
+
+    def get_customer_by_normalized_name(self, norm_name: str) -> CustomerMaster | None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                clean = norm_name.strip()
+                cur.execute("SELECT code FROM customers WHERE normalized_name = %s LIMIT 1", (clean,))
+                row = cur.fetchone()
+                if row:
+                    return self.get_customer(row["code"])
+                cur.execute("SELECT customer_id FROM customer_aliases WHERE normalized_alias = %s LIMIT 1", (clean,))
+                alias_row = cur.fetchone()
+                if alias_row:
+                    return self.get_customer(alias_row["customer_id"])
+                return None
+
+    def list_customers(self, search: str | None = None, limit: int = 50, offset: int = 0) -> list[CustomerMaster]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                if search:
+                    pattern = f"%{search.strip()}%"
+                    cur.execute(
+                        """
+                        SELECT DISTINCT c.code FROM customers c
+                        LEFT JOIN customer_aliases a ON a.customer_id = c.code
+                        WHERE c.name ILIKE %s OR c.code ILIKE %s OR c.tax_code ILIKE %s OR c.normalized_name ILIKE %s OR a.alias ILIKE %s
+                        ORDER BY c.code ASC LIMIT %s OFFSET %s
+                        """,
+                        (pattern, pattern, pattern, pattern, pattern, limit, offset),
+                    )
+                else:
+                    cur.execute("SELECT code FROM customers ORDER BY id DESC LIMIT %s OFFSET %s", (limit, offset))
+                rows = cur.fetchall()
+                result = []
+                for r in rows:
+                    cust = self.get_customer(r["code"])
+                    if cust:
+                        result.append(cust)
+                return result
+
+    def update_customer(self, code: str, data: dict[str, Any]) -> CustomerMaster | None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cust = self.get_customer(code)
+                if not cust:
+                    return None
+                new_name = data.get("name", cust.name).strip()
+                new_norm = normalize_vietnamese_name(new_name)
+                new_tax = data.get("tax_code", cust.tax_code)
+                new_tier = data.get("tier", cust.tier)
+
+                cur.execute(
+                    """
+                    UPDATE customers SET name = %s, normalized_name = %s, tax_code = %s, tier = %s
+                    WHERE code = %s
+                    """,
+                    (new_name, new_norm, new_tax, new_tier, cust.code),
+                )
+                if "aliases" in data:
+                    cur.execute("DELETE FROM customer_aliases WHERE customer_id = %s", (cust.code,))
+                    for a in data["aliases"]:
+                        if a and a.strip():
+                            self.add_customer_alias(cust.code, a.strip())
+            conn.commit()
+            return self.get_customer(cust.code)
+
+    def delete_customer(self, code: str) -> bool:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cust = self.get_customer(code)
+                if not cust:
+                    return False
+                cur.execute("DELETE FROM customers WHERE code = %s", (cust.code,))
+                cur.execute("DELETE FROM customer_aliases WHERE customer_id = %s", (cust.code,))
+            conn.commit()
+            return True
+
+    def list_customer_master_aliases(self, customer_id: str | None = None) -> list[dict[str, Any]]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                if customer_id:
+                    cur.execute("SELECT * FROM customer_aliases WHERE customer_id = %s ORDER BY id DESC", (customer_id.strip(),))
+                else:
+                    cur.execute("SELECT * FROM customer_aliases ORDER BY id DESC")
+                rows = cur.fetchall()
+                return [dict(r) for r in rows]
 
 
 

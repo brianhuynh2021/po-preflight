@@ -9,33 +9,18 @@ from typing import Any
 from preflight.models import Product
 from preflight.rag.schemas import MatchCandidate, MatchResult, ResolutionTier
 
-# Known historical purchase mappings per customer account (Context Knowledge Base)
-CUSTOMER_HISTORICAL_NICKNAMES: dict[str, dict[str, str]] = {
-    "NORTHSTAR": {
-        "máy tính xách tay": "LAPTOP-A14",
-        "laptop đời mới": "LAPTOP-A14",
-        "màn hình phụ": "MONITOR-27",
-        "dock kết nối": "DOCK-USBC",
-        "dây mạng dài": "CAB-CAT6-3M",
-    },
-    "ACME": {
-        "máy tính cho dev": "LAPTOP-A14",
-        "màn hình thiết kế": "MONITOR-27",
-        "tai nghe họp online": "HEADSET-PRO",
-    },
-    "VINGROUP": {
-        "máy trạm kỹ thuật": "LAPTOP-A14",
-        "tai nghe chống ồn": "HEADSET-PRO",
-        "cáp mạng nội bộ": "CAB-CAT6-3M",
-    },
-}
-
-
 class LLMContextResolver:
     """Tier 4: Context-Aware Reasoning over Customer History & Gemini 2.0 Flash Fallback."""
 
-    def __init__(self, catalog: dict[str, Product], api_key: str | None = None, model: str = "gemini-2.0-flash"):
+    def __init__(
+        self,
+        catalog: dict[str, Product],
+        store: Any | None = None,
+        api_key: str | None = None,
+        model: str = "gemini-2.0-flash",
+    ):
         self.catalog = catalog
+        self.store = store
         self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
         self.model = model
 
@@ -79,22 +64,17 @@ class LLMContextResolver:
     def match(self, raw_query: str, customer_id: str | None = None) -> MatchResult:
         query_lower = raw_query.strip().lower()
 
-        # 1. Check customer-specific purchase history memory first
+        # 1. Check customer-specific purchase history & learned aliases from store
         matched_sku: str | None = None
         historical_rationale: str | None = None
 
-        if customer_id:
-            cust_key = customer_id.strip().upper()
-            for key, nicknames in CUSTOMER_HISTORICAL_NICKNAMES.items():
-                if key in cust_key:
-                    for nick, target_sku in nicknames.items():
-                        if nick in query_lower:
-                            matched_sku = target_sku
-                            historical_rationale = (
-                                f"Customer '{customer_id}' previously purchased SKU '{target_sku}' "
-                                f"using nickname '{nick}' in past orders."
-                            )
-                            break
+        if customer_id and self.store and hasattr(self.store, "get_customer_alias"):
+            learned = self.store.get_customer_alias(customer_id, raw_query)
+            if learned and learned in self.catalog:
+                matched_sku = learned
+                historical_rationale = (
+                    f"Customer '{customer_id}' previously matched alias '{raw_query}' to SKU '{learned}'."
+                )
 
         # 2. If historical memory did not match, try Gemini 2.0 Flash reasoning
         if not matched_sku and self.api_key:

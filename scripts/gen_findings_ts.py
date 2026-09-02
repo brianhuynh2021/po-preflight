@@ -31,7 +31,7 @@ def generate_ts() -> str:
     lines.append('export type FindingSeverity = "Info" | "Warning" | "Error";')
     lines.append("")
     lines.append(
-        'export type FindingCategory = "catalog" | "price" | "stock" | "credit" | "document" | "duplicate" | "fx";'
+        'export type FindingCategory = "catalog" | "price" | "stock" | "credit" | "document" | "duplicate" | "fx" | "customer";'
     )
     lines.append("")
 

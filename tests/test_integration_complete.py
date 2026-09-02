@@ -215,7 +215,7 @@ class TestCompleteIntegrationSuite(unittest.TestCase):
         # 1. Upload fresh unique clean PO
         clean_po = {
             "po_number": f"PO-E2E-UNIQUE-{abs(hash(self.db_path)) % 100000}",
-            "customer": "Global Tech Ventures",
+            "customer": "Northstar Retail",
             "currency": "VND",
             "items": [
                 {"sku": "LAPTOP-A14", "quantity": 2, "unit_price": 18500000},

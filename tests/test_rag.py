@@ -103,10 +103,14 @@ class TestHybridSKUMatcher(unittest.TestCase):
 
     def test_tier4_llm_context_customer_history(self):
         # Customer Northstar using nickname "máy tính xách tay"
-        res = self.matcher.resolve("máy tính xách tay", customer_id="Northstar Distribution")
+        from preflight.store import AuditStore
+        store = AuditStore(":memory:")
+        store.learn_alias("Northstar Distribution", "máy tính xách tay", "LAPTOP-A14")
+        matcher = HybridSKUMatcher(self.catalog, store=store)
+        res = matcher.resolve("máy tính xách tay", customer_id="Northstar Distribution")
         self.assertEqual(res.matched_sku, "LAPTOP-A14")
-        self.assertEqual(res.tier_used, ResolutionTier.TIER_4_LLM_CONTEXT)
-        self.assertIn("Customer 'Northstar Distribution' previously purchased", res.explanation)
+        self.assertEqual(res.confidence_score, 1.0)
+        self.assertIn("Active Learning Alias Store", res.explanation)
 
     def test_batch_resolve(self):
         queries = ["LAPTOP-A14", "Dây mạng 3m", "27-inch Monitor"]

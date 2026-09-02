@@ -40,7 +40,7 @@ class MatchResult(BaseModel):
 
 class ResolveRequest(BaseModel):
     raw_text: str = Field(..., description="Raw SKU or product name from incoming PO", example="Cáp mạng Cat6 3m bấm sẵn")
-    customer_id: str | None = Field(None, description="Optional customer identifier for historical context", example="CUST-NORTHSTAR")
+    customer_id: str | None = Field(None, description="Optional customer identifier for historical context", example="CUST-001")
 
 
 class BatchResolveRequest(BaseModel):

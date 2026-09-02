@@ -41,6 +41,20 @@ FINDING_SPECS: list[FindingSpec] = [
         category="credit",
     ),
     FindingSpec(
+        code="CUSTOMER_FUZZY_MATCHED",
+        default_severity="warning",
+        title_vi="Khớp khách hàng gần đúng",
+        description_vi="Tên khách hàng trên PO được nhận diện theo thuật toán so khớp gần đúng (fuzzy match).",
+        category="customer",
+    ),
+    FindingSpec(
+        code="CUSTOMER_UNRESOLVED",
+        default_severity="error",
+        title_vi="Không xác định được khách hàng",
+        description_vi="Tên khách hàng hoặc mã số thuế trên PO không khớp với hồ sơ khách hàng nào trong hệ thống.",
+        category="customer",
+    ),
+    FindingSpec(
         code="OVERDUE_DEBT_BLOCKED",
         default_severity="error",
         title_vi="Nợ quá hạn vượt giới hạn cho phép",

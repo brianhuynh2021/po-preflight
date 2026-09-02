@@ -4,6 +4,7 @@ import type {
   CatalogItem,
   ConfirmExtractionRequest,
   CustomerCreditProfile,
+  CustomerMaster,
   CustomerPriceAgreement,
   DashboardStats,
   ERPAdapterType,
@@ -364,6 +365,55 @@ export function createApiClient(config: ClientConfig = {}) {
       }),
   };
 
+  const customers = {
+    list: (search?: string) =>
+      request<CustomerMaster[]>(
+        search ? `/api/v1/customers?search=${encodeURIComponent(search)}` : "/api/v1/customers",
+      ),
+    get: (code: string) =>
+      request<
+        CustomerMaster & {
+          pricing?: CustomerPriceAgreement[];
+          credit?: CustomerCreditProfile | null;
+          recent_orders?: Array<{ id: number; po_number: string; status: string; total: number }>;
+        }
+      >(`/api/v1/customers/${encodeURIComponent(code)}`),
+    create: (payload: { code: string; name: string; tax_code?: string; tier?: string; aliases?: string[] }) =>
+      request<CustomerMaster>("/api/v1/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    update: (code: string, payload: { name?: string; tax_code?: string; tier?: string; aliases?: string[] }) =>
+      request<CustomerMaster>(`/api/v1/customers/${encodeURIComponent(code)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    delete: (code: string) =>
+      request<void>(`/api/v1/customers/${encodeURIComponent(code)}`, {
+        method: "DELETE",
+      }),
+    importCSV: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const url = `${baseUrl}/api/v1/customers/import-csv`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          ...config.headers,
+        },
+        credentials: "include",
+        body: formData,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new ApiError(res.status, res.statusText, data);
+      }
+      return data as { imported_count: number; errors: string[] };
+    },
+  };
+
   const system = {
     getModes: () => request<SystemModes>("/api/v1/system/modes"),
   };
@@ -415,6 +465,7 @@ export function createApiClient(config: ClientConfig = {}) {
     b2b,
     dashboard,
     catalog,
+    customers,
     rules,
     system,
     health,

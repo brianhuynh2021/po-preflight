@@ -39,6 +39,7 @@ from preflight.parsers import parse_order
 from preflight.rules import DecisionValidationError, analyze_order, validate_order_decision
 from preflight.rules_context import build_rule_context
 from preflight.security.rbac import Role, UserPrincipal, require_role
+from preflight.services.customer_resolver import resolve_customer
 from preflight.services.decisions import DecisionError, Principal, decide_order
 from preflight.store import AuditStore
 
@@ -307,7 +308,10 @@ async def upload_order(
             ) from None
 
         with getattr(store, "_lock", nullcontext()):
-            existing = store.get_order_by_po(order.po_number, customer=order.customer)
+            resolved_cust, cust_finding = resolve_customer(order.customer, store=store)
+            effective_customer = resolved_cust.name if resolved_cust else order.customer
+
+            existing = store.get_order_by_po(order.po_number, customer=effective_customer)
             duplicate = False
             revision = 1
             supersedes_order_id: int | None = None
@@ -319,10 +323,7 @@ async def upload_order(
 
                 if old_decision == "approved" or old_status in ("approved", "exported"):
                     duplicate = True
-                elif (
-                    old_decision in ("rejected", "needs_changes")
-                    or old_status in ("rejected", "needs_changes", "extraction_review")
-                ):
+                elif old_decision in ("rejected", "needs_changes") or old_status in ("rejected", "needs_changes"):
                     duplicate = False
                     revision = int(existing.get("revision", 1)) + 1
                     supersedes_order_id = int(existing["id"])
@@ -354,10 +355,21 @@ async def upload_order(
                     revision=revision,
                     supersedes_order_id=supersedes_order_id,
                 )
+            elif not resolved_cust and cust_finding:
+                # Customer unresolved -> force extraction_review stage
+                analysis = Analysis(
+                    order=order,
+                    findings=[cust_finding],
+                    status="extraction_review",
+                    revision=revision,
+                    supersedes_order_id=supersedes_order_id,
+                )
             else:
                 # Run preflight rules immediately with comprehensive RuleContext
                 ctx = build_rule_context(store, catalog, order, duplicate=duplicate, revision_diff=revision_diff)
                 analysis = analyze_order(order, ctx)
+                if cust_finding:
+                    analysis.findings.insert(0, cust_finding)
                 analysis.revision = revision
                 analysis.supersedes_order_id = supersedes_order_id
 
@@ -435,8 +447,16 @@ def confirm_extraction(
     ctx = build_rule_context(store, catalog, updated_order, duplicate=False)
     analysis = analyze_order(updated_order, ctx)
 
-    # Active Learning Feedback Loop: Persist customer nickname/alias mappings when human corrects SKUs
+    # Active Learning Feedback Loop: Persist customer and SKU alias mappings when human confirms/corrects
     try:
+        # 1. Customer alias learning
+        if payload.customer and row.get("customer") and payload.customer.strip() != row["customer"].strip():
+            # Check if payload.customer is a registered customer
+            cust = store.get_customer(payload.customer.strip()) or store.get_customer_by_normalized_name(payload.customer.strip())
+            if cust:
+                store.add_customer_alias(customer_id=cust.code, alias=row["customer"].strip())
+
+        # 2. SKU alias learning
         orig_order_json = json.loads(row.get("order_json", "{}"))
         orig_items = orig_order_json.get("items", [])
         for idx, confirmed_item in enumerate(payload.items):
@@ -446,7 +466,7 @@ def confirm_extraction(
                 if raw_orig and raw_orig.upper() != canonical_sku:
                     store.learn_alias(customer_id=customer, raw_query=raw_orig, target_sku=canonical_sku)
     except Exception as exc:
-        logger.warning(f"Failed to learn customer alias during extraction confirmation: {exc}")
+        logger.warning(f"Failed to learn aliases during extraction confirmation: {exc}")
 
     # Update database record
     store.update_analysis(int(row["id"]), analysis)
