@@ -62,8 +62,9 @@ export function RAGPlaygroundView() {
           sku: c.sku,
           name: c.name,
           price: Number(c.unit_price || 0),
-          score: c.confidence_score || c.score || 0,
+          score: c.confidence_score || 0,
         })),
+
       });
     } catch {
       // Graceful offline fallback simulation

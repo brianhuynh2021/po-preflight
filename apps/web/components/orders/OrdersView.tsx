@@ -61,12 +61,11 @@ export function OrdersView() {
 
   const approveSelected = async () => {
     try {
-      await api.orders.decide(
-        selected.id,
-        "approved",
-        "Admin Maya",
-        decisionNote || "Approved after reviewing validation evidence",
-      );
+      await api.orders.decide(selected.id, {
+        decision: "approved",
+        actor: "Admin Maya",
+        note: decisionNote || "Approved after reviewing validation evidence",
+      });
       await refreshOrders();
       showToast(`${selected.id} đã được phê duyệt và đồng bộ với Audit Log.`);
     } catch {
@@ -92,12 +91,11 @@ export function OrdersView() {
 
   const requestChanges = async () => {
     try {
-      await api.orders.decide(
-        selected.id,
-        "needs_changes",
-        "Admin Maya",
-        "Yêu cầu khách hàng điều chỉnh thông tin đơn hàng",
-      );
+      await api.orders.decide(selected.id, {
+        decision: "needs_changes",
+        actor: "Admin Maya",
+        note: "Yêu cầu khách hàng điều chỉnh thông tin đơn hàng",
+      });
       await refreshOrders();
       showToast(`Đã gửi yêu cầu chỉnh sửa cho đơn hàng ${selected.id}.`);
     } catch {
@@ -105,6 +103,7 @@ export function OrdersView() {
     }
     setDecisionOpen(false);
   };
+
 
   return (
     <div className="page orders-page page-enter">

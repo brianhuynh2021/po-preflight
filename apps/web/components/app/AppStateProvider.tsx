@@ -10,7 +10,8 @@ import {
   type ReactNode,
 } from "react";
 
-import type { ActivityEvent, PurchaseOrder } from "@/app/lib/types";
+import type { ActivityEvent, Decision, FindingCode, OrderStatus, PurchaseOrder } from "@/app/lib/types";
+import { FINDING_TITLE } from "@/app/lib/types";
 import { seedOrders } from "@/app/lib/seed";
 import { api } from "@/app/lib/api/client";
 
@@ -69,6 +70,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           liveData.map(async (sum) => {
             try {
               const detail = await api.orders.get(sum.id);
+              const mappedDecisions: Decision[] = (detail.decisions || []).map((d) => ({
+                type: d.decision === "approved" ? "APPROVE" : d.decision === "rejected" ? "REJECT" : "REQUEST_CHANGES",
+                actor: d.actor,
+                note: d.note || "",
+                createdAt: d.created_at || new Date().toISOString(),
+              }));
+
               return {
                 id: detail.po_number || sum.po_number,
                 customer: detail.customer || sum.customer,
@@ -100,6 +108,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   time: d.created_at || "Just now",
                   type: "human" as const,
                 })),
+                decisions: mappedDecisions,
               };
             } catch {
               return {
@@ -114,6 +123,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                 lines: [],
                 owner: "Live API Gateway",
                 timeline: [],
+                decisions: [],
               };
             }
           }),
@@ -127,6 +137,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setIsLiveConnected(false);
     }
   }, []);
+
 
 
   useEffect(() => {

@@ -32,12 +32,13 @@ export function CatalogView() {
           liveItems.map((it) => ({
             sku: it.sku,
             name: it.name,
-            unit_price: Number(it.unit_price),
+            unitPrice: Number(it.unit_price),
             stock: Number(it.stock),
             active: Boolean(it.active),
           })),
         );
       }
+
     } catch {
       // Keep current state
     } finally {
