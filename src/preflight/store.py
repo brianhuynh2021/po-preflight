@@ -81,6 +81,21 @@ CREATE TABLE IF NOT EXISTS audit_blocks (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_blocks_po ON audit_blocks(po_number);
 
+CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    company TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT NOT NULL,
+    erp TEXT,
+    volume TEXT,
+    note TEXT,
+    ip_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_leads_created ON leads(created_at DESC);
+
+
 CREATE TABLE IF NOT EXISTS customer_pricing (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     customer_id TEXT NOT NULL,
@@ -187,6 +202,21 @@ CREATE TABLE IF NOT EXISTS audit_blocks (
     block_hash VARCHAR(64) NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pg_audit_blocks_po ON audit_blocks(po_number);
+
+CREATE TABLE IF NOT EXISTS leads (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    company VARCHAR(255) NOT NULL,
+    phone VARCHAR(64) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    erp VARCHAR(128),
+    volume VARCHAR(128),
+    note TEXT,
+    ip_hash VARCHAR(128) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pg_leads_created ON leads(created_at DESC);
+
 
 CREATE TABLE IF NOT EXISTS customer_pricing (
     id SERIAL PRIMARY KEY,
@@ -388,6 +418,24 @@ class BaseAuditStore(abc.ABC):
 
     @abc.abstractmethod
     def get_order_by_po(self, po_number: str) -> dict[str, Any] | None:
+        pass
+
+    @abc.abstractmethod
+    def create_lead(
+        self,
+        name: str,
+        company: str,
+        phone: str,
+        email: str,
+        erp: str | None,
+        volume: str | None,
+        note: str | None,
+        ip_hash: str,
+    ) -> dict[str, Any]:
+        pass
+
+    @abc.abstractmethod
+    def list_leads(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
         pass
 
 
@@ -1057,6 +1105,51 @@ class AuditStore(BaseAuditStore):
             )
             self.connection.commit()
 
+    def create_lead(
+        self,
+        name: str,
+        company: str,
+        phone: str,
+        email: str,
+        erp: str | None,
+        volume: str | None,
+        note: str | None,
+        ip_hash: str,
+    ) -> dict[str, Any]:
+        now_str = datetime.now(UTC).isoformat()
+        with self._lock:
+            cur = self.connection.cursor()
+            cur.execute(
+                """
+                INSERT INTO leads (name, company, phone, email, erp, volume, note, ip_hash, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (name, company, phone, email, erp, volume, note, ip_hash, now_str),
+            )
+            self.connection.commit()
+            lead_id = cur.lastrowid or 1
+            return {
+                "id": lead_id,
+                "name": name,
+                "company": company,
+                "phone": phone,
+                "email": email,
+                "erp": erp,
+                "volume": volume,
+                "note": note,
+                "ip_hash": ip_hash,
+                "created_at": now_str,
+            }
+
+    def list_leads(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self.connection.execute(
+                "SELECT * FROM leads ORDER BY id DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+
 
 
 
@@ -1616,6 +1709,53 @@ class PostgresAuditStore(BaseAuditStore):
                     ),
                 )
             conn.commit()
+
+    def create_lead(
+        self,
+        name: str,
+        company: str,
+        phone: str,
+        email: str,
+        erp: str | None,
+        volume: str | None,
+        note: str | None,
+        ip_hash: str,
+    ) -> dict[str, Any]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO leads (name, company, phone, email, erp, volume, note, ip_hash)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, name, company, phone, email, erp, volume, note, ip_hash, created_at
+                    """,
+                    (name, company, phone, email, erp, volume, note, ip_hash),
+                )
+                row = cur.fetchone()
+                conn.commit()
+                if row:
+                    res = dict(row)
+                    if isinstance(res.get("created_at"), datetime):
+                        res["created_at"] = res["created_at"].isoformat()
+                    return res
+                return {}
+
+    def list_leads(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM leads ORDER BY id DESC LIMIT %s OFFSET %s",
+                    (limit, offset),
+                )
+                rows = cur.fetchall()
+                result = []
+                for r in rows:
+                    d = dict(r)
+                    if isinstance(d.get("created_at"), datetime):
+                        d["created_at"] = d["created_at"].isoformat()
+                    result.append(d)
+                return result
+
 
 
 

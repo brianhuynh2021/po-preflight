@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import { Play, RotateCcw, Clock } from "lucide-react";
+import { useRipple } from "@/app/lib/useRipple";
 
 interface NodeState {
   id: string;
@@ -13,6 +15,7 @@ interface NodeState {
 }
 
 export function AgentGraphVisualizer() {
+  const { createRipple } = useRipple();
   const [selectedThread] = useState("thread-demo-8899");
   const [activeStep, setActiveStep] = useState<string>("human_approval");
   const [isResumed, setIsResumed] = useState(false);
@@ -20,25 +23,25 @@ export function AgentGraphVisualizer() {
   const nodes: NodeState[] = [
     {
       id: "document_ingestion",
-      name: "Document Ingestion & OCR",
+      name: "Bóc tách tài liệu & OCR",
       category: "INGEST",
       status: "COMPLETED",
       latencyMs: 142,
-      description: "Cascading OCR engine: extracts header, line items, and performs zero-hallucination math grounding.",
+      description: "Động cơ OCR: Trích xuất tiêu đề, các dòng chi tiết và đối chiếu số học.",
       outputPayload: {
         po_number: "PO-2026-8899",
         customer: "Vingroup Retail",
         declared_total: 108440000,
-        math_check: "PASS (100% matched)",
+        math_check: "PASS (Khớp 100%)",
       },
     },
     {
       id: "hybrid_sku_rag",
-      name: "4-Tier Hybrid RAG Matcher",
+      name: "Khớp mã 4 tầng (4-Tier RAG)",
       category: "RAG",
       status: "COMPLETED",
       latencyMs: 12,
-      description: "Waterfall resolution: Tier 0 Alias -> Tier 1 Exact -> Tier 2 Fuzzy -> Tier 3 Vector.",
+      description: "Thác lọc mã: Bí danh khách hàng -> Khớp chính xác -> Mờ Fuzzy -> Ngữ nghĩa Vector.",
       outputPayload: {
         resolved_skus: 3,
         tier_breakdown: { tier_1: 1, tier_2: 1, tier_3: 1 },
@@ -46,11 +49,11 @@ export function AgentGraphVisualizer() {
     },
     {
       id: "deterministic_rules",
-      name: "Deterministic Policy Engine",
+      name: "Động cơ Quy tắc Nghiệp vụ",
       category: "RULES",
       status: "COMPLETED",
       latencyMs: 4,
-      description: "Evaluates pricing tolerance (2%), inventory availability, and duplicate order signatures.",
+      description: "Đánh giá dung sai giá, lượng tồn kho khả dụng và đơn hàng trùng lặp.",
       outputPayload: {
         findings_count: 2,
         blocking_errors: 1,
@@ -59,53 +62,61 @@ export function AgentGraphVisualizer() {
     },
     {
       id: "human_approval",
-      name: "HITL Checkpoint Interruption",
+      name: "Điểm dừng Duyệt người dùng (HITL)",
       category: "HITL",
       status: isResumed ? "COMPLETED" : "PAUSED",
       latencyMs: isResumed ? 1200 : 0,
-      description: "StateGraph checkpoint saves execution state and pushes mobile approval request to Telegram / Webhook.",
+      description: "Checkpoint lưu trạng thái phiên và gửi thông báo phê duyệt tới Telegram Bot.",
       outputPayload: isResumed
         ? { decision: "APPROVED", actor: "Operations Director", note: "VIP customer override" }
         : { checkpoint: "paused_before_node", pending_approval: true },
     },
     {
       id: "erp_outbox_dispatch",
-      name: "Transactional Outbox Sync",
+      name: "Ghi sổ ERP Transactional Outbox",
       category: "ERP",
       status: isResumed ? "COMPLETED" : "PENDING",
-      latencyMs: isResumed ? 48 : 0,
-      description: "Atomic idempotency delivery into SAP S/4HANA / Odoo without duplicate order risk.",
+      latencyMs: isResumed ? 18 : 0,
+      description: "Ghi nhận bản tin Outbox vào cơ sở dữ liệu và gửi sang ERP qua Adapter.",
       outputPayload: isResumed
-        ? { erp_reference: "SAP-SO-20268899", idempotency_key: "373a8527101d02ec" }
+        ? { erp_status: "DELIVERED", transaction_id: "MISA-SO-20268899" }
         : { status: "awaiting_approval" },
     },
   ];
 
   const selectedNode = nodes.find((n) => n.id === activeStep) || nodes[0];
 
-  const handleSimulateResume = () => {
+  const handleSimulateResume = (e: React.MouseEvent<HTMLButtonElement>) => {
+    createRipple(e);
     setIsResumed(true);
   };
 
+  const handleReset = (e: React.MouseEvent<HTMLButtonElement>) => {
+    createRipple(e);
+    setIsResumed(false);
+  };
+
   return (
-    <div className="page agent-graph-page">
+    <div className="page agent-graph-page page-enter">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">LANGGRAPH MULTI-AGENT WORKFLOW (ISSUE #39)</p>
-          <h1>LangGraph Stateful Workflow Visualizer</h1>
+          <p className="eyebrow">QUY TRÌNH LANGGRAPH AI STATEFUL</p>
+          <h1>Sơ đồ Luồng Tác vụ Stateful LangGraph</h1>
           <p>
-            Real-time inspection of cyclical agent StateGraph execution, checkpoint persistence, and Human-in-the-Loop interruptions.
+            Giám sát trực quan tiến trình thực thi đồ thị tác vụ, điểm lưu trạng thái (Checkpointer) và các điểm ngắt duyệt người dùng (HITL).
           </p>
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
           {!isResumed && (
-            <button className="primary-button" onClick={handleSimulateResume}>
-              ▶ Resume StateGraph Execution
+            <button className="primary-button interactive" onClick={handleSimulateResume} style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}>
+              <Play size={16} />
+              <span>Tiếp tục luồng (Resume DAG)</span>
             </button>
           )}
           {isResumed && (
-            <button className="secondary-button" onClick={() => setIsResumed(false)}>
-              ↺ Reset Checkpoint
+            <button className="secondary-button interactive" onClick={handleReset} style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}>
+              <RotateCcw size={16} />
+              <span>Đặt lại điểm lưu (Reset)</span>
             </button>
           )}
         </div>
@@ -113,73 +124,64 @@ export function AgentGraphVisualizer() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "var(--space-5)" }}>
         {/* Left: DAG Pipeline Canvas */}
-        <div className="clean-card">
-          <div className="card-header-clean">
+        <div className="content-card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
             <div>
-              <h3>Active Execution DAG: {selectedThread}</h3>
-              <small style={{ color: "var(--muted)" }}>Checkpointer: MemorySaver (Thread State Anchored)</small>
+              <h3 style={{ fontSize: "1.1rem", margin: "0 0 4px" }}>Luồng thực thi: {selectedThread}</h3>
+              <small style={{ color: "var(--muted)" }}>Checkpointer: MemorySaver (Trạng thái theo luồng)</small>
             </div>
             <span
               className={`badge-clean ${
                 isResumed ? "badge-clean-success" : "badge-clean-warning"
               }`}
             >
-              {isResumed ? "● COMPLETED" : "⏸ INTERRUPTED (HITL)"}
+              {isResumed ? "● HOÀN THÀNH" : "⏸ ĐANG TẠM DỪNG (HITL)"}
             </span>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", padding: "10px 0" }}>
             {nodes.map((node, index) => {
               const isSelected = activeStep === node.id;
-              const isCurrentPause = node.id === "human_approval" && !isResumed;
 
               return (
                 <div
                   key={node.id}
-                  className={`dag-node ${isSelected ? "active-step" : ""}`}
-                  style={{
-                    cursor: "pointer",
-                    borderLeft: isCurrentPause ? "4px solid var(--amber)" : undefined,
-                  }}
                   onClick={() => setActiveStep(node.id)}
+                  style={{
+                    padding: "var(--space-3)",
+                    background: isSelected ? "rgba(16,185,129,0.08)" : "var(--canvas)",
+                    border: isSelected ? "2px solid var(--color-primary)" : "1px solid var(--line)",
+                    borderRadius: "var(--radius-md)",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: "24px",
-                          height: "24px",
-                          borderRadius: "50%",
-                          background: node.status === "COMPLETED" ? "var(--green-soft)" : isCurrentPause ? "var(--amber-soft)" : "var(--canvas)",
-                          color: node.status === "COMPLETED" ? "var(--green)" : isCurrentPause ? "var(--amber)" : "var(--muted)",
-                          fontSize: "var(--text-xs)",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {index + 1}
+                      <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--color-primary)" }}>
+                        #{index + 1}
                       </span>
-                      <strong style={{ fontSize: "var(--text-base)", color: "var(--ink)" }}>{node.name}</strong>
+                      <strong style={{ fontSize: "0.95rem", color: "var(--ink)" }}>{node.name}</strong>
                     </div>
-
                     <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                      <span className="code-snippet">{node.latencyMs}ms</span>
+                      <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                        <Clock size={12} /> {node.latencyMs}ms
+                      </span>
                       <span
                         className={`badge-clean ${
                           node.status === "COMPLETED"
                             ? "badge-clean-success"
                             : node.status === "PAUSED"
                             ? "badge-clean-warning"
-                            : "badge-clean-info"
+                            : "badge-clean-neutral"
                         }`}
+                        style={{ fontSize: "0.7rem" }}
                       >
-                        {node.status}
+                        {node.status === "COMPLETED" ? "Đã xong" : node.status === "PAUSED" ? "Tạm dừng" : "Đang chờ"}
                       </span>
                     </div>
                   </div>
-                  <p style={{ margin: "8px 0 0", fontSize: "var(--text-sm)", color: "var(--muted)" }}>
+                  <p style={{ margin: "6px 0 0", fontSize: "0.8125rem", color: "var(--muted)" }}>
                     {node.description}
                   </p>
                 </div>
@@ -188,52 +190,25 @@ export function AgentGraphVisualizer() {
           </div>
         </div>
 
-        {/* Right: State Inspector & Telemetry */}
-        <div className="clean-card">
-          <div className="card-header-clean">
-            <h3>State Inspector: {selectedNode.name}</h3>
-            <span className="code-snippet">{selectedNode.category}</span>
+        {/* Right: Selected Node Payload & Inspector */}
+        <div className="content-card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
+            <h3 style={{ fontSize: "1.1rem", margin: 0 }}>Chi tiết nút tác vụ</h3>
+            <span className="badge-clean badge-clean-info">{selectedNode.category}</span>
           </div>
 
-          <div style={{ marginBottom: "var(--space-4)" }}>
-            <label style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--muted)", fontWeight: 600, marginBottom: "var(--space-1)" }}>
-              STEP SUMMARY
-            </label>
-            <p style={{ fontSize: "var(--text-sm)", color: "var(--ink)", margin: 0, lineHeight: 1.5 }}>
-              {selectedNode.description}
-            </p>
-          </div>
+          <h4 style={{ margin: "0 0 8px", fontSize: "1rem", color: "var(--ink)" }}>{selectedNode.name}</h4>
+          <p style={{ fontSize: "0.875rem", color: "var(--muted)", margin: "0 0 16px", lineHeight: 1.5 }}>
+            {selectedNode.description}
+          </p>
 
-          <div style={{ marginBottom: "var(--space-4)" }}>
-            <label style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--muted)", fontWeight: 600, marginBottom: "var(--space-1)" }}>
-              STATE PAYLOAD (JSON)
-            </label>
-            <pre
-              style={{
-                background: "var(--canvas)",
-                padding: "var(--space-3)",
-                borderRadius: "var(--radius-sm)",
-                border: "1px solid var(--line)",
-                fontSize: "var(--text-xs)",
-                fontFamily: "ui-monospace, monospace",
-                overflowX: "auto",
-                margin: 0,
-                color: "var(--ink)",
-              }}
-            >
-              {JSON.stringify(selectedNode.outputPayload, null, 2)}
+          <div style={{ background: "var(--canvas)", padding: "12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--line)" }}>
+            <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>
+              DỮ LIỆU ĐẦU RA (STATE PAYLOAD):
+            </div>
+            <pre style={{ margin: 0, fontSize: "0.75rem", color: "var(--ink)", overflowX: "auto", fontFamily: "ui-monospace, monospace" }}>
+              {JSON.stringify(selectedNode.outputPayload || {}, null, 2)}
             </pre>
-          </div>
-
-          <div style={{ borderTop: "1px solid var(--line)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", color: "var(--muted)" }}>
-              <span>Execution Engine:</span>
-              <strong style={{ color: "var(--ink)" }}>LangGraph Core v0.2</strong>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", color: "var(--muted)", marginTop: "var(--space-1)" }}>
-              <span>State Reducer:</span>
-              <strong style={{ color: "var(--ink)" }}>Immutable Append</strong>
-            </div>
           </div>
         </div>
       </div>

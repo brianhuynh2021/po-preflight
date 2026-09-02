@@ -26,19 +26,18 @@ export const metadata: Metadata = {
     template: "%s | PO Preflight — Nhật Minh Technology",
   },
   description:
-    "Cổng kiểm soát an toàn tự động cho đơn đặt hàng B2B dành cho doanh nghiệp phân phối & bán buôn. Bóc tách Zero-Hallucination, khớp mã kho SKU siêu tốc, phê duyệt 1 chạm qua Telegram/Zalo và đồng bộ SAP/Odoo ERP.",
+    "Cổng kiểm soát an toàn tự động cho đơn đặt hàng B2B dành cho doanh nghiệp phân phối & bán buôn. Tự kiểm tra tổng tiền dòng so với tổng đơn, đối soát giá và tồn kho, duyệt tức thì qua mobile bot Telegram & Zalo.",
   keywords: [
     "PO Preflight",
     "Kiểm soát đơn hàng B2B",
     "Bóc tách hóa đơn tự động",
     "Khớp mã kho SKU",
-    "Zero-Hallucination OCR",
     "Phê duyệt Telegram Zalo",
-    "Đồng bộ SAP Odoo ERP",
+    "Đồng bộ ERP MISA Bravo Fast Odoo",
     "Nhật Minh Technology",
-    "SOX 404 Audit Merkle",
+    "Nhật ký bất biến SHA-256",
   ],
-  authors: [{ name: "Huỳnh Nguyễn", url: "https://www.facebook.com/profile.php?id=61592607906687" }],
+  authors: [{ name: "Nhật Minh Technology", url: "https://popreflight.vn" }],
   creator: "Công ty Nhật Minh Technology",
   publisher: "Nhật Minh Technology",
   formatDetection: {
@@ -59,7 +58,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "PO Preflight — Cổng Kiểm Soát Đơn Hàng B2B Tự Động Hóa",
     description:
-      "Cổng kiểm soát an toàn tự động cho đơn đặt hàng B2B. Zero-Hallucination, 4-Tier RAG, phê duyệt 1 chạm Telegram/Zalo và đồng bộ ERP.",
+      "Cổng kiểm soát an toàn tự động cho đơn đặt hàng B2B. Đối soát số học, 4-Tier RAG, phê duyệt 1 chạm Telegram/Zalo và đồng bộ ERP.",
     creator: "@nhatminhtech",
   },
   robots: {
@@ -87,24 +86,13 @@ const jsonLd = {
       name: "Công ty Nhật Minh Technology",
       url: "https://popreflight.vn",
       logo: "https://popreflight.vn/logo.png",
-      founder: {
-        "@type": "Person",
-        name: "Huỳnh Nguyễn",
-        sameAs: "https://www.facebook.com/profile.php?id=61592607906687",
-      },
       contactPoint: {
         "@type": "ContactPoint",
-        telephone: "+84-984-883-750",
+        telephone: "+84-28-7300-6868",
         contactType: "Customer Support",
-        email: "huynh2102@gmail.com",
+        email: "contact@popreflight.vn",
         areaServed: "VN",
         availableLanguage: ["Vietnamese", "English"],
-      },
-      address: {
-        "@type": "PostalAddress",
-        streetAddress: "Khu phố 5, P. Tân Khai",
-        addressRegion: "Đồng Nai",
-        addressCountry: "VN",
       },
     },
     {
@@ -117,7 +105,7 @@ const jsonLd = {
         "@type": "Offer",
         price: "0",
         priceCurrency: "VND",
-        description: "14-day free pilot trial for enterprise distributors",
+        description: "30-day free pilot trial for enterprise distributors",
       },
       publisher: {
         "@id": "https://popreflight.vn/#organization",

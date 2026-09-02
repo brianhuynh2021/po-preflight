@@ -12,40 +12,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1.0,
     },
     {
-      url: `${baseUrl}/landing`,
+      url: `${baseUrl}/pricing`,
       lastModified,
-      changeFrequency: "daily",
+      changeFrequency: "weekly",
       priority: 0.9,
     },
     {
-      url: `${baseUrl}/orders`,
-      lastModified,
-      changeFrequency: "hourly",
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/staging`,
-      lastModified,
-      changeFrequency: "weekly",
-      priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/rag-playground`,
-      lastModified,
-      changeFrequency: "weekly",
-      priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/audit-certificate`,
-      lastModified,
-      changeFrequency: "weekly",
-      priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/settings`,
+      url: `${baseUrl}/security`,
       lastModified,
       changeFrequency: "monthly",
-      priority: 0.6,
+      priority: 0.8,
     },
   ];
 }
