@@ -82,6 +82,12 @@ def build_parser() -> argparse.ArgumentParser:
     email_cmd = intake_sub.add_parser("email", help="Email IMAP PO intake")
     email_cmd.add_argument("--once", action="store_true", default=True, help="Poll once and exit")
     email_cmd.add_argument("--loop", action="store_true", help="Continuously poll every interval")
+    email_cmd.add_argument(
+        "--max-messages",
+        type=int,
+        default=None,
+        help="Max messages to process per poll (default 20)",
+    )
 
     # Seed Demo Subcommand
     subparsers.add_parser("seed-demo", help="Seed demo organization, catalog, customers, and sample orders")
@@ -304,7 +310,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"📧 Starting continuous Email Intake polling (interval: {interval}s)...")
                 try:
                     while True:
-                        results = service.poll_once(catalog_path=args.catalog)
+                        results = service.poll_once(
+                            catalog_path=args.catalog, max_messages=args.max_messages
+                        )
                         print(f"[{datetime.now(UTC).isoformat()}] Polled inbox: {len(results)} message(s) processed.")
                         time.sleep(interval)
                 except KeyboardInterrupt:
@@ -312,10 +320,14 @@ def main(argv: list[str] | None = None) -> int:
                     return 0
             else:
                 print("📧 Polling email intake mailbox once...")
-                results = service.poll_once(catalog_path=args.catalog)
+                results = service.poll_once(
+                    catalog_path=args.catalog, max_messages=args.max_messages
+                )
                 print(f"✔ Completed email intake poll: {len(results)} message(s) processed.")
                 for r in results:
                     print(f"   • [{r.status}] MsgID: {r.message_id} | Sender: {r.sender_email} | Subject: {r.subject} | Orders: {r.orders_created}")
+                    for name, reason in r.failed_attachments:
+                        print(f"       ✗ {name}: {reason}")
                 return 0
         finally:
             store.close()

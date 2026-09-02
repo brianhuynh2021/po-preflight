@@ -9,6 +9,7 @@ from email.utils import parseaddr
 import imaplib
 import logging
 import os
+import traceback
 from dataclasses import dataclass, field, replace
 from datetime import datetime, UTC
 from pathlib import Path
@@ -26,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {".xlsx", ".xls", ".csv", ".pdf", ".png", ".jpg", ".jpeg", ".json"}
 DEFAULT_TEMPLATE_PATH = "examples/templates/PO_MAU.xlsx"
+# A poll runs synchronously, so cap how many messages one call may parse.
+DEFAULT_MAX_MESSAGES = 20
 
 
 @dataclass
@@ -99,10 +102,12 @@ class EmailProcessResult:
     message_id: str
     sender_email: str
     subject: str
-    status: str  # "PROCESSED", "IGNORED", "ERROR", "DUPLICATE"
+    status: str  # "PROCESSED", "PARTIAL", "IGNORED", "ERROR", "DUPLICATE"
     orders_created: int = 0
     analysis_ids: list[int] = field(default_factory=list)
     po_numbers: list[str] = field(default_factory=list)
+    # (filename, error message) for each attachment that failed to parse.
+    failed_attachments: list[tuple[str, str]] = field(default_factory=list)
     error_message: str | None = None
     auto_reply_sent: bool = False
     customer_resolved: str | None = None
@@ -175,10 +180,12 @@ class EmailIntakeService:
             raw_uid=uid,
         )
 
-    def fetch_unread_messages(self) -> list[EmailMessageItem]:
-        """Connect to IMAP server and fetch UNSEEN messages."""
+    def fetch_unread_messages(self, max_messages: int | None = None) -> list[EmailMessageItem]:
+        """Connect to IMAP server and fetch UNSEEN messages (at most max_messages)."""
+        limit = DEFAULT_MAX_MESSAGES if max_messages is None else max(1, max_messages)
+
         if self._imap_client is not None:
-            return self._imap_client.fetch_messages()
+            return list(self._imap_client.fetch_messages())[:limit]
 
         if not self.config.imap_host or not self.config.imap_user:
             logger.info("IMAP intake not configured. Skipping mailbox poll.")
@@ -196,7 +203,7 @@ class EmailIntakeService:
 
             typ, data = imap.search(None, "UNSEEN")
             if typ == "OK" and data[0]:
-                for num in data[0].split():
+                for num in data[0].split()[:limit]:
                     typ, msg_data = imap.fetch(num, "(RFC822)")
                     if typ == "OK" and msg_data and isinstance(msg_data[0], tuple):
                         raw_email = msg_data[0][1]
@@ -273,7 +280,9 @@ class EmailIntakeService:
         """Process a single email message: validate idempotency, extract attachments, run rules, and auto-reply."""
         # 1. Check idempotency
         existing_log = self.store.get_email_inbox_log(msg.message_id)
-        if existing_log and existing_log.get("status") in ("PROCESSED", "IGNORED"):
+        # PARTIAL counts as processed: some orders were already recorded, so a
+        # re-poll must not duplicate them. ERROR is retried (nothing landed).
+        if existing_log and existing_log.get("status") in ("PROCESSED", "PARTIAL", "IGNORED"):
             logger.info("Email message %s already processed. Skipping.", msg.message_id)
             return EmailProcessResult(
                 message_id=msg.message_id,
@@ -337,6 +346,7 @@ class EmailIntakeService:
         orders_created = 0
         analysis_ids: list[int] = []
         po_numbers: list[str] = []
+        failed_attachments: list[tuple[str, str]] = []
         catalog = get_catalog(catalog_path)
 
         for attachment in valid_attachments:
@@ -399,11 +409,36 @@ class EmailIntakeService:
                 )
 
             except Exception as exc:
-                logger.error("Error processing attachment '%s': %s", attachment.filename, exc)
+                # One bad attachment must not abort the rest of the message, but
+                # it must stay visible: recorded here, surfaced in the DB log,
+                # and reported back to the sender in the auto-reply.
+                logger.exception("Error processing attachment '%s'", attachment.filename)
+                failed_attachments.append((attachment.filename, str(exc)))
+                try:
+                    self.store.record_request_error(
+                        request_id=f"email-intake-{msg.message_id}",
+                        endpoint="email_intake_attachment",
+                        status_code=422,
+                        error_message=f"{attachment.filename}: {exc}",
+                        traceback_str=traceback.format_exc(),
+                    )
+                except Exception:
+                    logger.warning("Could not persist attachment error for '%s'", attachment.filename)
 
-        # 6. Record log & Send confirmation auto-reply
+        # 6. Record log & Send auto-reply reflecting the real outcome
+        failed_lines = "".join(
+            f"- {name}: {reason}\n" for name, reason in failed_attachments
+        )
+
         if orders_created > 0:
-            status_str = "PROCESSED"
+            # A message with some unreadable attachments is only a partial
+            # success; reporting it as fully PROCESSED would hide lost POs.
+            status_str = "PARTIAL" if failed_attachments else "PROCESSED"
+            err_msg = (
+                f"{len(failed_attachments)} tệp đính kèm không bóc tách được."
+                if failed_attachments
+                else None
+            )
             self.store.record_email_inbox_log(
                 message_id=msg.message_id,
                 sender=msg.sender_email,
@@ -412,24 +447,43 @@ class EmailIntakeService:
                 attachments_count=len(msg.attachments),
                 orders_created=orders_created,
                 status=status_str,
+                error_message=err_msg,
             )
 
-            reply_subject = f"Re: {msg.subject} - Tiếp nhận PO thành công"
             po_list_str = ", ".join(po_numbers)
             ids_str = ", ".join(str(i) for i in analysis_ids)
-            reply_body = (
-                f"Kính gửi Quý khách,\n\n"
-                f"Hệ thống đã tiếp nhận thành công {orders_created} đơn hàng từ thư '{msg.subject}':\n"
-                f"- Mã đơn hàng (PO): {po_list_str}\n"
-                f"- Mã theo dõi hệ thống: {ids_str}\n\n"
-                f"Đơn hàng đang được tự động kiểm tra đối soát quy chuẩn bán hàng và tồn kho.\n\n"
-                f"Trân trọng,\n"
-                f"Bộ phận Xử lý Đơn hàng (PO Preflight)"
-            )
+            if failed_attachments:
+                reply_subject = f"Re: {msg.subject} - Tiếp nhận PO một phần"
+                reply_body = (
+                    f"Kính gửi Quý khách,\n\n"
+                    f"Hệ thống đã tiếp nhận {orders_created} đơn hàng từ thư '{msg.subject}':\n"
+                    f"- Mã đơn hàng (PO): {po_list_str}\n"
+                    f"- Mã theo dõi hệ thống: {ids_str}\n\n"
+                    f"Tuy nhiên, {len(failed_attachments)} tệp sau KHÔNG đọc được và chưa được ghi nhận:\n"
+                    f"{failed_lines}\n"
+                    f"Vui lòng kiểm tra lại các tệp trên theo file mẫu đính kèm và gửi lại.\n\n"
+                    f"Trân trọng,\n"
+                    f"Bộ phận Xử lý Đơn hàng (PO Preflight)"
+                )
+                template_file = DEFAULT_TEMPLATE_PATH if Path(DEFAULT_TEMPLATE_PATH).exists() else None
+            else:
+                reply_subject = f"Re: {msg.subject} - Tiếp nhận PO thành công"
+                reply_body = (
+                    f"Kính gửi Quý khách,\n\n"
+                    f"Hệ thống đã tiếp nhận thành công {orders_created} đơn hàng từ thư '{msg.subject}':\n"
+                    f"- Mã đơn hàng (PO): {po_list_str}\n"
+                    f"- Mã theo dõi hệ thống: {ids_str}\n\n"
+                    f"Đơn hàng đang được tự động kiểm tra đối soát quy chuẩn bán hàng và tồn kho.\n\n"
+                    f"Trân trọng,\n"
+                    f"Bộ phận Xử lý Đơn hàng (PO Preflight)"
+                )
+                template_file = None
+
             auto_reply_sent = self.send_auto_reply(
                 to_email=msg.sender_email,
                 subject=reply_subject,
                 body=reply_body,
+                attachment_path=template_file,
             )
 
             return EmailProcessResult(
@@ -440,6 +494,8 @@ class EmailIntakeService:
                 orders_created=orders_created,
                 analysis_ids=analysis_ids,
                 po_numbers=po_numbers,
+                failed_attachments=failed_attachments,
+                error_message=err_msg,
                 auto_reply_sent=auto_reply_sent,
                 customer_resolved=resolved_customer_name,
             )
@@ -455,22 +511,45 @@ class EmailIntakeService:
                 status="ERROR",
                 error_message=err_msg,
             )
+
+            # The sender must be told their PO was not accepted, otherwise the
+            # order is silently lost on both ends.
+            reply_body = (
+                f"Kính gửi Quý khách,\n\n"
+                f"Hệ thống KHÔNG bóc tách được dữ liệu đơn hàng từ thư '{msg.subject}'.\n"
+                f"Chi tiết các tệp không đọc được:\n"
+                f"{failed_lines or '- (không có tệp nào đọc được)'}\n"
+                f"Vui lòng điền thông tin theo file mẫu Excel đính kèm và gửi lại.\n\n"
+                f"Trân trọng,\n"
+                f"Bộ phận Xử lý Đơn hàng (PO Preflight)"
+            )
+            template_file = DEFAULT_TEMPLATE_PATH if Path(DEFAULT_TEMPLATE_PATH).exists() else None
+            auto_reply_sent = self.send_auto_reply(
+                to_email=msg.sender_email,
+                subject=f"Re: {msg.subject} - Không tiếp nhận được đơn hàng",
+                body=reply_body,
+                attachment_path=template_file,
+            )
+
             return EmailProcessResult(
                 message_id=msg.message_id,
                 sender_email=msg.sender_email,
                 subject=msg.subject,
                 status="ERROR",
                 orders_created=0,
+                failed_attachments=failed_attachments,
                 error_message=err_msg,
+                auto_reply_sent=auto_reply_sent,
                 customer_resolved=resolved_customer_name,
             )
 
     def poll_once(
         self,
         catalog_path: str | Path = "examples/catalog.csv",
+        max_messages: int | None = None,
     ) -> list[EmailProcessResult]:
-        """Fetch all unread messages and process them sequentially."""
-        messages = self.fetch_unread_messages()
+        """Fetch unread messages (up to max_messages) and process them sequentially."""
+        messages = self.fetch_unread_messages(max_messages=max_messages)
         results: list[EmailProcessResult] = []
         for msg in messages:
             res = self.process_message(msg, catalog_path=catalog_path)

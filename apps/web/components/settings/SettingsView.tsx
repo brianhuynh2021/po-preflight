@@ -6,6 +6,12 @@ import { api, describeError } from "@/app/lib/api/client";
 import { useAppState } from "@/components/app/AppStateProvider";
 import { useRipple } from "@/app/lib/useRipple";
 
+const EMAIL_FEEDBACK_STYLE = {
+  success: { bg: "rgba(16, 185, 129, 0.1)", fg: "#10b981" },
+  warning: { bg: "rgba(245, 158, 11, 0.1)", fg: "#f59e0b" },
+  error: { bg: "rgba(239, 68, 68, 0.1)", fg: "#ef4444" },
+} as const;
+
 export function SettingsView() {
   const { user } = useAppState();
   const { createRipple } = useRipple();
@@ -26,7 +32,10 @@ export function SettingsView() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPollingEmail, setIsPollingEmail] = useState(false);
-  const [emailFeedback, setEmailFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [emailFeedback, setEmailFeedback] = useState<{
+    type: "success" | "warning" | "error";
+    message: string;
+  } | null>(null);
   const [telegramChatId, setTelegramChatId] = useState("");
   const [telegramUsername, setTelegramUsername] = useState("");
   const [linkFeedback, setLinkFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -67,10 +76,23 @@ export function SettingsView() {
     try {
       const res = await api.emailIntake.poll();
       const totalCreated = res.results.reduce((acc, curr) => acc + curr.orders_created, 0);
-      setEmailFeedback({
-        type: "success",
-        message: `Đã quét hộp thư thành công! Xử lý ${res.processed_count} thư, tiếp nhận ${totalCreated} đơn hàng mới.`,
-      });
+      const failed = res.results.flatMap((r) => r.failed_attachments);
+      // A partial result must not be reported as a clean success: the sender
+      // was told which files failed, and the operator needs to see them too.
+      setEmailFeedback(
+        failed.length > 0
+          ? {
+              type: "warning",
+              message:
+                `Đã quét ${res.processed_count} thư, tiếp nhận ${totalCreated} đơn hàng. ` +
+                `${failed.length} tệp không đọc được: ` +
+                failed.map((f) => `${f.filename} (${f.error})`).join("; "),
+            }
+          : {
+              type: "success",
+              message: `Đã quét hộp thư thành công! Xử lý ${res.processed_count} thư, tiếp nhận ${totalCreated} đơn hàng mới.`,
+            },
+      );
       await fetchStatus();
     } catch (err) {
       setEmailFeedback({
@@ -194,9 +216,9 @@ export function SettingsView() {
                 padding: "var(--space-2) var(--space-3)",
                 borderRadius: "var(--radius-sm)",
                 fontSize: "0.85rem",
-                backgroundColor: emailFeedback.type === "success" ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
-                color: emailFeedback.type === "success" ? "#10b981" : "#ef4444",
-                border: emailFeedback.type === "success" ? "1px solid #10b981" : "1px solid #ef4444",
+                backgroundColor: EMAIL_FEEDBACK_STYLE[emailFeedback.type].bg,
+                color: EMAIL_FEEDBACK_STYLE[emailFeedback.type].fg,
+                border: `1px solid ${EMAIL_FEEDBACK_STYLE[emailFeedback.type].fg}`,
               }}
             >
               {emailFeedback.message}

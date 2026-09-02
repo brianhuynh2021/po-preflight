@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import os
 from typing import Any
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from preflight.api.deps import get_store
-from preflight.intake.email import EmailIntakeConfig, EmailIntakeService
+from preflight.intake.email import DEFAULT_MAX_MESSAGES, EmailIntakeConfig, EmailIntakeService
 from preflight.security.rbac import Role, UserPrincipal, require_role
 from preflight.store import BaseAuditStore
 
@@ -44,15 +44,22 @@ def get_email_intake_status(
     summary="Trigger On-Demand Email Intake Mailbox Poll",
 )
 def trigger_email_poll(
+    max_messages: int = Query(
+        DEFAULT_MAX_MESSAGES,
+        ge=1,
+        le=200,
+        description="Số thư tối đa xử lý trong một lần quét (poll chạy đồng bộ).",
+    ),
     store: BaseAuditStore = Depends(get_store),
     user: UserPrincipal = Depends(require_role(Role.SALES_ADMIN)),
 ) -> dict[str, Any]:
     service = EmailIntakeService(store=store)
-    results = service.poll_once()
-    
+    results = service.poll_once(max_messages=max_messages)
+
     return {
         "status": "success",
         "processed_count": len(results),
+        "max_messages": max_messages,
         "results": [
             {
                 "message_id": r.message_id,
@@ -62,6 +69,9 @@ def trigger_email_poll(
                 "orders_created": r.orders_created,
                 "analysis_ids": r.analysis_ids,
                 "po_numbers": r.po_numbers,
+                "failed_attachments": [
+                    {"filename": name, "error": reason} for name, reason in r.failed_attachments
+                ],
                 "auto_reply_sent": r.auto_reply_sent,
                 "customer_resolved": r.customer_resolved,
                 "error_message": r.error_message,
@@ -76,7 +86,7 @@ def trigger_email_poll(
     summary="List Recent Email Inbox Ingestion Logs",
 )
 def list_email_logs(
-    limit: int = 50,
+    limit: int = Query(50, ge=1, le=500),
     store: BaseAuditStore = Depends(get_store),
     user: UserPrincipal = Depends(require_role(Role.VIEWER)),
 ) -> list[dict[str, Any]]:

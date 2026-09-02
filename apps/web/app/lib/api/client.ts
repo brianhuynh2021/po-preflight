@@ -530,23 +530,28 @@ export function createApiClient(config: ClientConfig = {}) {
         recent_error_count: number;
         total_recent_logs: number;
       }>("/api/v1/intake/email/status"),
-    poll: () =>
+    poll: (maxMessages?: number) =>
       request<{
         status: string;
         processed_count: number;
+        max_messages: number;
         results: Array<{
           message_id: string;
           sender: string;
           subject: string;
-          status: string;
+          status: "PROCESSED" | "PARTIAL" | "IGNORED" | "ERROR" | "DUPLICATE";
           orders_created: number;
           analysis_ids: number[];
           po_numbers: string[];
+          failed_attachments: Array<{ filename: string; error: string }>;
           auto_reply_sent: boolean;
           customer_resolved: string | null;
           error_message: string | null;
         }>;
-      }>("/api/v1/intake/email/poll", { method: "POST" }),
+      }>(
+        maxMessages ? `/api/v1/intake/email/poll?max_messages=${maxMessages}` : "/api/v1/intake/email/poll",
+        { method: "POST" },
+      ),
     getLogs: (limit = 50) => request<Array<Record<string, unknown>>>(`/api/v1/intake/email/logs?limit=${limit}`),
   };
 
