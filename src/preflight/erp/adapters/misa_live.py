@@ -20,6 +20,8 @@ class MisaAmisLiveAdapter(BaseERPAdapter):
     Publishes sales orders into MISA sa_order and sa_order_detail vouchers.
     """
 
+    adapter_type = ERPAdapterType.MISA_AMIS_LIVE
+
     def __init__(
         self,
         base_url: str | None = None,
@@ -111,3 +113,63 @@ class MisaAmisLiveAdapter(BaseERPAdapter):
                 timestamp=time.time(),
                 error_message=str(exc),
             )
+
+    def fetch_inventory(self, skus: list[str] | None = None) -> list[InventorySnapshot]:
+        """Fetch inventory on-hand from MISA AMIS Stock API."""
+        from datetime import datetime, timezone
+        from decimal import Decimal
+        from preflight.models import InventorySnapshot
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        default_map = {
+            "LAPTOP-A14": (Decimal("50"), Decimal("0")),
+            "MONITOR-27": (Decimal("30"), Decimal("0")),
+            "CAB-CAT6-3M": (Decimal("100"), Decimal("0")),
+            "HEADSET-PRO": (Decimal("0"), Decimal("0")),
+            "KEYBOARD-M1": (Decimal("25"), Decimal("0")),
+            "MOUSE-W2": (Decimal("40"), Decimal("0")),
+        }
+        target_skus = skus if skus is not None else list(default_map.keys())
+
+        if self.dry_run or not self.access_token:
+            return [
+                InventorySnapshot(
+                    sku=s,
+                    warehouse="KHO-TONG",
+                    on_hand=default_map.get(s, (Decimal("50"), Decimal("0")))[0],
+                    reserved=default_map.get(s, (Decimal("50"), Decimal("0")))[1],
+                    as_of=now_iso,
+                    source="misa_live_dryrun",
+                )
+                for s in target_skus
+            ]
+
+        try:
+            url = f"{self.api_url}/inventory/stock_balance"
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-MISA-AppID": self.app_id,
+                    "Authorization": f"Bearer {self.access_token}",
+                },
+                method="GET",
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                data = json.loads(response.read().decode("utf-8"))
+                items = data.get("data", [])
+                return [
+                    InventorySnapshot(
+                        sku=it.get("inventory_item_code", ""),
+                        warehouse=it.get("stock_code", "KHO-TONG"),
+                        on_hand=Decimal(str(it.get("quantity", 0))),
+                        reserved=Decimal(str(it.get("reserved_quantity", 0))),
+                        as_of=now_iso,
+                        source="misa_live",
+                    )
+                    for it in items
+                ]
+        except Exception as exc:
+            logger.error(f"Failed to fetch MISA live inventory: {exc}")
+            return []
+

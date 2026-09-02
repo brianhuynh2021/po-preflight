@@ -358,6 +358,34 @@ export function createApiClient(config: ClientConfig = {}) {
     },
   };
 
+  const inventory = {
+    listSnapshots: (skus?: string[]) => {
+      const q = skus && skus.length > 0 ? `?skus=${skus.join("&skus=")}` : "";
+      return request<Array<{
+        sku: string;
+        warehouse: string;
+        on_hand: number | string;
+        reserved: number | string;
+        as_of: string;
+        source: string;
+        allocated_local: number | string;
+        atp: number | string;
+        is_stale: boolean;
+      }>>(`/api/v1/inventory/snapshots${q}`);
+    },
+    sync: (adapter?: string) => {
+      const q = adapter ? `?adapter_type=${encodeURIComponent(adapter)}` : "";
+      return request<{
+        success: boolean;
+        adapter: string;
+        count: number;
+        snapshots: Array<Record<string, unknown>>;
+      }>(`/api/v1/inventory/sync${q}`, {
+        method: "POST",
+      });
+    },
+  };
+
   const rules = {
     getConfig: () => request<RuleConfig>("/api/v1/rules"),
     updateConfig: (payload: Partial<RuleConfig>) =>
@@ -499,6 +527,7 @@ export function createApiClient(config: ClientConfig = {}) {
     b2b,
     dashboard,
     catalog,
+    inventory,
     customers,
     users,
     rules,

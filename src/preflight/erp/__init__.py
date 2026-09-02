@@ -4,6 +4,7 @@ from preflight.erp.adapters.base import BaseERPAdapter
 from preflight.erp.adapters.odoo import MockOdooAdapter
 from preflight.erp.adapters.sap import MockSAPAdapter
 from preflight.erp.outbox import OutboxStore
+from preflight.erp.registry import get_adapter, get_erp_adapter
 from preflight.erp.schemas import (
     ERPAdapterType,
     ERPEventStatus,
@@ -24,4 +25,6 @@ __all__ = [
     "ERPSyncPayload",
     "ERPSyncResponse",
     "OutboxStats",
+    "get_adapter",
+    "get_erp_adapter",
 ]

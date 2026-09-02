@@ -36,3 +36,7 @@ def get_adapter(name: str | ERPAdapterType | None = None) -> BaseERPAdapter:
     else:
         # Default fallback to MockSAPAdapter
         return MockSAPAdapter()
+
+
+get_erp_adapter = get_adapter
+

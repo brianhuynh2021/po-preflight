@@ -22,6 +22,7 @@ export type FindingCode =
   | "BELOW_MOQ"
   | "INVALID_PACK_SIZE"
   | "INSUFFICIENT_STOCK"
+  | "INVENTORY_STALE"
   | "CONTRACT_PRICE_EXPIRED"
   | "PRICE_MISMATCH"
   | "FX_RATE_UNAVAILABLE"
@@ -164,8 +165,15 @@ export const FINDINGS_REGISTRY: Record<FindingCode, FindingMetadata> = {
   "INSUFFICIENT_STOCK": {
     code: "INSUFFICIENT_STOCK",
     defaultSeverity: "Warning",
-    titleVi: 'Không đủ tồn kho đáp ứng',
-    descriptionVi: 'Tồn kho khả dụng trong kho không đủ đáp ứng số lượng đặt hàng.',
+    titleVi: 'Không đủ tồn kho đáp ứng (ATP)',
+    descriptionVi: 'Tồn kho khả dụng (Available to Promise) không đủ đáp ứng số lượng đặt sau khi trừ giữ chỗ và phân bổ nội bộ.',
+    category: "stock",
+  },
+  "INVENTORY_STALE": {
+    code: "INVENTORY_STALE",
+    defaultSeverity: "Warning",
+    titleVi: 'Dữ liệu tồn kho ERP bị cũ',
+    descriptionVi: 'Thời gian đồng bộ tồn kho từ ERP đã vượt quá ngưỡng quy định trong chính sách, cần đồng bộ lại.',
     category: "stock",
   },
   "CONTRACT_PRICE_EXPIRED": {
@@ -230,7 +238,8 @@ export const FINDING_TITLE: Record<FindingCode, string> = {
   "UOM_CONVERSION_MISSING": 'Thiếu cấu hình quy đổi đơn vị (UOM)',
   "BELOW_MOQ": 'Số lượng đặt dưới mức tối thiểu (MOQ)',
   "INVALID_PACK_SIZE": 'Số lượng đặt không đúng quy cách đóng gói',
-  "INSUFFICIENT_STOCK": 'Không đủ tồn kho đáp ứng',
+  "INSUFFICIENT_STOCK": 'Không đủ tồn kho đáp ứng (ATP)',
+  "INVENTORY_STALE": 'Dữ liệu tồn kho ERP bị cũ',
   "CONTRACT_PRICE_EXPIRED": 'Giá hợp đồng đã hết hiệu lực',
   "PRICE_MISMATCH": 'Chênh lệch giá so với Catalog',
   "FX_RATE_UNAVAILABLE": 'Tỷ giá ngoại tệ không khả dụng',
@@ -258,6 +267,7 @@ export const SEVERITY_BY_CODE: Record<FindingCode, FindingSeverity> = {
   "BELOW_MOQ": "Warning",
   "INVALID_PACK_SIZE": "Warning",
   "INSUFFICIENT_STOCK": "Warning",
+  "INVENTORY_STALE": "Warning",
   "CONTRACT_PRICE_EXPIRED": "Warning",
   "PRICE_MISMATCH": "Warning",
   "FX_RATE_UNAVAILABLE": "Error",

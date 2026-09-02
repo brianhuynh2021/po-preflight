@@ -67,6 +67,15 @@ def build_parser() -> argparse.ArgumentParser:
     u_unlock = users_sub.add_parser("unlock", help="Unlock a locked user account")
     u_unlock.add_argument("username", help="Username to unlock")
 
+    # Inventory Subcommands
+    inv_cmd = subparsers.add_parser("inventory", help="Inventory snapshots and ATP management")
+    inv_sub = inv_cmd.add_subparsers(dest="inventory_command", required=True)
+    inv_sync = inv_sub.add_parser("sync", help="Sync stock balances from ERP")
+    inv_sync.add_argument("--adapter", default=None, choices=("odoo", "sap", "misa_amis", "mock_odoo", "mock_sap"), help="ERP adapter")
+    inv_sync.add_argument("--sku", nargs="*", help="Specific SKUs to sync")
+    inv_list = inv_sub.add_parser("list", help="List inventory snapshots and ATP")
+    inv_list.add_argument("--sku", help="Filter by specific SKU")
+
     # Seed Demo Subcommand
     subparsers.add_parser("seed-demo", help="Seed demo organization, catalog, customers, and sample orders")
 
@@ -240,6 +249,37 @@ def main(argv: list[str] | None = None) -> int:
                     return 1
                 store.reset_failed_logins(args.username.strip().lower())
                 print(f"✔ Account '{args.username}' unlocked successfully.")
+                return 0
+        finally:
+            store.close()
+
+    if args.command == "inventory":
+        from preflight.erp import get_erp_adapter
+        from preflight.store import create_audit_store
+        store = create_audit_store(args.db)
+        try:
+            if args.inventory_command == "sync":
+                adapter = get_erp_adapter(args.adapter)
+                target_skus = args.sku if args.sku else list(load_catalog(args.catalog).keys())
+                snaps = adapter.fetch_inventory(skus=target_skus)
+                count = store.record_inventory_snapshots(snaps)
+                print(f"✔ Synced {count} inventory snapshot(s) from ERP adapter '{adapter.adapter_type.value}'.")
+                for s in snaps:
+                    print(f"   • {s.sku}: on_hand={s.on_hand}, reserved={s.reserved} (warehouse: {s.warehouse})")
+                return 0
+            if args.inventory_command == "list":
+                catalog = load_catalog(args.catalog)
+                target_skus = [args.sku] if args.sku else list(catalog.keys())
+                print(f"📦 Inventory Snapshots & ATP (Total SKUs: {len(target_skus)}):")
+                for s in target_skus:
+                    prod = catalog.get(s)
+                    stock_cat = prod.stock if prod else 0
+                    atp = store.calculate_atp(s, catalog_stock=stock_cat)
+                    stale_flag = " [STALE]" if atp.get("is_stale") else ""
+                    print(
+                        f"   • {s}: on_hand={atp['on_hand']}, reserved_erp={atp['reserved_erp']}, "
+                        f"allocated_local={atp['allocated_local']}, ATP={atp['atp']}{stale_flag} (src: {atp['source']})"
+                    )
                 return 0
         finally:
             store.close()

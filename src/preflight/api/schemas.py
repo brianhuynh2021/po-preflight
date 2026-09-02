@@ -193,6 +193,18 @@ class DashboardStatsResponse(BaseModel):
     recent_orders: list[dict[str, Any]] = Field(default_factory=list, description="5 most recent orders")
 
 
+class InventorySnapshotResponse(BaseModel):
+    sku: str = Field(..., description="Product SKU")
+    warehouse: str = Field("DEFAULT", description="Warehouse code")
+    on_hand: Decimal = Field(..., description="On-hand stock count")
+    reserved: Decimal = Field(Decimal("0"), description="ERP reserved stock count")
+    as_of: str = Field(..., description="Snapshot timestamp")
+    source: str = Field("odoo", description="ERP source")
+    allocated_local: Decimal = Field(Decimal("0"), description="Local approved orders allocated stock")
+    atp: Decimal = Field(Decimal("0"), description="Available-to-promise quantity")
+    is_stale: bool = Field(False, description="Whether snapshot is stale")
+
+
 class CatalogItemResponse(BaseModel):
     sku: str = Field(..., description="Unique product SKU")
     name: str = Field(..., description="Product name")
@@ -204,6 +216,13 @@ class CatalogItemResponse(BaseModel):
     pack_size: int = Field(1, description="Standard packaging pack size")
     category: str | None = Field(None, description="Product category")
     barcode: str | None = Field(None, description="Product barcode")
+    on_hand: Decimal | None = Field(None, description="ERP physical on-hand inventory")
+    reserved_erp: Decimal | None = Field(None, description="ERP reserved inventory")
+    allocated_local: Decimal | None = Field(None, description="Locally allocated un-exported stock")
+    atp: Decimal | None = Field(None, description="Available to Promise quantity")
+    as_of: str | None = Field(None, description="Snapshot timestamp")
+    is_stale: bool = Field(False, description="Whether inventory data is stale")
+
 
 
 class RuleConfigResponse(BaseModel):

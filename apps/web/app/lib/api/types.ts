@@ -172,6 +172,12 @@ export interface CatalogItem {
   pack_size?: number;
   category?: string | null;
   barcode?: string | null;
+  on_hand?: number | string | null;
+  reserved_erp?: number | string | null;
+  allocated_local?: number | string | null;
+  atp?: number | string | null;
+  as_of?: string | null;
+  is_stale?: boolean;
 }
 
 export interface RuleConfig {

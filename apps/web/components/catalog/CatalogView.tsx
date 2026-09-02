@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, FileUp, RefreshCw, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Database, FileUp, RefreshCw, X } from "lucide-react";
 
 import { FilterSelect } from "@/components/common/FilterSelect";
 import { SearchFilter } from "@/components/common/SearchFilter";
@@ -20,6 +20,7 @@ const STATUS_OPTIONS = [
 export function CatalogView() {
   const [items, setItems] = useState<Product[]>(seedCatalog);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingERP, setIsSyncingERP] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -44,6 +45,12 @@ export function CatalogView() {
             packSize: it.pack_size || 1,
             category: it.category || null,
             barcode: it.barcode || null,
+            onHand: it.on_hand != null ? Number(it.on_hand) : Number(it.stock),
+            reservedErp: it.reserved_erp != null ? Number(it.reserved_erp) : 0,
+            allocatedLocal: it.allocated_local != null ? Number(it.allocated_local) : 0,
+            atp: it.atp != null ? Number(it.atp) : Number(it.stock),
+            asOf: it.as_of || null,
+            isStale: Boolean(it.is_stale),
           })),
         );
       }
@@ -53,6 +60,26 @@ export function CatalogView() {
       setIsSyncing(false);
     }
   }, []);
+
+  const handleSyncERPInventory = async () => {
+    setIsSyncingERP(true);
+    setFeedback(null);
+    try {
+      const res = await api.inventory.sync();
+      setFeedback({
+        type: "success",
+        message: `Đã đồng bộ thành công ${res.count} mã tồn kho từ ERP (${res.adapter}).`,
+      });
+      await syncCatalog();
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        message: `Lỗi đồng bộ tồn kho ERP: ${describeError(err)}`,
+      });
+    } finally {
+      setIsSyncingERP(false);
+    }
+  };
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -114,9 +141,9 @@ export function CatalogView() {
     <div className="page simple-page page-enter">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">COMPANY DATA</p>
-          <h1>Product catalog</h1>
-          <p>The active reference used by order validation rules.</p>
+          <p className="eyebrow">COMPANY MASTER DATA — Product catalog</p>
+          <h1>Danh mục sản phẩm & Tồn kho ATP</h1>
+          <p>Bảng giá chuẩn (Catalog price), đơn vị tính quy đổi, tồn kho ERP và hạn mức phân bổ khả dụng (ATP).</p>
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
           <input
@@ -132,11 +159,23 @@ export function CatalogView() {
               createRipple(e);
               fileInputRef.current?.click();
             }}
-            disabled={isImporting || isSyncing}
+            disabled={isImporting || isSyncing || isSyncingERP}
             style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
           >
             <FileUp size={15} strokeWidth={2} className={isImporting ? "animate-spin" : ""} />
-            <span>{isImporting ? "Đang xử lý..." : "Nhập catalog CSV"}</span>
+            <span>{isImporting ? "Đang xử lý..." : "Nhập CSV"}</span>
+          </button>
+          <button
+            className="secondary-button interactive"
+            onClick={(e) => {
+              createRipple(e);
+              void handleSyncERPInventory();
+            }}
+            disabled={isSyncingERP || isSyncing || isImporting}
+            style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
+          >
+            <Database size={15} strokeWidth={2} className={isSyncingERP ? "animate-spin" : ""} />
+            <span>{isSyncingERP ? "Đang đồng bộ ERP..." : "Đồng bộ tồn ERP"}</span>
           </button>
           <button
             className="primary-button interactive"
@@ -144,11 +183,11 @@ export function CatalogView() {
               createRipple(e);
               void syncCatalog();
             }}
-            disabled={isSyncing || isImporting}
+            disabled={isSyncing || isImporting || isSyncingERP}
             style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
           >
             <RefreshCw size={15} strokeWidth={2} className={isSyncing ? "animate-spin" : ""} />
-            <span>{isSyncing ? "Đang đồng bộ..." : "Sync catalog"}</span>
+            <span>{isSyncing ? "Đang tải..." : "Làm mới"}</span>
           </button>
         </div>
       </div>
@@ -212,60 +251,79 @@ export function CatalogView() {
             />
           </div>
           <span className="sync-state">
-            <i /> Synced 4 minutes ago
+            <i /> Tồn kho đồng bộ trực tiếp với ERP
           </span>
         </div>
         <div className="table-wrap">
           <table className="catalog-table">
             <thead>
               <tr>
-                <th>SKU</th>
-                <th>Product</th>
-                <th style={{ textAlign: "right" }}>Catalog price</th>
-                <th style={{ textAlign: "right" }}>Available</th>
-                <th style={{ textAlign: "center" }}>ĐVT (UOM)</th>
-                <th style={{ textAlign: "center" }}>MOQ</th>
-                <th style={{ textAlign: "center" }}>Pack size</th>
-                <th style={{ textAlign: "center" }}>Status</th>
+                <th>Mã SKU</th>
+                <th>Tên sản phẩm</th>
+                <th style={{ textAlign: "right" }}>Giá niêm yết (Catalog price)</th>
+                <th style={{ textAlign: "right" }}>Tồn kho ERP</th>
+                <th style={{ textAlign: "right" }}>Giữ chỗ / Cục bộ</th>
+                <th style={{ textAlign: "right" }}>Khả dụng (ATP)</th>
+                <th style={{ textAlign: "center" }}>ĐVT</th>
+                <th style={{ textAlign: "center" }}>MOQ / Quy cách</th>
+                <th style={{ textAlign: "center" }}>Trạng thái</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((item) => (
-                <tr key={item.sku}>
-                  <td>
-                    <strong>{item.sku}</strong>
-                  </td>
-                  <td>{item.name}</td>
-                  <td className="tabular-nums" style={{ textAlign: "right" }}>
-                    {money(item.unitPrice, "VND")}
-                  </td>
-                  <td className="tabular-nums" style={{ textAlign: "right" }}>
-                    {item.stock}
-                  </td>
-                  <td style={{ textAlign: "center" }}>
-                    <span className="badge" style={{ fontSize: "0.8rem", padding: "2px 6px" }}>
-                      {item.baseUom || "PCS"}
-                    </span>
-                  </td>
-                  <td className="tabular-nums" style={{ textAlign: "center" }}>
-                    {item.moq || 1}
-                  </td>
-                  <td className="tabular-nums" style={{ textAlign: "center" }}>
-                    {item.packSize || 1}
-                  </td>
-                  <td style={{ textAlign: "center" }}>
-                    <span
-                      className={
-                        item.active
-                          ? "catalog-state active"
-                          : "catalog-state inactive"
-                      }
-                    >
-                      {item.active ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {rows.map((item) => {
+                const atpVal = item.atp != null ? item.atp : item.stock;
+                const onHandVal = item.onHand != null ? item.onHand : item.stock;
+                const reservedVal = (item.reservedErp || 0) + (item.allocatedLocal || 0);
+
+                return (
+                  <tr key={item.sku}>
+                    <td>
+                      <strong>{item.sku}</strong>
+                    </td>
+                    <td>
+                      <div>{item.name}</div>
+                      {item.asOf && (
+                        <div style={{ fontSize: "0.75rem", color: item.isStale ? "#ef4444" : "var(--color-muted-text)" }}>
+                          {item.isStale ? "⚠️ Dữ liệu cũ: " : "🕒 Cập nhật: "}{new Date(item.asOf).toLocaleTimeString()}
+                        </div>
+                      )}
+                    </td>
+                    <td className="tabular-nums" style={{ textAlign: "right" }}>
+                      {money(item.unitPrice, "VND")}
+                    </td>
+                    <td className="tabular-nums" style={{ textAlign: "right", color: "var(--color-muted-text)" }}>
+                      {onHandVal}
+                    </td>
+                    <td className="tabular-nums" style={{ textAlign: "right", color: reservedVal > 0 ? "#b45309" : "var(--color-muted-text)" }}>
+                      {reservedVal > 0 ? `-${reservedVal}` : "0"}
+                    </td>
+                    <td className="tabular-nums" style={{ textAlign: "right" }}>
+                      <strong style={{ color: atpVal <= 5 ? (atpVal === 0 ? "#ef4444" : "#f59e0b") : "#10b981" }}>
+                        {atpVal}
+                      </strong>
+                    </td>
+                    <td style={{ textAlign: "center" }}>
+                      <span className="badge" style={{ fontSize: "0.8rem", padding: "2px 6px" }}>
+                        {item.baseUom || "PCS"}
+                      </span>
+                    </td>
+                    <td className="tabular-nums" style={{ textAlign: "center" }}>
+                      {item.moq || 1} / {item.packSize || 1}
+                    </td>
+                    <td style={{ textAlign: "center" }}>
+                      <span
+                        className={
+                          item.active
+                            ? "catalog-state active"
+                            : "catalog-state inactive"
+                        }
+                      >
+                        {item.active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

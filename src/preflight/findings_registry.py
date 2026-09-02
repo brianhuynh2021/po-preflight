@@ -141,8 +141,15 @@ FINDING_SPECS: list[FindingSpec] = [
     FindingSpec(
         code="INSUFFICIENT_STOCK",
         default_severity="warning",
-        title_vi="Không đủ tồn kho đáp ứng",
-        description_vi="Tồn kho khả dụng trong kho không đủ đáp ứng số lượng đặt hàng.",
+        title_vi="Không đủ tồn kho đáp ứng (ATP)",
+        description_vi="Tồn kho khả dụng (Available to Promise) không đủ đáp ứng số lượng đặt sau khi trừ giữ chỗ và phân bổ nội bộ.",
+        category="stock",
+    ),
+    FindingSpec(
+        code="INVENTORY_STALE",
+        default_severity="warning",
+        title_vi="Dữ liệu tồn kho ERP bị cũ",
+        description_vi="Thời gian đồng bộ tồn kho từ ERP đã vượt quá ngưỡng quy định trong chính sách, cần đồng bộ lại.",
         category="stock",
     ),
     FindingSpec(

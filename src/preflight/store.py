@@ -17,6 +17,7 @@ from preflight.models import (
     CustomerCreditProfile,
     CustomerMaster,
     CustomerPriceAgreement,
+    InventorySnapshot,
     RulePolicy,
     UOMConversion,
     User,
@@ -197,6 +198,40 @@ CREATE TABLE IF NOT EXISTS api_keys (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+
+CREATE TABLE IF NOT EXISTS inventory_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sku TEXT NOT NULL,
+    warehouse TEXT NOT NULL DEFAULT 'DEFAULT',
+    on_hand NUMERIC NOT NULL DEFAULT 0,
+    reserved NUMERIC NOT NULL DEFAULT 0,
+    as_of TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'odoo',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_inventory_snapshots_sku ON inventory_snapshots(sku);
+CREATE INDEX IF NOT EXISTS idx_inventory_snapshots_as_of ON inventory_snapshots(as_of DESC);
+
+CREATE TABLE IF NOT EXISTS erp_outbox (
+    event_id TEXT PRIMARY KEY,
+    po_number TEXT NOT NULL,
+    customer TEXT NOT NULL,
+    total_amount REAL NOT NULL,
+    currency TEXT NOT NULL,
+    idempotency_key TEXT UNIQUE NOT NULL,
+    payload_json TEXT NOT NULL,
+    status TEXT NOT NULL,
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    transaction_id TEXT,
+    adapter_type TEXT,
+    last_error TEXT,
+    next_attempt_at REAL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_erp_outbox_status ON erp_outbox(status);
+CREATE INDEX IF NOT EXISTS idx_erp_outbox_idemp ON erp_outbox(idempotency_key);
+CREATE INDEX IF NOT EXISTS idx_erp_outbox_po ON erp_outbox(po_number);
 """
 
 
@@ -373,6 +408,39 @@ CREATE TABLE IF NOT EXISTS api_keys (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_pg_api_keys_hash ON api_keys(key_hash);
+
+CREATE TABLE IF NOT EXISTS inventory_snapshots (
+    id SERIAL PRIMARY KEY,
+    sku VARCHAR(128) NOT NULL,
+    warehouse VARCHAR(128) NOT NULL DEFAULT 'DEFAULT',
+    on_hand NUMERIC NOT NULL DEFAULT 0,
+    reserved NUMERIC NOT NULL DEFAULT 0,
+    as_of TIMESTAMP WITH TIME ZONE NOT NULL,
+    source VARCHAR(64) NOT NULL DEFAULT 'odoo',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pg_inventory_snapshots_sku ON inventory_snapshots(sku);
+
+CREATE TABLE IF NOT EXISTS erp_outbox (
+    event_id VARCHAR(64) PRIMARY KEY,
+    po_number VARCHAR(128) NOT NULL,
+    customer VARCHAR(255) NOT NULL,
+    total_amount DOUBLE PRECISION NOT NULL,
+    currency VARCHAR(16) NOT NULL,
+    idempotency_key VARCHAR(128) UNIQUE NOT NULL,
+    payload_json JSONB NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    transaction_id VARCHAR(128),
+    adapter_type VARCHAR(64),
+    last_error TEXT,
+    next_attempt_at DOUBLE PRECISION,
+    created_at DOUBLE PRECISION NOT NULL,
+    updated_at DOUBLE PRECISION NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pg_erp_outbox_status ON erp_outbox(status);
+CREATE INDEX IF NOT EXISTS idx_pg_erp_outbox_idemp ON erp_outbox(idempotency_key);
+CREATE INDEX IF NOT EXISTS idx_pg_erp_outbox_po ON erp_outbox(po_number);
 """
 
 
@@ -654,6 +722,31 @@ class BaseAuditStore(abc.ABC):
     @abc.abstractmethod
     def seed_initial_admin(self) -> None:
         pass
+
+    @abc.abstractmethod
+    def record_inventory_snapshots(self, snapshots: list[InventorySnapshot]) -> int:
+        pass
+
+    @abc.abstractmethod
+    def get_latest_inventory_snapshots(self, skus: list[str] | None = None) -> dict[str, InventorySnapshot]:
+        pass
+
+    @abc.abstractmethod
+    def get_inventory_snapshot(self, sku: str) -> InventorySnapshot | None:
+        pass
+
+    @abc.abstractmethod
+    def get_allocated_local_stock(self, sku: str) -> Decimal:
+        pass
+
+    @abc.abstractmethod
+    def get_all_allocated_local_stock(self) -> dict[str, Decimal]:
+        pass
+
+    @abc.abstractmethod
+    def calculate_atp(self, sku: str, catalog_stock: Decimal | int = Decimal("0")) -> dict[str, Any]:
+        pass
+
 
 
 
@@ -1933,6 +2026,155 @@ class AuditStore(BaseAuditStore):
                 for u in defaults:
                     self.create_user(u)
 
+    def record_inventory_snapshots(self, snapshots: list[InventorySnapshot]) -> int:
+        with self._lock:
+            count = 0
+            now_iso = datetime.now(UTC).isoformat()
+            for s in snapshots:
+                as_of_val = s.as_of or now_iso
+                self.connection.execute(
+                    """
+                    INSERT INTO inventory_snapshots (sku, warehouse, on_hand, reserved, as_of, source, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (s.sku.strip(), s.warehouse.strip(), str(s.on_hand), str(s.reserved), as_of_val, s.source.strip(), now_iso),
+                )
+                count += 1
+            self.connection.commit()
+            return count
+
+    def get_latest_inventory_snapshots(self, skus: list[str] | None = None) -> dict[str, InventorySnapshot]:
+        with self._lock:
+            if skus:
+                clean_skus = [s.strip() for s in skus if s]
+                if not clean_skus:
+                    return {}
+                placeholders = ",".join("?" for _ in clean_skus)
+                rows = self.connection.execute(
+                    f"""
+                    SELECT id, sku, warehouse, on_hand, reserved, as_of, source
+                    FROM inventory_snapshots
+                    WHERE sku IN ({placeholders})
+                    ORDER BY id DESC
+                    """,
+                    tuple(clean_skus),
+                ).fetchall()
+            else:
+                rows = self.connection.execute(
+                    """
+                    SELECT id, sku, warehouse, on_hand, reserved, as_of, source
+                    FROM inventory_snapshots
+                    ORDER BY id DESC
+                    """
+                ).fetchall()
+
+            snapshots: dict[str, InventorySnapshot] = {}
+            for r in rows:
+                sku = r["sku"]
+                if sku not in snapshots:
+                    snapshots[sku] = InventorySnapshot(
+                        id=r["id"],
+                        sku=sku,
+                        warehouse=r["warehouse"],
+                        on_hand=Decimal(str(r["on_hand"])),
+                        reserved=Decimal(str(r["reserved"])),
+                        as_of=str(r["as_of"]),
+                        source=r["source"],
+                    )
+            return snapshots
+
+    def get_inventory_snapshot(self, sku: str) -> InventorySnapshot | None:
+        snaps = self.get_latest_inventory_snapshots(skus=[sku])
+        return snaps.get(sku.strip())
+
+    def get_all_allocated_local_stock(self) -> dict[str, Decimal]:
+        """Calculate local stock allocations for approved orders not yet exported to ERP."""
+        with self._lock:
+            rows = self.connection.execute(
+                """
+                SELECT a.id, a.po_number, a.order_json
+                FROM analyses a
+                WHERE LOWER(a.status) = 'approved'
+                """
+            ).fetchall()
+            if not rows:
+                return {}
+
+            sent_pos = set()
+            try:
+                sent_rows = self.connection.execute(
+                    "SELECT po_number FROM erp_outbox WHERE status = 'SENT'"
+                ).fetchall()
+                sent_pos = {r["po_number"] for r in sent_rows if r["po_number"]}
+            except Exception:
+                pass
+
+            uom_conversions = self.get_uom_conversions()
+            uom_map = {(u.sku, u.uom_code): u.conversion_factor for u in uom_conversions}
+
+            allocations: dict[str, Decimal] = {}
+            for r in rows:
+                po_num = r["po_number"]
+                if po_num in sent_pos:
+                    continue
+                raw_json = r["order_json"]
+                if not raw_json:
+                    continue
+                od = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+                items = od.get("items", [])
+                for item in items:
+                    sku = item.get("sku", "").strip()
+                    if not sku:
+                        continue
+                    qty = Decimal(str(item.get("quantity", 0)))
+                    uom = str(item.get("uom", "PCS")).strip().upper()
+                    factor = uom_map.get((sku, uom), Decimal("1.0"))
+                    base_qty = qty * factor
+                    allocations[sku] = allocations.get(sku, Decimal("0")) + base_qty
+
+            return allocations
+
+    def get_allocated_local_stock(self, sku: str) -> Decimal:
+        return self.get_all_allocated_local_stock().get(sku.strip(), Decimal("0"))
+
+    def calculate_atp(self, sku: str, catalog_stock: Decimal | int = Decimal("0")) -> dict[str, Any]:
+        snapshot = self.get_inventory_snapshot(sku)
+        allocated = self.get_allocated_local_stock(sku)
+        if snapshot:
+            on_hand = snapshot.on_hand
+            reserved = snapshot.reserved
+            as_of = snapshot.as_of
+            source = snapshot.source
+        else:
+            on_hand = Decimal(str(catalog_stock))
+            reserved = Decimal("0")
+            as_of = ""
+            source = "catalog"
+
+        atp = max(Decimal("0"), on_hand - reserved - allocated)
+        is_stale = False
+        if as_of:
+            try:
+                dt = datetime.fromisoformat(as_of.replace("Z", "+00:00"))
+                age_hours = (datetime.now(UTC) - dt).total_seconds() / 3600.0
+                policy = self.get_policy()
+                if age_hours > policy.inventory_stale_hours:
+                    is_stale = True
+            except Exception:
+                pass
+
+        return {
+            "sku": sku,
+            "on_hand": on_hand,
+            "reserved_erp": reserved,
+            "allocated_local": allocated,
+            "atp": atp,
+            "as_of": as_of,
+            "source": source,
+            "is_stale": is_stale,
+        }
+
+
 
 
 
@@ -3014,6 +3256,154 @@ class PostgresAuditStore(BaseAuditStore):
                     ]
                     for u in defaults:
                         self.create_user(u)
+
+    def record_inventory_snapshots(self, snapshots: list[InventorySnapshot]) -> int:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                count = 0
+                now_iso = datetime.now(UTC).isoformat()
+                for s in snapshots:
+                    as_of_val = s.as_of or now_iso
+                    cur.execute(
+                        """
+                        INSERT INTO inventory_snapshots (sku, warehouse, on_hand, reserved, as_of, source, created_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (s.sku.strip(), s.warehouse.strip(), str(s.on_hand), str(s.reserved), as_of_val, s.source.strip(), now_iso),
+                    )
+                    count += 1
+            conn.commit()
+            return count
+
+    def get_latest_inventory_snapshots(self, skus: list[str] | None = None) -> dict[str, InventorySnapshot]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                if skus:
+                    clean_skus = [s.strip() for s in skus if s]
+                    if not clean_skus:
+                        return {}
+                    cur.execute(
+                        """
+                        SELECT id, sku, warehouse, on_hand, reserved, as_of, source
+                        FROM inventory_snapshots
+                        WHERE sku = ANY(%s)
+                        ORDER BY id DESC
+                        """,
+                        (clean_skus,),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT id, sku, warehouse, on_hand, reserved, as_of, source
+                        FROM inventory_snapshots
+                        ORDER BY id DESC
+                        """
+                    )
+                rows = cur.fetchall()
+                snapshots: dict[str, InventorySnapshot] = {}
+                for r in rows:
+                    sku = r["sku"]
+                    if sku not in snapshots:
+                        as_of_str = r["as_of"].isoformat() if isinstance(r["as_of"], datetime) else str(r["as_of"])
+                        snapshots[sku] = InventorySnapshot(
+                            id=r["id"],
+                            sku=sku,
+                            warehouse=r["warehouse"],
+                            on_hand=Decimal(str(r["on_hand"])),
+                            reserved=Decimal(str(r["reserved"])),
+                            as_of=as_of_str,
+                            source=r["source"],
+                        )
+                return snapshots
+
+    def get_inventory_snapshot(self, sku: str) -> InventorySnapshot | None:
+        snaps = self.get_latest_inventory_snapshots(skus=[sku])
+        return snaps.get(sku.strip())
+
+    def get_all_allocated_local_stock(self) -> dict[str, Decimal]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT a.id, a.po_number, a.order_json
+                    FROM analyses a
+                    WHERE LOWER(a.status) = 'approved'
+                    """
+                )
+                rows = cur.fetchall()
+                sent_pos = set()
+                try:
+                    cur.execute("SELECT po_number FROM erp_outbox WHERE status = 'SENT'")
+                    sent_rows = cur.fetchall()
+                    sent_pos = {r["po_number"] for r in sent_rows if r["po_number"]}
+                except Exception:
+                    pass
+
+                uom_conversions = self.get_uom_conversions()
+                uom_map = {(u.sku, u.uom_code): u.conversion_factor for u in uom_conversions}
+
+                allocations: dict[str, Decimal] = {}
+                for r in rows:
+                    po_num = r["po_number"]
+                    if po_num in sent_pos:
+                        continue
+                    raw_json = r["order_json"]
+                    if not raw_json:
+                        continue
+                    od = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+                    items = od.get("items", [])
+                    for item in items:
+                        sku = item.get("sku", "").strip()
+                        if not sku:
+                            continue
+                        qty = Decimal(str(item.get("quantity", 0)))
+                        uom = str(item.get("uom", "PCS")).strip().upper()
+                        factor = uom_map.get((sku, uom), Decimal("1.0"))
+                        base_qty = qty * factor
+                        allocations[sku] = allocations.get(sku, Decimal("0")) + base_qty
+
+                return allocations
+
+    def get_allocated_local_stock(self, sku: str) -> Decimal:
+        return self.get_all_allocated_local_stock().get(sku.strip(), Decimal("0"))
+
+    def calculate_atp(self, sku: str, catalog_stock: Decimal | int = Decimal("0")) -> dict[str, Any]:
+        snapshot = self.get_inventory_snapshot(sku)
+        allocated = self.get_allocated_local_stock(sku)
+        if snapshot:
+            on_hand = snapshot.on_hand
+            reserved = snapshot.reserved
+            as_of = snapshot.as_of
+            source = snapshot.source
+        else:
+            on_hand = Decimal(str(catalog_stock))
+            reserved = Decimal("0")
+            as_of = ""
+            source = "catalog"
+
+        atp = max(Decimal("0"), on_hand - reserved - allocated)
+        is_stale = False
+        if as_of:
+            try:
+                dt = datetime.fromisoformat(as_of.replace("Z", "+00:00"))
+                age_hours = (datetime.now(UTC) - dt).total_seconds() / 3600.0
+                policy = self.get_policy()
+                if age_hours > policy.inventory_stale_hours:
+                    is_stale = True
+            except Exception:
+                pass
+
+        return {
+            "sku": sku,
+            "on_hand": on_hand,
+            "reserved_erp": reserved,
+            "allocated_local": allocated,
+            "atp": atp,
+            "as_of": as_of,
+            "source": source,
+            "is_stale": is_stale,
+        }
+
 
 
 

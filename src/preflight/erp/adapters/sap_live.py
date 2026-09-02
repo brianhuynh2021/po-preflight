@@ -20,6 +20,8 @@ class SAPLiveAdapter(BaseERPAdapter):
     Communicates with standard API_SALES_ORDER_SRV with Idempotency header and CSRF token.
     """
 
+    adapter_type = ERPAdapterType.SAP_ODATA_LIVE
+
     def __init__(
         self,
         base_url: str | None = None,
@@ -115,3 +117,66 @@ class SAPLiveAdapter(BaseERPAdapter):
                 timestamp=time.time(),
                 error_message=str(exc),
             )
+
+    def fetch_inventory(self, skus: list[str] | None = None) -> list[InventorySnapshot]:
+        """Fetch stock on-hand from SAP S/4HANA A_MaterialStock OData API."""
+        from datetime import datetime, timezone
+        from decimal import Decimal
+        from preflight.models import InventorySnapshot
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        default_map = {
+            "LAPTOP-A14": (Decimal("50"), Decimal("0")),
+            "MONITOR-27": (Decimal("30"), Decimal("0")),
+            "CAB-CAT6-3M": (Decimal("100"), Decimal("0")),
+            "HEADSET-PRO": (Decimal("0"), Decimal("0")),
+            "KEYBOARD-M1": (Decimal("25"), Decimal("0")),
+            "MOUSE-W2": (Decimal("40"), Decimal("0")),
+        }
+        target_skus = skus if skus is not None else list(default_map.keys())
+
+        if self.dry_run or not self.auth_token:
+            return [
+                InventorySnapshot(
+                    sku=s,
+                    warehouse="SAP-PLANT-1000",
+                    on_hand=default_map.get(s, (Decimal("50"), Decimal("0")))[0],
+                    reserved=default_map.get(s, (Decimal("50"), Decimal("0")))[1],
+                    as_of=now_iso,
+                    source="sap_live_dryrun",
+                )
+                for s in target_skus
+            ]
+
+        try:
+            url = f"{self.endpoint_url.split('/SalesOrder')[0]}/A_MaterialStock"
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "Accept": "application/json",
+                    "Authorization": f"Bearer {self.auth_token}",
+                },
+                method="GET",
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                data = json.loads(response.read().decode("utf-8"))
+                results = data.get("d", {}).get("results", [])
+                snapshots = []
+                for r in results:
+                    mat = r.get("Material", "")
+                    qty = Decimal(str(r.get("MatlWrhsStkQtyInMatlBaseUnit", 0)))
+                    snapshots.append(
+                        InventorySnapshot(
+                            sku=mat,
+                            warehouse=r.get("Plant", "PLANT-1000"),
+                            on_hand=qty,
+                            reserved=Decimal("0"),
+                            as_of=now_iso,
+                            source="sap_live",
+                        )
+                    )
+                return snapshots
+        except Exception as exc:
+            logger.error(f"Failed to fetch SAP live inventory: {exc}")
+            return []
+

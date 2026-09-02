@@ -24,6 +24,7 @@ from preflight.api.routes import (
     events,
     health,
     ingestion,
+    inventory,
     leads,
     matcher,
     metrics,
@@ -177,6 +178,7 @@ app.include_router(metrics.router)
 app.include_router(orders.router)
 app.include_router(dashboard.router)
 app.include_router(catalog.router)
+app.include_router(inventory.router)
 app.include_router(rules.router)
 app.include_router(matcher.router)
 app.include_router(customers.router)

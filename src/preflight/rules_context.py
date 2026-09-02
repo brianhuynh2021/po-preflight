@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Callable, Mapping
 from preflight.models import (
     CustomerCreditProfile,
     CustomerPriceAgreement,
+    InventorySnapshot,
     Order,
     Product,
     RulePolicy,
@@ -77,10 +78,69 @@ class RuleContext:
     revision_diff: dict[str, Any] | None = None
     fx_rates: Mapping[str, Decimal] = field(default_factory=dict)  # "USD_VND" -> rate
     fx_source: str = "static"  # "static" | "live" | "none"
+    inventory_snapshots: tuple[InventorySnapshot, ...] = ()
+    inventory_allocations: Mapping[str, Decimal] = field(default_factory=dict)
+    inventory_stale_hours: int = 24
+
+    def get_inventory_snapshot(self, sku: str) -> InventorySnapshot | None:
+        clean_sku = sku.strip().upper()
+        for s in self.inventory_snapshots:
+            if s.sku.strip().upper() == clean_sku:
+                return s
+        return None
+
+    def get_atp_info(self, sku: str) -> dict[str, Any]:
+        snapshot = self.get_inventory_snapshot(sku)
+        clean_sku = sku.strip().upper()
+        # Look up allocated local stock
+        allocated = Decimal("0")
+        for k, v in self.inventory_allocations.items():
+            if k.strip().upper() == clean_sku:
+                allocated = v
+                break
+
+        prod = self.catalog.get(sku) or self.catalog.get(clean_sku)
+        if snapshot:
+            on_hand = snapshot.on_hand
+            reserved_erp = snapshot.reserved
+            as_of = snapshot.as_of
+            source = snapshot.source
+        else:
+            on_hand = Decimal(str(prod.stock)) if prod else Decimal("0")
+            reserved_erp = Decimal("0")
+            as_of = ""
+            source = "catalog"
+
+        safety_margin = Decimal(str(self.stock_safety_margin))
+        atp = max(Decimal("0"), on_hand - reserved_erp - allocated - safety_margin)
+
+        is_stale = False
+        if as_of:
+            try:
+                dt = datetime.fromisoformat(as_of.replace("Z", "+00:00"))
+                age_hours = (datetime.now(timezone.utc) - dt).total_seconds() / 3600.0
+                if age_hours > self.inventory_stale_hours:
+                    is_stale = True
+            except Exception:
+                pass
+
+        return {
+            "sku": sku,
+            "on_hand": on_hand,
+            "reserved_erp": reserved_erp,
+            "allocated_local": allocated,
+            "safety_margin": safety_margin,
+            "atp": atp,
+            "as_of": as_of,
+            "source": source,
+            "is_stale": is_stale,
+        }
 
     def available_stock(self, product: Product) -> int:
-        """Calculate effective available stock factoring in inventory safety margins."""
-        return max(0, product.stock - self.stock_safety_margin)
+        """Calculate effective available stock (ATP) factoring in inventory safety margins."""
+        info = self.get_atp_info(product.sku)
+        return int(info["atp"])
+
 
 
 def build_rule_context(
@@ -168,6 +228,21 @@ def build_rule_context(
 
     order_date = order.order_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
+    # 7. Inventory Snapshots & Local Allocations for ATP
+    inventory_snapshots: list[InventorySnapshot] = []
+    inventory_allocations: dict[str, Decimal] = {}
+    if hasattr(store, "get_latest_inventory_snapshots"):
+        try:
+            snaps_dict = store.get_latest_inventory_snapshots()
+            inventory_snapshots = list(snaps_dict.values())
+        except Exception:
+            pass
+    if hasattr(store, "get_all_allocated_local_stock"):
+        try:
+            inventory_allocations = store.get_all_allocated_local_stock()
+        except Exception:
+            pass
+
     return RuleContext(
         catalog=catalog,
         pricing_agreements=tuple(pricing_list),
@@ -187,4 +262,8 @@ def build_rule_context(
         revision_diff=revision_diff,
         fx_rates=fx_rates,
         fx_source=fx_source,
+        inventory_snapshots=tuple(inventory_snapshots),
+        inventory_allocations=inventory_allocations,
+        inventory_stale_hours=getattr(policy, "inventory_stale_hours", 24),
     )
+

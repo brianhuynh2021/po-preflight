@@ -442,8 +442,39 @@ def analyze_order(
                 )
             )
 
-        # Stock verification using available_stock
-        avail_stock = context.available_stock(product)
+        # Stock verification using ATP and inventory snapshots
+        atp_info = context.get_atp_info(product.sku) if hasattr(context, "get_atp_info") else {
+            "on_hand": Decimal(str(product.stock)),
+            "reserved_erp": Decimal("0"),
+            "allocated_local": Decimal("0"),
+            "atp": Decimal(str(context.available_stock(product))),
+            "as_of": "",
+            "source": "catalog",
+            "is_stale": False,
+        }
+
+        # Check inventory staleness
+        if atp_info.get("is_stale"):
+            findings.append(
+                registry.make(
+                    code="INVENTORY_STALE",
+                    severity="warning",
+                    sku=item.sku,
+                    message=(
+                        f"SKU {item.sku}: Dữ liệu tồn kho từ ERP ({atp_info.get('source', 'ERP')}) đã cũ ({atp_info.get('as_of')}), "
+                        f"vượt quá ngưỡng cho phép ({getattr(context, 'inventory_stale_hours', 24)}h). Cần đồng bộ lại tồn kho."
+                    ),
+                    evidence={
+                        "sku": item.sku,
+                        "as_of": str(atp_info.get("as_of", "")),
+                        "stale_threshold_hours": str(getattr(context, "inventory_stale_hours", 24)),
+                        "source": str(atp_info.get("source", "")),
+                        "rule_version": context.policy_version,
+                    },
+                )
+            )
+
+        avail_stock = int(atp_info.get("atp", context.available_stock(product)))
         if int(base_quantity) > avail_stock:
             safety_note = f" (safety margin: {context.stock_safety_margin})" if context.stock_safety_margin > 0 else ""
             findings.append(
@@ -453,14 +484,20 @@ def analyze_order(
                     sku=item.sku,
                     message=(
                         f"SKU {item.sku}: ordered {item.quantity} {declared_uom} (~{base_quantity:.0f} {base_uom}), "
-                        f"only {product.stock} {base_uom} in stock{safety_note}."
+                        f"only {avail_stock} {base_uom} available-to-promise (ATP) in stock{safety_note}."
                     ),
                     evidence={
                         "ordered_quantity": str(item.quantity),
                         "available_stock": str(avail_stock),
                         "total_stock": str(product.stock),
+                        "on_hand": str(atp_info.get("on_hand", product.stock)),
+                        "reserved_erp": str(atp_info.get("reserved_erp", 0)),
+                        "allocated_local": str(atp_info.get("allocated_local", 0)),
+                        "atp": str(atp_info.get("atp", avail_stock)),
                         "safety_margin": str(context.stock_safety_margin),
                         "uom": base_uom,
+                        "as_of": str(atp_info.get("as_of", "")),
+                        "source": str(atp_info.get("source", "")),
                         "rule_version": context.policy_version,
                     },
                 )

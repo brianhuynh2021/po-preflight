@@ -144,6 +144,13 @@ export interface Product {
   packSize?: number;
   category?: string | null;
   barcode?: string | null;
+  onHand?: number | null;
+  reservedErp?: number | null;
+  allocatedLocal?: number | null;
+  atp?: number | null;
+  asOf?: string | null;
+  source?: string | null;
+  isStale?: boolean;
 }
 
 // ------------------------------------------------------------- customer master

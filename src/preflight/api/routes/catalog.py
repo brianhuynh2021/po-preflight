@@ -24,24 +24,36 @@ router = APIRouter(prefix="/api/v1/catalog", tags=["Product Catalog & Inventory"
     "",
     response_model=list[CatalogItemResponse],
     summary="List Master Product Catalog",
-    description="Retrieve all registered SKUs with official unit prices, base UOM, MOQ, pack sizes, and real-time inventory counts.",
+    description="Retrieve all registered SKUs with official unit prices, base UOM, MOQ, pack sizes, and real-time inventory counts and ATP.",
 )
-def list_catalog(catalog: dict[str, Product] = Depends(get_catalog)) -> list[CatalogItemResponse]:
-    return [
-        CatalogItemResponse(
-            sku=prod.sku,
-            name=prod.name,
-            unit_price=prod.unit_price,
-            stock=prod.stock,
-            active=prod.active,
-            base_uom=prod.base_uom,
-            moq=prod.moq,
-            pack_size=prod.pack_size,
-            category=prod.category,
-            barcode=prod.barcode,
+def list_catalog(
+    catalog: dict[str, Product] = Depends(get_catalog),
+    store: BaseAuditStore = Depends(get_audit_store),
+) -> list[CatalogItemResponse]:
+    items: list[CatalogItemResponse] = []
+    for prod in catalog.values():
+        atp_info = store.calculate_atp(prod.sku, catalog_stock=prod.stock)
+        items.append(
+            CatalogItemResponse(
+                sku=prod.sku,
+                name=prod.name,
+                unit_price=prod.unit_price,
+                stock=prod.stock,
+                active=prod.active,
+                base_uom=prod.base_uom,
+                moq=prod.moq,
+                pack_size=prod.pack_size,
+                category=prod.category,
+                barcode=prod.barcode,
+                on_hand=atp_info.get("on_hand"),
+                reserved_erp=atp_info.get("reserved_erp"),
+                allocated_local=atp_info.get("allocated_local"),
+                atp=atp_info.get("atp"),
+                as_of=atp_info.get("as_of"),
+                is_stale=atp_info.get("is_stale", False),
+            )
         )
-        for prod in catalog.values()
-    ]
+    return items
 
 
 @router.post(

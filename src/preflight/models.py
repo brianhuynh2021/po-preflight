@@ -283,6 +283,7 @@ class RulePolicy:
     )
     credit_exception_min_role: str = "director"
     enforce_separation_of_duties: bool = True
+    inventory_stale_hours: int = 24
     version: str = "2.0"
 
     @classmethod
@@ -317,6 +318,7 @@ class RulePolicy:
             approval_tiers=approval_tuple,
             credit_exception_min_role=str(data.get("credit_exception_min_role", "director")).strip().lower(),
             enforce_separation_of_duties=bool(data.get("enforce_separation_of_duties", True)),
+            inventory_stale_hours=int(data.get("inventory_stale_hours", 24)),
             version=str(data.get("version", "2.0")),
         )
 
@@ -333,6 +335,7 @@ class RulePolicy:
             "approval_tiers": [t.to_dict() for t in self.approval_tiers],
             "credit_exception_min_role": self.credit_exception_min_role,
             "enforce_separation_of_duties": self.enforce_separation_of_duties,
+            "inventory_stale_hours": self.inventory_stale_hours,
             "version": self.version,
         }
 
@@ -388,4 +391,27 @@ class CustomerMaster:
             "aliases": self.aliases,
             "created_at": self.created_at,
         }
+
+
+@dataclass(frozen=True)
+class InventorySnapshot:
+    sku: str
+    warehouse: str = "DEFAULT"
+    on_hand: Decimal = Decimal("0")
+    reserved: Decimal = Decimal("0")
+    as_of: str = ""
+    source: str = "odoo"
+    id: int | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "sku": self.sku,
+            "warehouse": self.warehouse,
+            "on_hand": str(self.on_hand),
+            "reserved": str(self.reserved),
+            "as_of": self.as_of,
+            "source": self.source,
+        }
+
 
