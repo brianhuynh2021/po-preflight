@@ -47,7 +47,7 @@ class TestSecurityAndMetrics(unittest.TestCase):
             headers={"X-API-Key": "invalid_bogus_key_12345"},
         )
         self.assertEqual(res.status_code, 401)
-        self.assertIn("Invalid or expired API Key", res.json().get("detail", ""))
+        self.assertEqual(res.json().get("code"), "UNAUTHORIZED")
 
     def test_rbac_role_hierarchy_viewer_forbidden_to_approve(self):
         """Test VIEWER role is blocked from manager-level decision actions (403 Forbidden)."""
@@ -59,7 +59,7 @@ class TestSecurityAndMetrics(unittest.TestCase):
             headers=headers,
         )
         self.assertEqual(res.status_code, 403)
-        self.assertIn("requires at least 'MANAGER' role", res.json().get("detail", ""))
+        self.assertEqual(res.json().get("code"), "FORBIDDEN")
 
     def test_auth_fail_closed_default_without_token_returns_401(self):
         """Test missing token returns 401 Unauthorized under default auth_required=true."""
@@ -70,7 +70,7 @@ class TestSecurityAndMetrics(unittest.TestCase):
                 json={"decision": "approved", "actor": "anonymous_attacker"},
             )
             self.assertEqual(res.status_code, 401)
-            self.assertIn("Authentication required", res.json().get("detail", ""))
+            self.assertEqual(res.json().get("code"), "UNAUTHORIZED")
 
     def test_production_mode_rejects_open_auth_flag_returns_401(self):
         """Test setting PREFLIGHT_AUTH_REQUIRED=false in PRODUCTION still returns 401 Unauthorized."""
@@ -84,7 +84,7 @@ class TestSecurityAndMetrics(unittest.TestCase):
                 json={"decision": "approved", "actor": "anonymous_user"},
             )
             self.assertEqual(res.status_code, 401)
-            self.assertIn("Authentication required in production", res.json().get("detail", ""))
+            self.assertEqual(res.json().get("code"), "UNAUTHORIZED")
 
     def test_production_mode_does_not_load_dev_keys(self):
         """Test dev keys (pf_dev_*) are NOT loaded into registry when PREFLIGHT_ENV=production."""
@@ -121,7 +121,7 @@ class TestSecurityAndMetrics(unittest.TestCase):
         # 4th request must be rate-limited (429)
         res_limit = self.client.get("/api/v1/orders", headers=headers)
         self.assertEqual(res_limit.status_code, 429)
-        self.assertIn("Rate limit exceeded", res_limit.text)
+        self.assertEqual(res_limit.json().get("code"), "RATE_LIMITED")
         self.assertEqual(res_limit.headers.get("Retry-After"), "60")
 
     def test_rate_limiter_cannot_be_bypassed_with_testclient_header(self):

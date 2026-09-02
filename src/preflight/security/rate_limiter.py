@@ -61,6 +61,9 @@ global_rate_limiter = SlidingWindowRateLimiter()
 
 
 
+import json
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """FastAPI Middleware to enforce sliding window rate limiting."""
 
@@ -77,11 +80,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         allowed, remaining = global_rate_limiter.is_allowed(client_key, path)
         if not allowed:
+            req_id = request.headers.get("X-Request-ID", "")
+            doc = {
+                "type": "https://popreflight.vn/errors/rate_limited",
+                "title": "Too Many Requests",
+                "status": 429,
+                "code": "RATE_LIMITED",
+                "detail": "Vượt quá giới hạn tần suất yêu cầu. Vui lòng thử lại sau 60 giây.",
+                "request_id": req_id,
+            }
             return Response(
-                content='{"detail": "Rate limit exceeded. Please retry in 60 seconds."}',
+                content=json.dumps(doc),
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                media_type="application/json",
-                headers={"Retry-After": "60", "X-RateLimit-Remaining": "0"},
+                media_type="application/problem+json",
+                headers={"Retry-After": "60", "X-RateLimit-Remaining": "0", "X-Request-ID": req_id},
             )
 
         response = await call_next(request)

@@ -84,6 +84,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         start_time = time.perf_counter()
         request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:8]
+        request.state.request_id = request_id
 
         method = request.method
         method_color = METHOD_COLORS.get(method, WHITE)

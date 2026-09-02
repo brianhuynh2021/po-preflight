@@ -27,23 +27,76 @@ import type {
 
 
 
-const DEFAULT_BASE_URL = "http://localhost:8001";
+export interface ProblemDetails {
+  type?: string;
+  title?: string;
+  status?: number;
+  code?: string;
+  detail?: string;
+  request_id?: string;
+  errors?: Array<{ field?: string; message?: string; type?: string }>;
+}
 
 export class ApiError extends Error {
+  public code: string;
+  public requestId: string;
+  public detailVi: string;
+  public validationErrors?: Array<{ field?: string; message?: string; type?: string }>;
+
   constructor(
     public status: number,
     public statusText: string,
     public data: unknown,
   ) {
-    super(`API Error ${status} ${statusText}: ${JSON.stringify(data)}`);
+    let message = `API Error ${status} ${statusText}`;
+    let code = "UNKNOWN_ERROR";
+    let requestId = "";
+    let detailVi = "Đã xảy ra lỗi không xác định. Vui lòng thử lại.";
+    let validationErrors: Array<{ field?: string; message?: string; type?: string }> | undefined = undefined;
+
+    if (data && typeof data === "object") {
+      const prob = data as ProblemDetails;
+      if (prob.code) code = prob.code;
+      if (prob.request_id) requestId = prob.request_id;
+      if (prob.detail) detailVi = prob.detail;
+      if (prob.errors) validationErrors = prob.errors;
+      message = `[${code}] ${detailVi} (${status})`;
+    } else if (typeof data === "string") {
+      detailVi = data;
+      message = data;
+    }
+
+    super(message);
     this.name = "ApiError";
+    this.code = code;
+    this.requestId = requestId;
+    this.detailVi = detailVi;
+    this.validationErrors = validationErrors;
   }
+}
+
+export function describeError(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.validationErrors && err.validationErrors.length > 0) {
+      const details = err.validationErrors
+        .map((e) => `${e.field ? e.field + ": " : ""}${e.message || "Không hợp lệ"}`)
+        .join("; ");
+      return `${err.detailVi} (${details})`;
+    }
+    return err.detailVi || err.message;
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return String(err);
 }
 
 export interface ClientConfig {
   baseUrl?: string;
   headers?: Record<string, string>;
 }
+
+const DEFAULT_BASE_URL = "http://localhost:8001";
 
 export function createApiClient(config: ClientConfig = {}) {
   const baseUrl = config.baseUrl || DEFAULT_BASE_URL;

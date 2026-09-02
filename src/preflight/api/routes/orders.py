@@ -5,13 +5,22 @@ import shutil
 import uuid
 from decimal import Decimal
 from pathlib import Path
-
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Request, Response
+from fastapi import APIRouter, Depends, Query, UploadFile, File, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from preflight.api.deps import get_audit_store, get_catalog
+from preflight.api.errors import (
+    DecisionConflict,
+    Forbidden,
+    NotFound,
+    ParseError,
+    PayloadTooLarge,
+    Unauthorized,
+    UnsupportedFormat,
+    ValidationFailed,
+)
 from preflight.api.events import event_bus
 from preflight.api.logging_config import logger
 from preflight.api.schemas import (
@@ -107,7 +116,7 @@ def get_order_detail(
 ) -> OrderDetailResponse:
     row = store.get_order(order_id)
     if not row:
-        raise HTTPException(status_code=404, detail=f"Order {order_id} not found in preflight store.")
+        raise NotFound(f"Không tìm thấy đơn hàng {order_id} trong hệ thống.")
 
     order_data = json.loads(row["order_json"]) if row.get("order_json") else {}
     findings_data = json.loads(row["findings_json"]) if row.get("findings_json") else []
@@ -204,15 +213,20 @@ async def upload_order(
     catalog: dict[str, Product] = Depends(get_catalog),
 ) -> OrderDetailResponse:
 
-    upload_dir = Path("runtime/uploads")
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    prefix = uuid.uuid4().hex
-    raw_name = Path(file.filename).name if file.filename else "uploaded_order.tmp"
-    safe_name = f"{prefix}_{raw_name}"
-    temp_path = upload_dir / safe_name
-
+    filename = file.filename or "uploaded_order.tmp"
+    suffix = Path(filename).suffix.lower()
+    ALLOWED_EXTENSIONS = {".json", ".pdf", ".png", ".jpg", ".jpeg", ".txt", ".csv"}
+    if suffix not in ALLOWED_EXTENSIONS:
+        raise UnsupportedFormat(
+            f"Định dạng tệp '{suffix}' không được hỗ trợ. Vui lòng tải lên tệp PDF, JSON, PNG, JPG hoặc TXT."
+        )
 
     MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB Limit
+
+    upload_dir = Path("runtime/uploads")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    temp_name = f"tmp_{uuid.uuid4().hex}_{Path(filename).name}"
+    temp_path = upload_dir / temp_name
 
     try:
         content = bytearray()
@@ -220,15 +234,20 @@ async def upload_order(
         while chunk := await file.read(chunk_size):
             content.extend(chunk)
             if len(content) > MAX_UPLOAD_SIZE:
-                raise HTTPException(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    detail=f"Uploaded file exceeds maximum limit of {MAX_UPLOAD_SIZE // (1024 * 1024)}MB.",
+                raise PayloadTooLarge(
+                    f"Kích thước tệp vượt quá giới hạn 10MB cho phép (kích thước hiện tại: {len(content) / (1024*1024):.1f}MB)."
                 )
         temp_path.write_bytes(content)
 
+        # Parse order in dedicated guarded try-block
+        try:
+            order = parse_order(temp_path)
+        except Exception as exc:
+            logger.warning(f"Failed to parse PO document '{filename}': {exc}")
+            raise ParseError(
+                "Không thể đọc hoặc phân tích nội dung tệp PO. Vui lòng kiểm tra định dạng dữ liệu."
+            ) from None
 
-        # Parse order
-        order = parse_order(temp_path)
         duplicate = store.has_po(order.po_number)
 
         if staged_review:
@@ -239,9 +258,14 @@ async def upload_order(
             ctx = build_rule_context(store, catalog, order, duplicate=duplicate)
             analysis = analyze_order(order, ctx)
 
-
         # Persist to database
-        analysis_id = store.record_analysis(analysis, str(file.filename))
+        analysis_id = store.record_analysis(analysis, str(filename))
+
+        # Store permanent file in structured hierarchy <analysis_id>/<safe_name>
+        final_dir = upload_dir / str(analysis_id)
+        final_dir.mkdir(parents=True, exist_ok=True)
+        final_path = final_dir / Path(filename).name
+        shutil.move(str(temp_path), str(final_path))
 
         # Broadcast SSE Real-Time Event
         event_bus.publish(
@@ -258,9 +282,12 @@ async def upload_order(
 
         # Return full detail
         return get_order_detail(str(analysis_id), store=store, catalog=catalog)
-    except Exception as exc:
-        logger.error(f"Failed to process PO file: {exc}", exc_info=True)
-        raise HTTPException(status_code=400, detail=f"Failed to process PO file: {exc}")
+    finally:
+        if temp_path.exists():
+            try:
+                temp_path.unlink()
+            except Exception:
+                pass
 
 
 @router.post(
@@ -278,7 +305,7 @@ def confirm_extraction(
 ) -> OrderDetailResponse:
     row = store.get_order(order_id)
     if not row:
-        raise HTTPException(status_code=404, detail=f"Order {order_id} not found.")
+        raise NotFound(f"Không tìm thấy đơn hàng {order_id}.")
 
     po_number = payload.po_number or row["po_number"]
     customer = payload.customer or row["customer"]
@@ -292,7 +319,7 @@ def confirm_extraction(
         for it in payload.items
     )
     if not items:
-        raise HTTPException(status_code=400, detail="Order must have at least one line item.")
+        raise ValidationFailed("Đơn hàng phải có ít nhất một dòng sản phẩm.")
 
     updated_order = Order(
         po_number=po_number,
@@ -304,7 +331,6 @@ def confirm_extraction(
     # Run deterministic preflight rules on confirmed order with RuleContext
     ctx = build_rule_context(store, catalog, updated_order, duplicate=False)
     analysis = analyze_order(updated_order, ctx)
-
 
     # Active Learning Feedback Loop: Persist customer nickname/alias mappings when human corrects SKUs
     try:
@@ -374,9 +400,16 @@ def record_decision(
             created_at=result.created_at,
         )
     except DecisionError as err:
-        raise HTTPException(status_code=err.status_code, detail=err.message)
-
-
+        if err.status_code == 404:
+            raise NotFound(err.message)
+        elif err.status_code == 403:
+            raise Forbidden(err.message)
+        elif err.status_code == 409:
+            raise DecisionConflict(err.message)
+        elif err.status_code == 422:
+            raise ValidationFailed(err.message)
+        else:
+            raise DecisionConflict(err.message)
 
 
 @router.get(
@@ -390,7 +423,7 @@ def get_audit_certificate(
 ) -> dict[str, Any]:
     row = store.get_order(order_id)
     if not row:
-        raise HTTPException(status_code=404, detail=f"Order {order_id} not found.")
+        raise NotFound(f"Không tìm thấy đơn hàng {order_id}.")
 
     po_number = row["po_number"]
     decisions = row.get("decisions", [])
@@ -405,7 +438,6 @@ def get_audit_certificate(
         decisions=decisions,
         stored_blocks=stored_blocks if stored_blocks else None,
     )
-
 
 
 @router.get(

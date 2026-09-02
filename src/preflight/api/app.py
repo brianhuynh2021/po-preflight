@@ -182,6 +182,101 @@ app.include_router(erp.router)
 app.include_router(events.router)
 
 
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.requests import Request
+from preflight.api.errors import PreflightError, ValidationFailed
+
+
+@app.exception_handler(PreflightError)
+async def preflight_error_handler(request: Request, exc: PreflightError) -> JSONResponse:
+    req_id = getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID", "")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=exc.to_problem_dict(req_id),
+        media_type="application/problem+json",
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    req_id = getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID", "")
+    errors = []
+    for err in exc.errors():
+        loc = ".".join(str(l) for l in err.get("loc", []) if l != "body")
+        msg = err.get("msg", "Dữ liệu không hợp lệ.")
+        err_type = err.get("type", "")
+        if "missing" in err_type:
+            msg = "Trường này là bắt buộc."
+        elif "string_too_short" in err_type:
+            msg = "Độ dài chuỗi quá ngắn."
+        elif "int_parsing" in err_type or "decimal" in err_type:
+            msg = "Định dạng số không hợp lệ."
+        errors.append({"field": loc, "message": msg, "type": err_type})
+
+    validation_exc = ValidationFailed(
+        "Dữ liệu yêu cầu không hợp lệ. Vui lòng kiểm tra lại các trường thông tin.",
+        errors=errors,
+    )
+    return JSONResponse(
+        status_code=422,
+        content=validation_exc.to_problem_dict(req_id),
+        media_type="application/problem+json",
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    req_id = getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID", "")
+    code_map = {
+        400: "BAD_REQUEST",
+        401: "UNAUTHORIZED",
+        403: "FORBIDDEN",
+        404: "NOT_FOUND",
+        409: "CONFLICT",
+        413: "PAYLOAD_TOO_LARGE",
+        415: "UNSUPPORTED_FORMAT",
+        422: "VALIDATION_FAILED",
+        429: "RATE_LIMITED",
+        500: "INTERNAL_ERROR",
+        503: "UPSTREAM_UNAVAILABLE",
+    }
+    code = code_map.get(exc.status_code, f"HTTP_{exc.status_code}")
+    doc = {
+        "type": f"https://popreflight.vn/errors/{code.lower()}",
+        "title": exc.detail if isinstance(exc.detail, str) else "HTTP Error",
+        "status": exc.status_code,
+        "code": code,
+        "detail": str(exc.detail),
+        "request_id": req_id,
+    }
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=doc,
+        media_type="application/problem+json",
+    )
+
+
+@app.exception_handler(Exception)
+async def global_unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    req_id = getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID", "")
+    logger.exception(f"Unhandled system exception occurred [request_id={req_id}]: {exc}")
+    doc = {
+        "type": "https://popreflight.vn/errors/internal_error",
+        "title": "Internal Server Error",
+        "status": 500,
+        "code": "INTERNAL_ERROR",
+        "detail": f"Lỗi hệ thống. Mã tham chiếu: {req_id}",
+        "request_id": req_id,
+    }
+    return JSONResponse(
+        status_code=500,
+        content=doc,
+        media_type="application/problem+json",
+    )
+
+
 @app.get("/", include_in_schema=False)
 def root_redirect():
     """Redirect root path to interactive Swagger documentation."""

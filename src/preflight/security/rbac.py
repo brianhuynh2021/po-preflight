@@ -54,6 +54,9 @@ def get_api_key_registry() -> dict[str, tuple[str, Role]]:
     return registry
 
 
+from preflight.api.errors import Forbidden, Unauthorized
+
+
 def get_current_user(
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     authorization: Optional[str] = Header(None),
@@ -72,27 +75,15 @@ def get_current_user(
         for registered_key, (username, role) in registry.items():
             if secrets.compare_digest(token, registered_key):
                 return UserPrincipal(username=username, role=role, api_key_id=token[:8] + "...")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired API Key.",
-            headers={"WWW-Authenticate": "ApiKey"},
-        )
+        raise Unauthorized("Khóa API không hợp lệ hoặc đã hết hạn.")
 
     if auth_required:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required. Provide 'X-API-Key' or 'Authorization: Bearer <token>' header.",
-            headers={"WWW-Authenticate": "ApiKey"},
-        )
+        raise Unauthorized("Yêu cầu xác thực. Vui lòng cung cấp header 'X-API-Key' hoặc 'Authorization: Bearer <token>'.")
 
     # Open development mode — never allowed in production
     env_name = os.getenv("PREFLIGHT_ENV", "development").strip().lower()
     if env_name in ("production", "prod"):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required in production.",
-            headers={"WWW-Authenticate": "ApiKey"},
-        )
+        raise Unauthorized("Yêu cầu xác thực bắt buộc trong môi trường production.")
 
     return UserPrincipal(
         username="dev_admin",
@@ -107,9 +98,8 @@ def require_role(min_role: Role) -> Callable[[UserPrincipal], UserPrincipal]:
 
     def role_checker(user: UserPrincipal = Depends(get_current_user)) -> UserPrincipal:
         if user.role < min_role:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access forbidden: requires at least '{min_role.name}' role (Your role: '{user.role.name}').",
+            raise Forbidden(
+                f"Truy cập bị từ chối: Yêu cầu vai trò tối thiểu '{min_role.name}' (Vai trò hiện tại của bạn: '{user.role.name}')."
             )
         return user
 
