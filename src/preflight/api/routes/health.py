@@ -12,8 +12,9 @@ from preflight.api.deps import (
     get_db_path,
 )
 from preflight.api.schemas import CatalogStatus, DatabaseStatus, HealthResponse
+import preflight
 from preflight.models import Product
-from preflight.store import AuditStore
+from preflight.store import AuditStore, PostgresAuditStore
 
 router = APIRouter(tags=["System Health & Diagnostics"])
 
@@ -30,27 +31,39 @@ def get_health(
 ) -> HealthResponse:
     uptime = time.time() - SERVER_START_TIME
 
-    # Check database tables
+    # Check database connectivity and tables
     db_connected = False
     tables = []
+    db_type = "postgresql" if isinstance(store, PostgresAuditStore) else "sqlite"
+    db_path = getattr(store, "database_url", str(get_db_path()))
+
     try:
-        cursor = store.connection.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        )
-        tables = [row[0] for row in cursor.fetchall()]
-        db_connected = True
+        if isinstance(store, PostgresAuditStore):
+            with store._pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+                    )
+                    tables = [row["table_name"] if isinstance(row, dict) else row[0] for row in cur.fetchall()]
+            db_connected = True
+        else:
+            cursor = store.connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+            tables = [row[0] for row in cursor.fetchall()]
+            db_connected = True
     except Exception:
         db_connected = False
 
     return HealthResponse(
         status="healthy" if (db_connected and len(catalog) > 0) else "degraded",
-        version="0.1.0",
+        version=getattr(preflight, "__version__", "0.2.0"),
         timestamp=datetime.now(UTC).isoformat(),
         uptime_seconds=round(uptime, 2),
         database=DatabaseStatus(
             connected=db_connected,
-            type="sqlite",
-            path=str(get_db_path()),
+            type=db_type,
+            path=str(db_path),
             tables=tables,
         ),
         catalog=CatalogStatus(

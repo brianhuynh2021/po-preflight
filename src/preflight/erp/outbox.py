@@ -11,6 +11,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Sequence
 
+from preflight.api.errors import ConfigurationError
 from preflight.erp.schemas import (
     ERPAdapterType,
     ERPEventStatus,
@@ -384,7 +385,7 @@ class OutboxStore(BaseOutboxStore):
 
 
 class PostgresOutboxStore(BaseOutboxStore):
-    """PostgreSQL Enterprise Outbox Store with Connection Pooling."""
+    """PostgreSQL Enterprise Outbox Store with psycopg 3 Connection Pooling."""
 
     def __init__(
         self,
@@ -395,37 +396,34 @@ class PostgresOutboxStore(BaseOutboxStore):
         self.database_url = database_url
         self.pool_size = pool_size
         self.max_overflow = max_overflow
-        self._fallback_sqlite: OutboxStore | None = None
-        self._pool_initialized = False
-        self._try_init_pool()
 
-    def _try_init_pool(self) -> None:
         try:
-            from psycopg2 import pool
-            self._pool = pool.ThreadedConnectionPool(
-                minconn=1,
-                maxconn=self.pool_size + self.max_overflow,
-                dsn=self.database_url,
+            from psycopg_pool import ConnectionPool
+            from psycopg.rows import dict_row
+
+            self._pool = ConnectionPool(
+                conninfo=self.database_url,
+                min_size=1,
+                max_size=self.pool_size + self.max_overflow,
+                open=True,
+                timeout=3.0,
+                kwargs={"row_factory": dict_row, "connect_timeout": 3},
             )
             self._init_pg_schema()
-            self._pool_initialized = True
-        except Exception:
-            self._fallback_sqlite = OutboxStore("runtime/pg_fallback_outbox.db")
+        except Exception as exc:
+            raise ConfigurationError(
+                f"Không thể kết nối đến PostgreSQL outbox database tại {database_url}: {exc}"
+            ) from exc
 
     def _init_pg_schema(self) -> None:
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection(timeout=3.0) as conn:
             with conn.cursor() as cur:
                 cur.execute(POSTGRES_OUTBOX_SCHEMA)
             conn.commit()
-        finally:
-            self._pool.putconn(conn)
 
     def close(self) -> None:
-        if self._pool_initialized and hasattr(self, "_pool"):
-            self._pool.closeall()
-        if self._fallback_sqlite:
-            self._fallback_sqlite.close()
+        if hasattr(self, "_pool"):
+            self._pool.close()
 
     def enqueue_order(
         self,
@@ -439,21 +437,16 @@ class PostgresOutboxStore(BaseOutboxStore):
         approved_at: str | None = None,
         source_analysis_id: int | None = None,
     ) -> ERPSyncPayload:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.enqueue_order(
-                po_number, customer, items, total_amount, currency, idempotency_key, approved_by, approved_at, source_analysis_id
-            )
-
         if not idempotency_key:
             idempotency_key = compute_idempotency_key(source_analysis_id, po_number, items)
 
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT payload_json FROM erp_outbox WHERE idempotency_key = %s", (idempotency_key,))
                 row = cur.fetchone()
                 if row:
-                    data = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                    val = row["payload_json"]
+                    data = json.loads(val) if isinstance(val, str) else val
                     data["total_amount"] = Decimal(str(data["total_amount"]))
                     return ERPSyncPayload(**data)
 
@@ -490,16 +483,11 @@ class PostgresOutboxStore(BaseOutboxStore):
                 )
             conn.commit()
             return payload
-        finally:
-            self._pool.putconn(conn)
 
     def fetch_pending(self, limit: int = 10) -> list[ERPSyncPayload]:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.fetch_pending(limit)
-        conn = self._pool.getconn()
-        now = time.time()
-        timeout_threshold = now - 300.0
-        try:
+        with self._pool.connection() as conn:
+            now = time.time()
+            timeout_threshold = now - 300.0
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -516,7 +504,7 @@ class PostgresOutboxStore(BaseOutboxStore):
                 if not rows:
                     return []
 
-                event_ids = [row[0] for row in rows]
+                event_ids = [row["event_id"] for row in rows]
                 cur.execute(
                     """
                     UPDATE erp_outbox
@@ -528,21 +516,16 @@ class PostgresOutboxStore(BaseOutboxStore):
 
                 results: list[ERPSyncPayload] = []
                 for row in rows:
-                    data = json.loads(row[1]) if isinstance(row[1], str) else row[1]
+                    val = row["payload_json"]
+                    data = json.loads(val) if isinstance(val, str) else val
                     data["total_amount"] = Decimal(str(data["total_amount"]))
                     results.append(ERPSyncPayload(**data))
             conn.commit()
             return results
-        finally:
-            self._pool.putconn(conn)
 
     def mark_sent(self, event_id: str, tx_id: str, adapter_type: ERPAdapterType | str) -> None:
-        if self._fallback_sqlite:
-            self._fallback_sqlite.mark_sent(event_id, tx_id, adapter_type)
-            return
-        conn = self._pool.getconn()
         adapter_val = adapter_type.value if hasattr(adapter_type, "value") else str(adapter_type)
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -553,20 +536,14 @@ class PostgresOutboxStore(BaseOutboxStore):
                     (ERPEventStatus.SENT.value, tx_id, adapter_val, time.time(), event_id),
                 )
             conn.commit()
-        finally:
-            self._pool.putconn(conn)
 
     def mark_failed(self, event_id: str, error: str) -> None:
-        if self._fallback_sqlite:
-            self._fallback_sqlite.mark_failed(event_id, error)
-            return
-        conn = self._pool.getconn()
         now = time.time()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT retry_count FROM erp_outbox WHERE event_id = %s", (event_id,))
                 row = cur.fetchone()
-                current_retry = (row[0] if row else 0) + 1
+                current_retry = (row["retry_count"] if row else 0) + 1
                 if current_retry >= 3:
                     cur.execute(
                         """
@@ -589,14 +566,9 @@ class PostgresOutboxStore(BaseOutboxStore):
                         (ERPEventStatus.PENDING.value, current_retry, next_attempt, error, now, event_id),
                     )
             conn.commit()
-        finally:
-            self._pool.putconn(conn)
 
     def get_by_idempotency_key(self, idempotency_key: str) -> dict[str, Any] | None:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.get_by_idempotency_key(idempotency_key)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -612,16 +584,10 @@ class PostgresOutboxStore(BaseOutboxStore):
                 row = cur.fetchone()
                 if not row:
                     return None
-                cols = [desc[0] for desc in cur.description]
-                return dict(zip(cols, row))
-        finally:
-            self._pool.putconn(conn)
+                return dict(row)
 
     def get_stats(self) -> OutboxStats:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.get_stats()
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -636,24 +602,19 @@ class PostgresOutboxStore(BaseOutboxStore):
                     """
                 )
                 row = cur.fetchone()
-                if not row or row[5] == 0:
+                if not row or (row.get("total") or 0) == 0:
                     return OutboxStats()
                 return OutboxStats(
-                    pending_count=row[0] or 0,
-                    processing_count=row[1] or 0,
-                    sent_count=row[2] or 0,
-                    failed_count=row[3] or 0,
-                    dead_letter_count=row[4] or 0,
-                    total_events=row[5] or 0,
+                    pending_count=int(row.get("pending") or 0),
+                    processing_count=int(row.get("processing") or 0),
+                    sent_count=int(row.get("sent") or 0),
+                    failed_count=int(row.get("failed") or 0),
+                    dead_letter_count=int(row.get("dead_letter") or 0),
+                    total_events=int(row.get("total") or 0),
                 )
-        finally:
-            self._pool.putconn(conn)
 
     def list_events(self, limit: int = 50) -> list[dict[str, Any]]:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.list_events(limit)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -666,10 +627,7 @@ class PostgresOutboxStore(BaseOutboxStore):
                     """,
                     (limit,),
                 )
-                cols = [desc[0] for desc in cur.description]
-                return [dict(zip(cols, row)) for row in cur.fetchall()]
-        finally:
-            self._pool.putconn(conn)
+                return [dict(row) for row in cur.fetchall()]
 
 
 def create_outbox_store(database_url_or_path: str | Path | None = None) -> BaseOutboxStore:

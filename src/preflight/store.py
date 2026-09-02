@@ -11,6 +11,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from preflight.api.errors import ConfigurationError
 from preflight.models import (
     Analysis,
     CustomerCreditProfile,
@@ -996,8 +997,7 @@ class AuditStore(BaseAuditStore):
 
 
 class PostgresAuditStore(BaseAuditStore):
-
-    """Enterprise PostgreSQL Audit Store with Connection Pooling (pool_size=20, max_overflow=10)."""
+    """Enterprise PostgreSQL Audit Store with psycopg 3 Connection Pooling."""
 
     def __init__(
         self,
@@ -1008,59 +1008,43 @@ class PostgresAuditStore(BaseAuditStore):
         self.database_url = database_url
         self.pool_size = pool_size
         self.max_overflow = max_overflow
-        self._fallback_sqlite: AuditStore | None = None
 
-        # Try to initialize connection pool if psycopg2 or asyncpg is available;
-        # otherwise provide safe in-memory adapter fallback for environments without live Postgres instance.
-        self._pool_initialized = False
-        self._try_init_pool()
-
-    def _try_init_pool(self) -> None:
         try:
-            import psycopg2
-            from psycopg2 import pool
-            self._pool = pool.ThreadedConnectionPool(
-                minconn=1,
-                maxconn=self.pool_size + self.max_overflow,
-                dsn=self.database_url,
+            from psycopg_pool import ConnectionPool
+            from psycopg.rows import dict_row
+
+            self._pool = ConnectionPool(
+                conninfo=self.database_url,
+                min_size=1,
+                max_size=self.pool_size + self.max_overflow,
+                open=True,
+                timeout=3.0,
+                kwargs={"row_factory": dict_row, "connect_timeout": 3},
             )
             self._init_pg_schema()
-            self._pool_initialized = True
-        except Exception:
-            # Fallback to local SQLite emulation for testing and zero-downtime development
-            self._fallback_sqlite = AuditStore("runtime/pg_fallback.db")
+        except Exception as exc:
+            raise ConfigurationError(
+                f"Không thể kết nối đến PostgreSQL database tại {database_url}: {exc}"
+            ) from exc
 
     def _init_pg_schema(self) -> None:
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection(timeout=3.0) as conn:
             with conn.cursor() as cur:
                 cur.execute(POSTGRES_SCHEMA)
             conn.commit()
-        finally:
-            self._pool.putconn(conn)
 
     def close(self) -> None:
-        if self._pool_initialized and hasattr(self, "_pool"):
-            self._pool.closeall()
-        if self._fallback_sqlite:
-            self._fallback_sqlite.close()
+        if hasattr(self, "_pool"):
+            self._pool.close()
 
     def has_po(self, po_number: str) -> bool:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.has_po(po_number)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1 FROM analyses WHERE po_number = %s LIMIT 1", (po_number,))
                 return cur.fetchone() is not None
-        finally:
-            self._pool.putconn(conn)
 
     def record_analysis(self, analysis: Analysis, source_file: str) -> int:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.record_analysis(analysis, source_file)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -1081,19 +1065,13 @@ class PostgresAuditStore(BaseAuditStore):
                         datetime.now(UTC).isoformat(),
                     ),
                 )
-                res_id = int(cur.fetchone()[0])
+                res_id = int(cur.fetchone()["id"])
             conn.commit()
             analysis.analysis_id = res_id
             return res_id
-        finally:
-            self._pool.putconn(conn)
 
     def update_analysis(self, order_id: int, analysis: Analysis) -> None:
-        if self._fallback_sqlite:
-            self._fallback_sqlite.update_analysis(order_id, analysis)
-            return
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -1113,8 +1091,6 @@ class PostgresAuditStore(BaseAuditStore):
                     ),
                 )
             conn.commit()
-        finally:
-            self._pool.putconn(conn)
 
     def record_decision(
         self,
@@ -1125,12 +1101,7 @@ class PostgresAuditStore(BaseAuditStore):
         display_name: str | None = None,
         channel: str | None = None,
     ) -> int:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.record_decision(
-                po_number, decision, actor, note, display_name=display_name, channel=channel
-            )
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -1148,26 +1119,18 @@ class PostgresAuditStore(BaseAuditStore):
                         datetime.now(UTC).isoformat(),
                     ),
                 )
-                d_id = int(cur.fetchone()[0])
+                d_id = int(cur.fetchone()["id"])
             conn.commit()
             return d_id
-        finally:
-            self._pool.putconn(conn)
-
 
     def history(self, po_number: str) -> dict[str, list[dict[str, object]]]:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.history(po_number)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM analyses WHERE po_number = %s ORDER BY id", (po_number,))
                 analyses = [dict(r) for r in cur.fetchall()]
                 cur.execute("SELECT * FROM decisions WHERE po_number = %s ORDER BY id", (po_number,))
                 decisions = [dict(r) for r in cur.fetchall()]
             return {"analyses": analyses, "decisions": decisions}
-        finally:
-            self._pool.putconn(conn)
 
     def list_orders(
         self,
@@ -1176,10 +1139,7 @@ class PostgresAuditStore(BaseAuditStore):
         limit: int = 50,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.list_orders(status=status, search=search, limit=limit, offset=offset)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 query = """
                     SELECT a.id, a.po_number, a.customer, a.status, a.total, a.source_file,
@@ -1202,14 +1162,9 @@ class PostgresAuditStore(BaseAuditStore):
                 params.extend([limit, offset])
                 cur.execute(query, params)
                 return [dict(r) for r in cur.fetchall()]
-        finally:
-            self._pool.putconn(conn)
 
     def get_order(self, po_or_id: str | int) -> dict[str, Any] | None:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.get_order(po_or_id)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 if isinstance(po_or_id, int) or str(po_or_id).isdigit():
                     cur.execute("SELECT * FROM analyses WHERE id = %s LIMIT 1", (int(po_or_id),))
@@ -1222,27 +1177,19 @@ class PostgresAuditStore(BaseAuditStore):
                 cur.execute("SELECT * FROM decisions WHERE po_number = %s ORDER BY id ASC", (data["po_number"],))
                 data["decisions"] = [dict(d) for d in cur.fetchall()]
                 return data
-        finally:
-            self._pool.putconn(conn)
 
     def get_order_by_po(self, po_number: str) -> dict[str, Any] | None:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.get_order_by_po(po_number)
         return self.get_order(po_number)
 
     def get_dashboard_stats(self) -> dict[str, Any]:
-
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.get_dashboard_stats()
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) FROM analyses")
-                total = cur.fetchone()[0]
-                cur.execute("SELECT status, COUNT(*) FROM analyses GROUP BY status")
-                status_counts = {r[0]: r[1] for r in cur.fetchall()}
-                cur.execute("SELECT decision, COUNT(*) FROM decisions GROUP BY decision")
-                decisions_count = {r[0]: r[1] for r in cur.fetchall()}
+                total = cur.fetchone()["count"]
+                cur.execute("SELECT status, COUNT(*) as count FROM analyses GROUP BY status")
+                status_counts = {r["status"]: r["count"] for r in cur.fetchall()}
+                cur.execute("SELECT decision, COUNT(*) as count FROM decisions GROUP BY decision")
+                decisions_count = {r["decision"]: r["count"] for r in cur.fetchall()}
                 cur.execute("SELECT id, po_number, customer, status, total, created_at FROM analyses ORDER BY id DESC LIMIT 5")
                 recent = [dict(r) for r in cur.fetchall()]
             return {
@@ -1251,8 +1198,6 @@ class PostgresAuditStore(BaseAuditStore):
                 "decisions_count": decisions_count,
                 "recent_orders": recent,
             }
-        finally:
-            self._pool.putconn(conn)
 
     def learn_alias(
         self,
@@ -1261,11 +1206,7 @@ class PostgresAuditStore(BaseAuditStore):
         target_sku: str,
         confidence: float = 1.0,
     ) -> None:
-        if self._fallback_sqlite:
-            self._fallback_sqlite.learn_alias(customer_id, raw_query, target_sku, confidence)
-            return
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -1279,37 +1220,25 @@ class PostgresAuditStore(BaseAuditStore):
                     (customer_id.strip(), raw_query.strip().lower(), target_sku.strip().upper(), confidence, datetime.now(UTC).isoformat()),
                 )
             conn.commit()
-        finally:
-            self._pool.putconn(conn)
 
     def get_customer_alias(self, customer_id: str, raw_query: str) -> str | None:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.get_customer_alias(customer_id, raw_query)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT target_sku FROM customer_aliases WHERE customer_id = %s AND raw_query = %s LIMIT 1",
                     (customer_id.strip(), raw_query.strip().lower()),
                 )
                 row = cur.fetchone()
-                return str(row[0]) if row else None
-        finally:
-            self._pool.putconn(conn)
+                return str(row["target_sku"]) if row else None
 
     def list_customer_aliases(self, customer_id: str | None = None) -> list[dict[str, Any]]:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.list_customer_aliases(customer_id)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 if customer_id:
                     cur.execute("SELECT * FROM customer_aliases WHERE customer_id = %s ORDER BY id DESC", (customer_id.strip(),))
                 else:
                     cur.execute("SELECT * FROM customer_aliases ORDER BY id DESC")
                 return [dict(r) for r in cur.fetchall()]
-        finally:
-            self._pool.putconn(conn)
 
     def append_audit_block(
         self,
@@ -1319,10 +1248,7 @@ class PostgresAuditStore(BaseAuditStore):
         payload: dict[str, Any],
         timestamp: float | None = None,
     ) -> dict[str, Any]:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.append_audit_block(po_number, action, actor, payload, timestamp)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             t = timestamp if timestamp is not None else time.time()
             with conn.cursor() as cur:
                 cur.execute(
@@ -1331,8 +1257,8 @@ class PostgresAuditStore(BaseAuditStore):
                 )
                 last_row = cur.fetchone()
                 if last_row:
-                    idx = last_row[0] + 1
-                    prev_hash = last_row[1]
+                    idx = last_row["block_index"] + 1
+                    prev_hash = last_row["block_hash"]
                 else:
                     idx = 0
                     prev_hash = "0000000000000000000000000000000000000000000000000000000000000000"
@@ -1358,29 +1284,18 @@ class PostgresAuditStore(BaseAuditStore):
                 "previous_hash": prev_hash,
                 "block_hash": b_hash,
             }
-        finally:
-            self._pool.putconn(conn)
 
     def get_audit_blocks(self, po_number: str) -> list[dict[str, Any]]:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.get_audit_blocks(po_number)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT block_index as index, timestamp, po_number, action, actor, payload_hash, previous_hash, block_hash FROM audit_blocks WHERE po_number = %s ORDER BY block_index ASC",
                     (po_number,),
                 )
                 return [dict(r) for r in cur.fetchall()]
-        finally:
-            self._pool.putconn(conn)
 
     def set_customer_pricing(self, pricing: CustomerPriceAgreement) -> None:
-        if self._fallback_sqlite:
-            self._fallback_sqlite.set_customer_pricing(pricing)
-            return
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -1405,14 +1320,9 @@ class PostgresAuditStore(BaseAuditStore):
                     ),
                 )
             conn.commit()
-        finally:
-            self._pool.putconn(conn)
 
     def get_customer_pricing(self, customer_id: str) -> list[CustomerPriceAgreement]:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.get_customer_pricing(customer_id)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT * FROM customer_pricing WHERE customer_id = %s ORDER BY sku ASC, min_quantity DESC",
@@ -1430,15 +1340,9 @@ class PostgresAuditStore(BaseAuditStore):
                     )
                     for r in cur.fetchall()
                 ]
-        finally:
-            self._pool.putconn(conn)
 
     def set_uom_conversion(self, conversion: UOMConversion) -> None:
-        if self._fallback_sqlite:
-            self._fallback_sqlite.set_uom_conversion(conversion)
-            return
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -1458,14 +1362,9 @@ class PostgresAuditStore(BaseAuditStore):
                     ),
                 )
             conn.commit()
-        finally:
-            self._pool.putconn(conn)
 
     def get_uom_conversions(self, sku: str | None = None) -> list[UOMConversion]:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.get_uom_conversions(sku)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 if sku:
                     cur.execute(
@@ -1483,15 +1382,9 @@ class PostgresAuditStore(BaseAuditStore):
                     )
                     for r in cur.fetchall()
                 ]
-        finally:
-            self._pool.putconn(conn)
 
     def set_customer_credit(self, credit: CustomerCreditProfile) -> None:
-        if self._fallback_sqlite:
-            self._fallback_sqlite.set_customer_credit(credit)
-            return
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -1516,14 +1409,9 @@ class PostgresAuditStore(BaseAuditStore):
                     ),
                 )
             conn.commit()
-        finally:
-            self._pool.putconn(conn)
 
     def get_customer_credit(self, customer_id: str) -> CustomerCreditProfile | None:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.get_customer_credit(customer_id)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT * FROM customer_credits WHERE customer_id = %s LIMIT 1",
@@ -1540,15 +1428,9 @@ class PostgresAuditStore(BaseAuditStore):
                     oldest_overdue_days=int(row["oldest_overdue_days"]),
                     status=row["status"],
                 )
-        finally:
-            self._pool.putconn(conn)
 
     def set_policy(self, policy: RulePolicy, updated_by: str = "system") -> None:
-        if self._fallback_sqlite:
-            self._fallback_sqlite.set_policy(policy, updated_by)
-            return
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -1562,14 +1444,9 @@ class PostgresAuditStore(BaseAuditStore):
                     (json.dumps(policy.to_dict()), datetime.now(UTC).isoformat(), updated_by),
                 )
             conn.commit()
-        finally:
-            self._pool.putconn(conn)
 
     def get_policy(self) -> RulePolicy:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.get_policy()
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT policy_json FROM rule_policies WHERE id = 1 LIMIT 1")
                 row = cur.fetchone()
@@ -1578,14 +1455,9 @@ class PostgresAuditStore(BaseAuditStore):
                 val = row["policy_json"]
                 data = json.loads(val) if isinstance(val, str) else val
                 return RulePolicy.from_dict(data)
-        finally:
-            self._pool.putconn(conn)
 
     def get_channel_identity(self, channel: str, external_id: str) -> dict[str, Any] | None:
-        if self._fallback_sqlite:
-            return self._fallback_sqlite.get_channel_identity(channel, external_id)
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT * FROM channel_identities WHERE channel = %s AND external_id = %s LIMIT 1",
@@ -1595,8 +1467,6 @@ class PostgresAuditStore(BaseAuditStore):
                 if not row:
                     return None
                 return dict(row)
-        finally:
-            self._pool.putconn(conn)
 
     def upsert_channel_identity(
         self,
@@ -1606,13 +1476,7 @@ class PostgresAuditStore(BaseAuditStore):
         display_name: str,
         role: str,
     ) -> None:
-        if self._fallback_sqlite:
-            self._fallback_sqlite.upsert_channel_identity(
-                channel, external_id, user_id, display_name, role
-            )
-            return
-        conn = self._pool.getconn()
-        try:
+        with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -1634,8 +1498,7 @@ class PostgresAuditStore(BaseAuditStore):
                     ),
                 )
             conn.commit()
-        finally:
-            self._pool.putconn(conn)
+
 
 
 

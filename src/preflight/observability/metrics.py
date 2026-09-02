@@ -54,9 +54,13 @@ class PrometheusMetricsRegistry:
         lines = []
 
         # Info metric
+        import preflight
+
+        env = os.getenv("PREFLIGHT_ENV", "development").strip().lower()
+        ver = getattr(preflight, "__version__", "0.1.0")
         lines.append("# HELP po_preflight_build_info Build and version metadata")
         lines.append("# TYPE po_preflight_build_info gauge")
-        lines.append('po_preflight_build_info{version="1.0.0",environment="production"} 1')
+        lines.append(f'po_preflight_build_info{{version="{ver}",environment="{env}"}} 1')
 
         # Uptime gauge
         uptime = time.time() - self.start_time

@@ -35,6 +35,9 @@ def route_after_human_approval(state: PreflightAgentState) -> Literal["erp_sync"
 
 
 
+from preflight.agent.checkpointer import get_agent_checkpointer
+
+
 def build_preflight_graph(
     catalog: dict[str, Product],
     store: AuditStore,
@@ -43,7 +46,7 @@ def build_preflight_graph(
 ):
     """Build and compile the LangGraph Preflight Orchestration StateGraph."""
     if checkpointer is None:
-        checkpointer = MemorySaver()
+        checkpointer = get_agent_checkpointer()
 
     # Wrap node functions with catalog and store dependencies
     bound_ingestion = functools.partial(ingestion_node, catalog=catalog, store=store)

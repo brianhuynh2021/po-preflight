@@ -109,10 +109,12 @@ class TelegramBotService:
         token: str | None = None,
         chat_id: str | None = None,
         store: AuditStore | None = None,
+        dry_run: bool | None = None,
     ):
         self.token = token or os.getenv("TELEGRAM_BOT_TOKEN")
         self.chat_id = chat_id or os.getenv("TELEGRAM_CHAT_ID")
         self.store = store
+        self.dry_run = dry_run if dry_run is not None else (os.getenv("TELEGRAM_DRY_RUN", "false").lower() in ("true", "1", "yes"))
 
     @property
     def is_configured(self) -> bool:
@@ -125,15 +127,35 @@ class TelegramBotService:
         keyboard = build_approval_inline_keyboard(order_id, web_base_url=web_base_url)
 
         if not self.is_configured:
-            logger.info(f"[TelegramBot (DRY RUN)] Dispatched PO alert for Order #{order_id}")
-            return BotNotificationResult(
-                success=True,
-                channel="telegram",
-                order_id=order_id,
-                message_id="mock_msg_12345",
-                dry_run=True,
-                details=f"Dry-run alert for Order #{order_id} generated successfully (No Telegram token configured).",
-            )
+            if self.dry_run:
+                logger.info(f"[TelegramBot (DRY RUN)] Dispatched PO alert for Order #{order_id}")
+                return BotNotificationResult(
+                    success=True,
+                    channel="telegram",
+                    order_id=order_id,
+                    message_id=None,
+                    dry_run=True,
+                    mode="dry_run",
+                    details=f"Dry-run alert for Order #{order_id} generated successfully.",
+                )
+            else:
+                env_name = os.getenv("PREFLIGHT_ENV", "development").strip().lower()
+                if env_name in ("production", "prod") and self.store:
+                    self.store.record_audit_block(
+                        po_number=str(order.get("po_number", order_id)),
+                        action="NOTIFY_SKIPPED",
+                        actor="system",
+                        data={"reason": "Telegram not configured in production", "channel": "telegram"},
+                    )
+                return BotNotificationResult(
+                    success=False,
+                    channel="telegram",
+                    order_id=order_id,
+                    message_id=None,
+                    dry_run=False,
+                    mode="unconfigured",
+                    details="Telegram chưa cấu hình (Thiếu TELEGRAM_BOT_TOKEN hoặc TELEGRAM_CHAT_ID).",
+                )
 
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
         payload = {
@@ -159,6 +181,7 @@ class TelegramBotService:
                     order_id=order_id,
                     message_id=msg_id,
                     dry_run=False,
+                    mode="live",
                     details=f"Alert dispatched to Telegram chat {self.chat_id}.",
                 )
         except Exception as exc:
@@ -169,6 +192,7 @@ class TelegramBotService:
                 order_id=order_id,
                 message_id=None,
                 dry_run=False,
+                mode="live",
                 details=f"Telegram API Error: {str(exc)}",
             )
 

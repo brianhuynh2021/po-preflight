@@ -10,16 +10,11 @@ from preflight.models import Product
 from preflight.security.rbac import Role, UserPrincipal, require_role
 from preflight.store import AuditStore
 
-from langgraph.checkpoint.memory import MemorySaver
-
 router = APIRouter(prefix="/api/v1/agent", tags=["LangGraph Agentic Orchestrator"])
-
-# Shared in-memory checkpointer for thread persistence across requests
-_SERVER_CHECKPOINTER = MemorySaver()
 
 
 def _get_server_graph(catalog: dict[str, Product], store: AuditStore):
-    return build_preflight_graph(catalog, store, checkpointer=_SERVER_CHECKPOINTER)
+    return build_preflight_graph(catalog, store)
 
 
 

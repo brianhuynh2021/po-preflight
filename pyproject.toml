@@ -13,8 +13,10 @@ dependencies = [
     "python-multipart>=0.0.9",
     "rapidfuzz>=3.9.0",
     "langgraph>=0.2.0",
+    "langgraph-checkpoint-sqlite>=2.0.0",
     "langchain-core>=0.3.0",
     "openpyxl>=3.1.0",
+    "psycopg[binary,pool]>=3.1",
 ]
 
 [project.optional-dependencies]

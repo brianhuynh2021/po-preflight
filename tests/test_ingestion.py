@@ -111,6 +111,8 @@ class TestIngestionAndVisionOCR(unittest.TestCase):
 
     def test_pipeline_scanned_image_vision_ocr_fallback(self):
         """Test pipeline falls back to Gemini Vision OCR for raster images."""
+        from tests.fixtures.mock_ocr import MockOCREngine
+        self.pipeline.ocr_engine = MockOCREngine()
         mock_image_bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
         extracted, domain_order = self.pipeline.process_file_bytes(mock_image_bytes, "mobile_photo.png")
 

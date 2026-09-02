@@ -12,6 +12,9 @@ from preflight.security.rate_limiter import global_rate_limiter
 from preflight.store import AuditStore
 
 
+import uuid
+
+
 class TestLangGraphAgent(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -46,10 +49,9 @@ class TestLangGraphAgent(unittest.TestCase):
         self.store = AuditStore(":memory:")
         self.graph = build_preflight_graph(self.catalog, self.store)
 
-
     def test_clean_order_auto_erp_sync(self):
         """Test clean order flows straight through to ERP without interruption."""
-        thread_id = "test-clean-01"
+        thread_id = f"test-clean-{uuid.uuid4().hex[:8]}"
         config = {"configurable": {"thread_id": thread_id}}
 
         initial_state = {
@@ -75,7 +77,7 @@ class TestLangGraphAgent(unittest.TestCase):
 
     def test_risky_order_hitl_interrupt_and_resume(self):
         """Test risky order interrupts at human_approval, then resumes upon approval."""
-        thread_id = "test-risk-01"
+        thread_id = f"test-risk-{uuid.uuid4().hex[:8]}"
         config = {"configurable": {"thread_id": thread_id}}
 
         # Out of stock item triggers warning

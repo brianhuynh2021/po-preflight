@@ -3,6 +3,7 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
+from preflight.api.errors import ConfigurationError
 from preflight.erp.outbox import (
     OutboxStore,
     PostgresOutboxStore,
@@ -33,8 +34,6 @@ class TestDualBackendDatabase(unittest.TestCase):
 
     def tearDown(self):
         Path(self.sqlite_db).unlink(missing_ok=True)
-        Path("runtime/pg_fallback.db").unlink(missing_ok=True)
-        Path("runtime/pg_fallback_outbox.db").unlink(missing_ok=True)
 
     def test_factory_resolves_sqlite_from_path(self):
         """Test factory creates SQLite AuditStore when given path or sqlite:/// URL."""
@@ -46,24 +45,22 @@ class TestDualBackendDatabase(unittest.TestCase):
         self.assertIsInstance(store2, AuditStore)
         store2.close()
 
-    def test_factory_resolves_postgres_from_url(self):
-        """Test factory creates PostgresAuditStore and PostgresOutboxStore from postgresql:// URL."""
-        pg_url = "postgresql://user:pass@localhost:5432/preflight_db"
-        store = create_audit_store(pg_url)
-        self.assertIsInstance(store, PostgresAuditStore)
-        self.assertEqual(store.database_url, pg_url)
-        self.assertEqual(store.pool_size, 20)
-        self.assertEqual(store.max_overflow, 10)
-        store.close()
+    def test_factory_raises_configuration_error_on_unreachable_postgres(self):
+        """Test that PostgresAuditStore fails closed with ConfigurationError instead of falling back to SQLite."""
+        pg_url = "postgresql://invalid_user:invalid_pass@127.0.0.1:59999/nonexistent_db"
+        with self.assertRaises(ConfigurationError):
+            create_audit_store(pg_url)
 
-        outbox = create_outbox_store(pg_url)
-        self.assertIsInstance(outbox, PostgresOutboxStore)
-        self.assertEqual(outbox.database_url, pg_url)
-        outbox.close()
+        with self.assertRaises(ConfigurationError):
+            create_outbox_store(pg_url)
 
-    def test_postgres_store_interface_and_emulation(self):
-        """Test PostgresAuditStore conforms to BaseAuditStore and performs CRUD operations."""
-        pg_store = PostgresAuditStore("postgresql://test:test@localhost:5432/testdb")
+    def test_postgres_store_live_when_configured(self):
+        """Test PostgresAuditStore live operations only when TEST_DATABASE_URL is provided."""
+        pg_url = os.getenv("TEST_DATABASE_URL")
+        if not pg_url:
+            self.skipTest("TEST_DATABASE_URL not set; skipping live PostgreSQL backend test.")
+
+        pg_store = PostgresAuditStore(pg_url)
         order = Order(
             po_number="PO-PG-TEST-001",
             customer="Enterprise Corp",
@@ -103,9 +100,13 @@ class TestDualBackendDatabase(unittest.TestCase):
 
         pg_store.close()
 
-    def test_postgres_outbox_store_interface_and_emulation(self):
-        """Test PostgresOutboxStore conforms to BaseOutboxStore and manages ERP outbox queue."""
-        outbox = PostgresOutboxStore("postgresql://test:test@localhost:5432/testdb")
+    def test_postgres_outbox_store_live_when_configured(self):
+        """Test PostgresOutboxStore live operations only when TEST_DATABASE_URL is provided."""
+        pg_url = os.getenv("TEST_DATABASE_URL")
+        if not pg_url:
+            self.skipTest("TEST_DATABASE_URL not set; skipping live PostgreSQL outbox test.")
+
+        outbox = PostgresOutboxStore(pg_url)
         payload = outbox.enqueue_order(
             po_number="PO-PG-OUTBOX-1",
             customer="Enterprise Corp",
@@ -129,3 +130,4 @@ class TestDualBackendDatabase(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

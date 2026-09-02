@@ -29,12 +29,16 @@ class TelegramUpdate(BaseModel):
     callback_query: TelegramCallbackQuery | None = Field(None, description="Incoming callback button click")
 
 
+from typing import Any, Literal
+
+
 class BotNotificationResult(BaseModel):
     success: bool = Field(..., description="Whether notification was dispatched successfully")
     channel: str = Field(..., description="Target channel (telegram / zalo)")
     order_id: int | str = Field(..., description="Purchase order identifier")
     message_id: str | None = Field(None, description="Dispatched message ID")
     dry_run: bool = Field(False, description="Whether notification was executed in dry-run mode")
+    mode: Literal["live", "dry_run", "unconfigured"] = Field("live", description="Bot dispatch execution mode")
     details: str = Field(..., description="Status explanation or error message")
 
 

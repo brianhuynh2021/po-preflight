@@ -81,7 +81,7 @@ class TestBotServices(unittest.TestCase):
         self.assertEqual(buttons[1][0]["callback_data"], "request_changes:1")
 
     def test_telegram_bot_service_dry_run(self):
-        bot = TelegramBotService(token=None, chat_id=None)
+        bot = TelegramBotService(token=None, chat_id=None, dry_run=True)
         res = bot.send_order_alert(self.sample_order)
         self.assertTrue(res.success)
         self.assertTrue(res.dry_run)
@@ -141,14 +141,15 @@ class TestBotServices(unittest.TestCase):
             self.assertEqual(data["result"]["decision"], "APPROVED")
 
     def test_api_telegram_notify_order_endpoint(self):
-        response = self.client.post(
-            "/api/v1/bot/telegram/notify/1",
-            headers={"X-API-Key": "pf_dev_mgr_8802"},
-        )
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertTrue(data["success"])
-        self.assertEqual(data["channel"], "telegram")
+        with patch.dict(os.environ, {"TELEGRAM_DRY_RUN": "true"}):
+            response = self.client.post(
+                "/api/v1/bot/telegram/notify/1",
+                headers={"X-API-Key": "pf_dev_mgr_8802"},
+            )
+            self.assertEqual(response.status_code, 200)
+            data = response.json()
+            self.assertTrue(data["success"])
+            self.assertEqual(data["channel"], "telegram")
 
 
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, UploadFile
 
+from preflight.api.errors import ParseError, UpstreamUnavailable, ValidationFailed
 from preflight.ingestion.pipeline import IntelligentIngestionPipeline
 from preflight.ingestion.schemas import ExtractedOrder
 from preflight.security.rbac import Role, UserPrincipal, require_role
@@ -25,19 +25,21 @@ async def extract_purchase_order(
     file: UploadFile = File(..., description="Purchase order document (PDF, PNG, JPG, CSV, JSON)"),
     user: UserPrincipal = Depends(require_role(Role.VIEWER)),
 ) -> ExtractedOrder:
-
     if not file.filename:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No file uploaded.")
+        raise ValidationFailed("Vui lòng chọn tệp để tải lên.")
 
     content = await file.read()
     if not content:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty.")
+        raise ValidationFailed("Tệp tải lên rỗng.")
 
     try:
         extracted, _ = _INGESTION_PIPELINE.process_file_bytes(content, filename=file.filename)
         return extracted
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Extraction failed: {exc}",
+    except UpstreamUnavailable:
+        raise UpstreamUnavailable(
+            "OCR chưa được cấu hình hoặc dịch vụ AI tạm thời không khả dụng. Vui lòng tải lên Excel/CSV hoặc nhập tay tại Staging Studio."
         )
+    except ParseError:
+        raise
+    except Exception as exc:
+        raise ParseError(f"Không thể xử lý tệp '{file.filename}': {exc}")

@@ -25,6 +25,7 @@ from preflight.api.routes import (
     metrics,
     orders,
     rules,
+    system,
 )
 
 from preflight.parsers import parse_order
@@ -180,6 +181,7 @@ app.include_router(bot.router)
 app.include_router(ingestion.router)
 app.include_router(erp.router)
 app.include_router(events.router)
+app.include_router(system.router)
 
 
 from fastapi.exceptions import RequestValidationError

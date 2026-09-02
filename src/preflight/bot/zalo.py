@@ -131,15 +131,28 @@ class ZaloBotService:
         order_id = order.get("id", order.get("po_number", "unknown"))
         payload = format_zalo_notification(order, web_base_url=web_base_url)
 
-        if self.dry_run or not self.access_token:
-            return BotNotificationResult(
-                success=True,
-                channel="zalo",
-                order_id=order_id,
-                message_id="zalo_msg_simulated_9988",
-                dry_run=True,
-                details=f"Zalo interactive alert dispatched for Order #{order_id} (Dry Run).",
-            )
+        if not self.access_token:
+            dry_run_allowed = os.getenv("ZALO_DRY_RUN", "false").lower() in ("true", "1", "yes") or self.dry_run
+            if dry_run_allowed:
+                return BotNotificationResult(
+                    success=True,
+                    channel="zalo",
+                    order_id=order_id,
+                    message_id=None,
+                    dry_run=True,
+                    mode="dry_run",
+                    details=f"Zalo interactive alert dispatched for Order #{order_id} (Dry Run).",
+                )
+            else:
+                return BotNotificationResult(
+                    success=False,
+                    channel="zalo",
+                    order_id=order_id,
+                    message_id=None,
+                    dry_run=False,
+                    mode="unconfigured",
+                    details="Zalo OA chưa cấu hình (Thiếu access_token hoặc ZALO_OA_SECRET).",
+                )
 
         try:
             req_data = json.dumps(payload).encode("utf-8")

@@ -4,9 +4,11 @@ import base64
 import json
 import logging
 import os
+import urllib.request
 from decimal import Decimal
 from typing import Any
 
+from preflight.api.errors import UpstreamUnavailable
 from preflight.ingestion.schemas import (
     DocumentType,
     ExtractedLineItem,
@@ -15,6 +17,7 @@ from preflight.ingestion.schemas import (
     ExtractorEngine,
 )
 from preflight.ingestion.verifier import SelfReflectionVerifier
+from preflight.resilience.circuit_breaker import CircuitBreakerOpenException, vision_ai_circuit_breaker
 
 logger = logging.getLogger("PreflightVisionOCR")
 
@@ -49,7 +52,7 @@ Return ONLY valid, raw JSON. Do not include markdown code block formatting.
 
 
 class GeminiVisionOCREngine:
-    """Gemini 2.0 Flash Multimodal Vision OCR Extractor."""
+    """Gemini 2.0 Flash Multimodal Vision OCR Extractor with Circuit Breaker Protection."""
 
     def __init__(self, api_key: str | None = None, model: str = "gemini-2.0-flash"):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
@@ -60,22 +63,35 @@ class GeminiVisionOCREngine:
     def is_live(self) -> bool:
         return bool(self.api_key)
 
+    @property
+    def is_available(self) -> bool:
+        return bool(self.api_key)
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.api_key)
+
     def extract(self, file_bytes: bytes, filename: str, doc_type: DocumentType) -> ExtractedOrder:
         """Extract structured PO data from image or scanned document bytes."""
         if not self.is_live:
-            # Fallback to intelligent deterministic/heuristic extraction for test/offline mode
-            return self._mock_vision_extraction(file_bytes, filename, doc_type)
+            raise UpstreamUnavailable(
+                "OCR chưa được cấu hình. Vui lòng cấu hình GEMINI_API_KEY hoặc tải lên tệp Excel/CSV/JSON."
+            )
 
         try:
-            return self._call_gemini_api(file_bytes, filename, doc_type)
+            return vision_ai_circuit_breaker.call(
+                self._call_gemini_api, file_bytes, filename, doc_type
+            )
+        except CircuitBreakerOpenException as exc:
+            logger.error(f"Vision OCR Circuit Breaker is OPEN: {exc}")
+            raise UpstreamUnavailable(
+                f"Dịch vụ AI Vision tạm thời bị ngắt kết nối bảo vệ do lỗi quá nhiều lần. Vui lòng thử lại sau {exc.retry_after_sec:.0f} giây."
+            ) from exc
         except Exception as exc:
-            logger.warning(f"Live Gemini Vision API call failed: {exc}. Falling back to dry-run parser.")
-            return self._mock_vision_extraction(file_bytes, filename, doc_type)
+            logger.error(f"Live Gemini Vision API call failed: {exc}")
+            raise UpstreamUnavailable(f"Gọi Gemini Vision OCR thất bại: {exc}") from exc
 
     def _call_gemini_api(self, file_bytes: bytes, filename: str, doc_type: DocumentType) -> ExtractedOrder:
-        import urllib.request
-
-        # Determine MIME type
         mime_type = "application/pdf" if doc_type in [DocumentType.DIGITAL_PDF, DocumentType.SCANNED_PDF] else "image/png"
         b64_data = base64.b64encode(file_bytes).decode("utf-8")
 
@@ -145,50 +161,5 @@ class GeminiVisionOCREngine:
                 extractor_used=ExtractorEngine.GEMINI_FLASH_VISION,
                 document_type=doc_type,
                 math_verification=math_res,
+                mode="live",
             )
-
-    def _mock_vision_extraction(self, file_bytes: bytes, filename: str, doc_type: DocumentType) -> ExtractedOrder:
-        """Heuristic offline extraction for scanned/image POs during testing."""
-        po_code = f"PO-SCAN-{abs(hash(filename)) % 10000:04d}"
-
-        # Sample extracted line items
-        items = [
-            ExtractedLineItem(
-                sku="LAPTOP-A14",
-                description="A14 Business Laptop 16GB RAM",
-                quantity=2,
-                unit_price=Decimal("18500000"),
-                amount=Decimal("37000000"),
-            ),
-            ExtractedLineItem(
-                sku="CAB-CAT6-3M",
-                description="Cat6 Ethernet Cable 3m",
-                quantity=5,
-                unit_price=Decimal("72000"),
-                amount=Decimal("360000"),
-            ),
-        ]
-
-        subtotal = Decimal("37360000")
-        header = ExtractedOrderHeader(
-            po_number=po_code,
-            customer="Northstar Scanned Ingestion",
-            order_date="2026-09-01",
-            currency="VND",
-            subtotal=subtotal,
-            tax_amount=Decimal("0"),
-            grand_total=subtotal,
-            notes="Extracted via Gemini Flash Vision (Dry-run mode)",
-        )
-
-        math_res = self.verifier.verify(header, items)
-
-        return ExtractedOrder(
-            header=header,
-            items=items,
-            raw_text=f"PO {po_code} from Northstar Scanned Ingestion",
-            confidence_score=0.92,
-            extractor_used=ExtractorEngine.GEMINI_FLASH_VISION,
-            document_type=doc_type,
-            math_verification=math_res,
-        )
