@@ -120,9 +120,9 @@ class TestDualBackendDatabase(unittest.TestCase):
         pending = outbox.fetch_pending(limit=5)
         self.assertTrue(any(p.po_number == "PO-PG-OUTBOX-1" for p in pending))
 
-        # Stats
+        # Stats (fetch_pending moved event to PROCESSING status)
         stats = outbox.get_stats()
-        self.assertGreaterEqual(stats.pending_count, 1)
+        self.assertGreaterEqual(stats.processing_count, 1)
 
         outbox.close()
 

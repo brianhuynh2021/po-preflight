@@ -21,6 +21,7 @@ class MockOdooAdapter(BaseERPAdapter):
             transaction_id=odoo_ref,
             adapter_type=ERPAdapterType.MOCK_ODOO,
             idempotency_key=payload.idempotency_key,
+            mode="mock",
             timestamp=time.time(),
             error_message=None,
         )

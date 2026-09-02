@@ -259,7 +259,7 @@ def erp_sync_node(state: PreflightAgentState, catalog: dict[str, Product], store
     status = state.get("status", "approved")
     trail = list(state.get("audit_trail", []))
 
-    if status in ["rejected", "blocked"]:
+    if status in ["rejected", "blocked", "decision_rejected"]:
         trail.append(f"[{time.strftime('%H:%M:%S')}] Order '{po_num}' was rejected/blocked. ERP sync skipped.")
         return {
             "erp_synced": False,
@@ -267,37 +267,66 @@ def erp_sync_node(state: PreflightAgentState, catalog: dict[str, Product], store
             "audit_trail": trail,
         }
 
-    from decimal import Decimal
-    from preflight.erp.outbox import OutboxStore
+    from preflight.erp.outbox import OutboxStore, compute_idempotency_key
+    from preflight.erp.payload import build_erp_payload
+    from preflight.erp.registry import get_adapter
     from preflight.erp.worker import OutboxSyncWorker
-    from preflight.erp.adapters.sap import MockSAPAdapter
+    from preflight.observability.metrics import metrics_registry
 
+    order_obj = state.get("order")
+    analysis_id = state.get("analysis_id")
 
-    # Persist in Outbox and dispatch to ERP Adapter
-    outbox = OutboxStore()
+    if order_obj:
+        draft = build_erp_payload(order_obj, source_analysis_id=analysis_id)
+    else:
+        stored_row = store.get_order_by_po(po_num) if hasattr(store, "get_order_by_po") else None
+        if not stored_row:
+            trail.append(f"[{time.strftime('%H:%M:%S')}] Order '{po_num}' not found for ERP payload.")
+            return {"erp_synced": False, "erp_tx_id": None, "audit_trail": trail}
+        draft = build_erp_payload(stored_row, source_analysis_id=analysis_id)
+
+    idemp_key = compute_idempotency_key(analysis_id, draft.po_number, draft.items)
+
+    outbox_path = getattr(store, "path", "runtime/preflight.db")
+    outbox = OutboxStore(outbox_path)
+    items_dicts = [it.to_dict() for it in draft.items]
     event = outbox.enqueue_order(
-        po_number=po_num,
-        customer=str(state.get("customer", "")),
-        items=state.get("items", []),
-        total_amount=Decimal(str(state.get("total", 0))),
-        currency=str(state.get("currency", "VND")),
+        po_number=draft.po_number,
+        customer=draft.customer,
+        items=items_dicts,
+        total_amount=draft.subtotal,
+        currency=draft.currency,
+        idempotency_key=idemp_key,
+        approved_by=draft.approved_by,
+        approved_at=draft.approved_at,
+        source_analysis_id=analysis_id,
     )
-    worker = OutboxSyncWorker(outbox_store=outbox, adapter=MockSAPAdapter())
+
+    adapter = get_adapter(None)
+    worker = OutboxSyncWorker(outbox_store=outbox, adapter=adapter, metrics_registry=metrics_registry)
     batch_results = worker.process_batch(limit=5)
-    tx_id = f"ERP-TX-{event.idempotency_key[:8].upper()}"
-    if batch_results and batch_results[0].transaction_id:
-        tx_id = batch_results[0].transaction_id
+    matching = next((r for r in batch_results if r.idempotency_key == event.idempotency_key), None)
 
-
-    trail.append(
-        f"[{time.strftime('%H:%M:%S')}] Order '{po_num}' synced to ERP successfully via Outbox. TxID: '{tx_id}', IdempotencyKey: '{event.idempotency_key}'."
-    )
-
-
-    return {
-        "erp_synced": True,
-        "erp_tx_id": tx_id,
-        "idempotency_key": event.idempotency_key,
-        "audit_trail": trail,
-    }
+    if matching and matching.success:
+        tx_id = matching.transaction_id
+        mode = matching.mode
+        trail.append(
+            f"[{time.strftime('%H:%M:%S')}] Order '{po_num}' synced to ERP successfully via Outbox. TxID: '{tx_id}', IdempotencyKey: '{idemp_key}' [mode={mode}]."
+        )
+        return {
+            "erp_synced": True,
+            "erp_tx_id": tx_id,
+            "idempotency_key": idemp_key,
+            "audit_trail": trail,
+        }
+    else:
+        err = matching.error_message if matching else "ERP sync failed or queued"
+        trail.append(f"[{time.strftime('%H:%M:%S')}] ERP sync failure for order '{po_num}': {err}")
+        return {
+            "erp_synced": False,
+            "erp_tx_id": None,
+            "idempotency_key": idemp_key,
+            "error": err,
+            "audit_trail": trail,
+        }
 

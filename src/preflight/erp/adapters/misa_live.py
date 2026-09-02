@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 from typing import Any
 
 from preflight.erp.adapters.base import BaseERPAdapter
+from preflight.erp.exceptions import ERPConfigurationError
 from preflight.erp.schemas import ERPAdapterType, ERPSyncPayload, ERPSyncResponse
+
+logger = logging.getLogger("PreflightMisaAmisLiveAdapter")
 
 
 class MisaAmisLiveAdapter(BaseERPAdapter):
@@ -31,13 +35,18 @@ class MisaAmisLiveAdapter(BaseERPAdapter):
     def sync_order(self, payload: ERPSyncPayload) -> ERPSyncResponse:
         """Create MISA AMIS sales order voucher."""
         if self.dry_run or not self.access_token:
+            if os.getenv("PREFLIGHT_ENV") == "production":
+                raise ERPConfigurationError("MISA credentials missing in production environment.")
+
+            logger.warning(f"MISA live adapter running in dry_run mode for PO '{payload.po_number}'")
             clean_digits = "".join(filter(str.isdigit, payload.po_number)) or "20261001"
-            misa_voucher_no = f"DH-{clean_digits}"
+            misa_voucher_no = f"DRYRUN-DH-{clean_digits}"
             return ERPSyncResponse(
                 success=True,
                 transaction_id=misa_voucher_no,
                 adapter_type=ERPAdapterType.MISA_AMIS_LIVE,
                 idempotency_key=payload.idempotency_key,
+                mode="dry_run",
                 timestamp=time.time(),
                 error_message=None,
             )
@@ -88,6 +97,7 @@ class MisaAmisLiveAdapter(BaseERPAdapter):
                     transaction_id=voucher_no,
                     adapter_type=ERPAdapterType.MISA_AMIS_LIVE,
                     idempotency_key=payload.idempotency_key,
+                    mode="live",
                     timestamp=time.time(),
                     error_message=None,
                 )
@@ -97,6 +107,7 @@ class MisaAmisLiveAdapter(BaseERPAdapter):
                 transaction_id=None,
                 adapter_type=ERPAdapterType.MISA_AMIS_LIVE,
                 idempotency_key=payload.idempotency_key,
+                mode="live",
                 timestamp=time.time(),
                 error_message=str(exc),
             )

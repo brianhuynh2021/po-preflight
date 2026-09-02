@@ -21,6 +21,7 @@ class MockSAPAdapter(BaseERPAdapter):
             transaction_id=sap_doc_num,
             adapter_type=ERPAdapterType.MOCK_SAP,
             idempotency_key=payload.idempotency_key,
+            mode="mock",
             timestamp=time.time(),
             error_message=None,
         )

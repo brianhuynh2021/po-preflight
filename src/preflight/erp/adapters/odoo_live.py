@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import logging
 import os
 import time
 import xmlrpc.client
 from typing import Any
 
 from preflight.erp.adapters.base import BaseERPAdapter
+from preflight.erp.exceptions import ERPConfigurationError
 from preflight.erp.schemas import ERPAdapterType, ERPSyncPayload, ERPSyncResponse
+
+logger = logging.getLogger("PreflightOdooLiveAdapter")
 
 
 class OdooLiveAdapter(BaseERPAdapter):
@@ -30,13 +34,18 @@ class OdooLiveAdapter(BaseERPAdapter):
         """Create Odoo sale.order and order lines with customer partner mapping."""
         # Simulated/Dry-run fallback if no live credentials
         if self.dry_run or not self.password:
+            if os.getenv("PREFLIGHT_ENV") == "production":
+                raise ERPConfigurationError("Odoo credentials missing in production environment.")
+
+            logger.warning(f"Odoo live adapter running in dry_run mode for PO '{payload.po_number}'")
             clean_digits = "".join(filter(str.isdigit, payload.po_number)) or "1001"
-            odoo_id = f"SO/2026/{clean_digits.zfill(4)}"
+            odoo_id = f"DRYRUN-SO/2026/{clean_digits.zfill(4)}"
             return ERPSyncResponse(
                 success=True,
                 transaction_id=odoo_id,
                 adapter_type=ERPAdapterType.ODOO_LIVE,
                 idempotency_key=payload.idempotency_key,
+                mode="dry_run",
                 timestamp=time.time(),
                 error_message=None,
             )
@@ -58,7 +67,6 @@ class OdooLiveAdapter(BaseERPAdapter):
                 "res.partner",
                 "search",
                 [[["name", "=", payload.customer]]],
-                {"limit": 1},
             )
             if partner_ids:
                 partner_id = partner_ids[0]
@@ -72,7 +80,7 @@ class OdooLiveAdapter(BaseERPAdapter):
                     [{"name": payload.customer, "customer_rank": 1}],
                 )
 
-            # 3. Format Sale Order Lines
+            # 3. Prepare Order Lines
             order_lines = []
             for item in payload.items:
                 order_lines.append(
@@ -121,6 +129,7 @@ class OdooLiveAdapter(BaseERPAdapter):
                 transaction_id=so_name,
                 adapter_type=ERPAdapterType.ODOO_LIVE,
                 idempotency_key=payload.idempotency_key,
+                mode="live",
                 timestamp=time.time(),
                 error_message=None,
             )
@@ -130,6 +139,7 @@ class OdooLiveAdapter(BaseERPAdapter):
                 transaction_id=None,
                 adapter_type=ERPAdapterType.ODOO_LIVE,
                 idempotency_key=payload.idempotency_key,
+                mode="live",
                 timestamp=time.time(),
                 error_message=str(exc),
             )

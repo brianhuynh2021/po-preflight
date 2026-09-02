@@ -9,7 +9,7 @@ import time
 import uuid
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from preflight.erp.schemas import (
     ERPAdapterType,
@@ -17,6 +17,35 @@ from preflight.erp.schemas import (
     ERPSyncPayload,
     OutboxStats,
 )
+
+
+def compute_idempotency_key(
+    analysis_id: int | str | None,
+    po_number: str,
+    items: Sequence[dict[str, Any] | Any],
+) -> str:
+    """Compute deterministic SHA256 idempotency key: sha256(analysis_id:po_number:revision_hash)[:24]."""
+    normalized_items = []
+    for it in items:
+        if hasattr(it, "to_dict"):
+            d = it.to_dict()
+        elif isinstance(it, dict):
+            d = {
+                "sku": str(it.get("sku", "")).strip(),
+                "description": str(it.get("description", "")).strip(),
+                "quantity": int(it.get("quantity", 1)),
+                "uom": str(it.get("uom", "PCS")).strip(),
+                "unit_price": str(it.get("unit_price", 0)),
+                "line_total": str(it.get("line_total", 0)),
+            }
+        else:
+            d = {"raw": str(it)}
+        normalized_items.append(d)
+
+    normalized_items.sort(key=lambda x: (x.get("sku", ""), x.get("quantity", 0)))
+    revision_hash = hashlib.sha256(json.dumps(normalized_items, sort_keys=True).encode("utf-8")).hexdigest()
+    src = f"{analysis_id or 0}:{po_number}:{revision_hash}"
+    return hashlib.sha256(src.encode("utf-8")).hexdigest()[:24]
 
 
 SQLITE_OUTBOX_SCHEMA = """
@@ -33,10 +62,12 @@ CREATE TABLE IF NOT EXISTS erp_outbox (
     transaction_id TEXT,
     adapter_type TEXT,
     last_error TEXT,
+    next_attempt_at REAL,
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_erp_outbox_status ON erp_outbox(status);
+CREATE INDEX IF NOT EXISTS idx_erp_outbox_idemp ON erp_outbox(idempotency_key);
 """
 
 POSTGRES_OUTBOX_SCHEMA = """
@@ -53,10 +84,12 @@ CREATE TABLE IF NOT EXISTS erp_outbox (
     transaction_id VARCHAR(128),
     adapter_type VARCHAR(64),
     last_error TEXT,
+    next_attempt_at DOUBLE PRECISION,
     created_at DOUBLE PRECISION NOT NULL,
     updated_at DOUBLE PRECISION NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pg_erp_outbox_status ON erp_outbox(status);
+CREATE INDEX IF NOT EXISTS idx_pg_erp_outbox_idemp ON erp_outbox(idempotency_key);
 """
 
 
@@ -75,6 +108,10 @@ class BaseOutboxStore(abc.ABC):
         items: list[dict[str, Any]],
         total_amount: Decimal,
         currency: str = "VND",
+        idempotency_key: str | None = None,
+        approved_by: str | None = None,
+        approved_at: str | None = None,
+        source_analysis_id: int | None = None,
     ) -> ERPSyncPayload:
         pass
 
@@ -83,11 +120,15 @@ class BaseOutboxStore(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def mark_sent(self, event_id: str, tx_id: str, adapter_type: ERPAdapterType) -> None:
+    def mark_sent(self, event_id: str, tx_id: str, adapter_type: ERPAdapterType | str) -> None:
         pass
 
     @abc.abstractmethod
     def mark_failed(self, event_id: str, error: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def get_by_idempotency_key(self, idempotency_key: str) -> dict[str, Any] | None:
         pass
 
     @abc.abstractmethod
@@ -113,6 +154,12 @@ class OutboxStore(BaseOutboxStore):
     def _init_schema(self) -> None:
         with self.conn:
             self.conn.executescript(SQLITE_OUTBOX_SCHEMA)
+            # Migration check: add next_attempt_at if missing
+            cur = self.conn.cursor()
+            cur.execute("PRAGMA table_info(erp_outbox)")
+            cols = [col[1] for col in cur.fetchall()]
+            if "next_attempt_at" not in cols:
+                cur.execute("ALTER TABLE erp_outbox ADD COLUMN next_attempt_at REAL")
 
     def enqueue_order(
         self,
@@ -121,15 +168,19 @@ class OutboxStore(BaseOutboxStore):
         items: list[dict[str, Any]],
         total_amount: Decimal,
         currency: str = "VND",
+        idempotency_key: str | None = None,
+        approved_by: str | None = None,
+        approved_at: str | None = None,
+        source_analysis_id: int | None = None,
     ) -> ERPSyncPayload:
         """Enqueue an approved purchase order for ERP synchronization."""
-        key_src = f"{po_number}:{customer}:{total_amount}"
-        idemp_key = hashlib.sha256(key_src.encode("utf-8")).hexdigest()[:24]
+        if not idempotency_key:
+            idempotency_key = compute_idempotency_key(source_analysis_id, po_number, items)
 
         cur = self.conn.cursor()
         cur.execute(
             "SELECT event_id, payload_json, status FROM erp_outbox WHERE idempotency_key = ?",
-            (idemp_key,),
+            (idempotency_key,),
         )
         row = cur.fetchone()
         if row:
@@ -147,8 +198,11 @@ class OutboxStore(BaseOutboxStore):
             items=items,
             total_amount=total_amount,
             currency=currency,
-            idempotency_key=idemp_key,
+            idempotency_key=idempotency_key,
             created_at=now,
+            approved_by=approved_by,
+            approved_at=approved_at,
+            source_analysis_id=source_analysis_id,
         )
 
         payload_dict = payload.model_dump()
@@ -160,8 +214,8 @@ class OutboxStore(BaseOutboxStore):
                 INSERT INTO erp_outbox (
                     event_id, po_number, customer, total_amount, currency,
                     idempotency_key, payload_json, status, retry_count,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                    next_attempt_at, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
                 """,
                 (
                     event_id,
@@ -169,7 +223,7 @@ class OutboxStore(BaseOutboxStore):
                     customer,
                     float(total_amount),
                     currency,
-                    idemp_key,
+                    idempotency_key,
                     json.dumps(payload_dict),
                     ERPEventStatus.PENDING.value,
                     now,
@@ -180,27 +234,48 @@ class OutboxStore(BaseOutboxStore):
         return payload
 
     def fetch_pending(self, limit: int = 10) -> list[ERPSyncPayload]:
-        """Fetch pending events ready to be processed by Outbox Sync Worker."""
-        cur = self.conn.cursor()
-        cur.execute(
-            """
-            SELECT payload_json FROM erp_outbox
-            WHERE status = ? OR (status = ? AND retry_count < 3)
-            ORDER BY created_at ASC
-            LIMIT ?
-            """,
-            (ERPEventStatus.PENDING.value, ERPEventStatus.FAILED.value, limit),
-        )
-        results: list[ERPSyncPayload] = []
-        for row in cur.fetchall():
-            data = json.loads(row["payload_json"])
-            data["total_amount"] = Decimal(str(data["total_amount"]))
-            results.append(ERPSyncPayload(**data))
-        return results
+        """Fetch pending events and mark them as PROCESSING atomically."""
+        now = time.time()
+        timeout_threshold = now - 300.0  # 5 minutes processing timeout
 
-    def mark_sent(self, event_id: str, tx_id: str, adapter_type: ERPAdapterType) -> None:
+        with self.conn:
+            cur = self.conn.cursor()
+            cur.execute(
+                """
+                SELECT event_id, payload_json FROM erp_outbox
+                WHERE (status = ? AND (next_attempt_at IS NULL OR next_attempt_at <= ?))
+                   OR (status = ? AND updated_at < ?)
+                ORDER BY created_at ASC
+                LIMIT ?
+                """,
+                (ERPEventStatus.PENDING.value, now, ERPEventStatus.PROCESSING.value, timeout_threshold, limit),
+            )
+            rows = cur.fetchall()
+            if not rows:
+                return []
+
+            event_ids = [row["event_id"] for row in rows]
+            placeholders = ",".join("?" * len(event_ids))
+            cur.execute(
+                f"""
+                UPDATE erp_outbox
+                SET status = ?, updated_at = ?
+                WHERE event_id IN ({placeholders})
+                """,
+                [ERPEventStatus.PROCESSING.value, now, *event_ids],
+            )
+
+            results: list[ERPSyncPayload] = []
+            for row in rows:
+                data = json.loads(row["payload_json"])
+                data["total_amount"] = Decimal(str(data["total_amount"]))
+                results.append(ERPSyncPayload(**data))
+            return results
+
+    def mark_sent(self, event_id: str, tx_id: str, adapter_type: ERPAdapterType | str) -> None:
         """Mark an outbox event as successfully synchronized to ERP."""
         now = time.time()
+        adapter_val = adapter_type.value if hasattr(adapter_type, "value") else str(adapter_type)
         with self.conn:
             self.conn.execute(
                 """
@@ -208,21 +283,57 @@ class OutboxStore(BaseOutboxStore):
                 SET status = ?, transaction_id = ?, adapter_type = ?, last_error = NULL, updated_at = ?
                 WHERE event_id = ?
                 """,
-                (ERPEventStatus.SENT.value, tx_id, adapter_type.value, now, event_id),
+                (ERPEventStatus.SENT.value, tx_id, adapter_val, now, event_id),
             )
 
     def mark_failed(self, event_id: str, error: str) -> None:
-        """Increment retry count and mark outbox event as failed."""
+        """Increment retry count and update status to PENDING with backoff or DEAD_LETTER."""
         now = time.time()
         with self.conn:
-            self.conn.execute(
-                """
-                UPDATE erp_outbox
-                SET status = ?, retry_count = retry_count + 1, last_error = ?, updated_at = ?
-                WHERE event_id = ?
-                """,
-                (ERPEventStatus.FAILED.value, error, now, event_id),
-            )
+            cur = self.conn.cursor()
+            cur.execute("SELECT retry_count FROM erp_outbox WHERE event_id = ?", (event_id,))
+            row = cur.fetchone()
+            current_retry = (row["retry_count"] if row else 0) + 1
+
+            if current_retry >= 3:
+                # Permanent failure -> DEAD_LETTER
+                cur.execute(
+                    """
+                    UPDATE erp_outbox
+                    SET status = ?, retry_count = ?, last_error = ?, updated_at = ?
+                    WHERE event_id = ?
+                    """,
+                    (ERPEventStatus.DEAD_LETTER.value, current_retry, error, now, event_id),
+                )
+            else:
+                # Exponential backoff: 1 min, 5 min, 30 min
+                delays = [60.0, 300.0, 1800.0]
+                delay_sec = delays[min(current_retry - 1, len(delays) - 1)]
+                next_attempt = now + delay_sec
+                cur.execute(
+                    """
+                    UPDATE erp_outbox
+                    SET status = ?, retry_count = ?, next_attempt_at = ?, last_error = ?, updated_at = ?
+                    WHERE event_id = ?
+                    """,
+                    (ERPEventStatus.PENDING.value, current_retry, next_attempt, error, now, event_id),
+                )
+
+    def get_by_idempotency_key(self, idempotency_key: str) -> dict[str, Any] | None:
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            SELECT event_id, po_number, customer, total_amount, currency,
+                   idempotency_key, payload_json, status, retry_count,
+                   transaction_id, adapter_type, last_error, next_attempt_at,
+                   created_at, updated_at
+            FROM erp_outbox
+            WHERE idempotency_key = ?
+            """,
+            (idempotency_key,),
+        )
+        row = cur.fetchone()
+        return dict(row) if row else None
 
     def get_stats(self) -> OutboxStats:
         """Retrieve count statistics of outbox queue."""
@@ -234,6 +345,7 @@ class OutboxStore(BaseOutboxStore):
                 SUM(CASE WHEN status = 'PROCESSING' THEN 1 ELSE 0 END) as processing,
                 SUM(CASE WHEN status = 'SENT' THEN 1 ELSE 0 END) as sent,
                 SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed,
+                SUM(CASE WHEN status = 'DEAD_LETTER' THEN 1 ELSE 0 END) as dead_letter,
                 COUNT(*) as total
             FROM erp_outbox
             """
@@ -247,6 +359,7 @@ class OutboxStore(BaseOutboxStore):
             processing_count=row["processing"] or 0,
             sent_count=row["sent"] or 0,
             failed_count=row["failed"] or 0,
+            dead_letter_count=row["dead_letter"] or 0,
             total_events=row["total"] or 0,
         )
 
@@ -256,8 +369,8 @@ class OutboxStore(BaseOutboxStore):
         cur.execute(
             """
             SELECT event_id, po_number, customer, total_amount, currency,
-                   idempotency_key, status, retry_count, transaction_id,
-                   adapter_type, last_error, created_at, updated_at
+                   idempotency_key, payload_json, status, retry_count, transaction_id,
+                   adapter_type, last_error, next_attempt_at, created_at, updated_at
             FROM erp_outbox
             ORDER BY created_at DESC
             LIMIT ?
@@ -321,16 +434,23 @@ class PostgresOutboxStore(BaseOutboxStore):
         items: list[dict[str, Any]],
         total_amount: Decimal,
         currency: str = "VND",
+        idempotency_key: str | None = None,
+        approved_by: str | None = None,
+        approved_at: str | None = None,
+        source_analysis_id: int | None = None,
     ) -> ERPSyncPayload:
         if self._fallback_sqlite:
-            return self._fallback_sqlite.enqueue_order(po_number, customer, items, total_amount, currency)
-        key_src = f"{po_number}:{customer}:{total_amount}"
-        idemp_key = hashlib.sha256(key_src.encode("utf-8")).hexdigest()[:24]
+            return self._fallback_sqlite.enqueue_order(
+                po_number, customer, items, total_amount, currency, idempotency_key, approved_by, approved_at, source_analysis_id
+            )
+
+        if not idempotency_key:
+            idempotency_key = compute_idempotency_key(source_analysis_id, po_number, items)
 
         conn = self._pool.getconn()
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT payload_json FROM erp_outbox WHERE idempotency_key = %s", (idemp_key,))
+                cur.execute("SELECT payload_json FROM erp_outbox WHERE idempotency_key = %s", (idempotency_key,))
                 row = cur.fetchone()
                 if row:
                     data = json.loads(row[0]) if isinstance(row[0], str) else row[0]
@@ -346,8 +466,11 @@ class PostgresOutboxStore(BaseOutboxStore):
                     items=items,
                     total_amount=total_amount,
                     currency=currency,
-                    idempotency_key=idemp_key,
+                    idempotency_key=idempotency_key,
                     created_at=now,
+                    approved_by=approved_by,
+                    approved_at=approved_at,
+                    source_analysis_id=source_analysis_id,
                 )
                 payload_dict = payload.model_dump()
                 payload_dict["total_amount"] = float(total_amount)
@@ -357,12 +480,12 @@ class PostgresOutboxStore(BaseOutboxStore):
                     INSERT INTO erp_outbox (
                         event_id, po_number, customer, total_amount, currency,
                         idempotency_key, payload_json, status, retry_count,
-                        created_at, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0, %s, %s)
+                        next_attempt_at, created_at, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0, NULL, %s, %s)
                     """,
                     (
                         event_id, po_number, customer, float(total_amount), currency,
-                        idemp_key, json.dumps(payload_dict), ERPEventStatus.PENDING.value, now, now,
+                        idempotency_key, json.dumps(payload_dict), ERPEventStatus.PENDING.value, now, now,
                     ),
                 )
             conn.commit()
@@ -374,31 +497,51 @@ class PostgresOutboxStore(BaseOutboxStore):
         if self._fallback_sqlite:
             return self._fallback_sqlite.fetch_pending(limit)
         conn = self._pool.getconn()
+        now = time.time()
+        timeout_threshold = now - 300.0
         try:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT payload_json FROM erp_outbox
-                    WHERE status = %s OR (status = %s AND retry_count < 3)
+                    SELECT event_id, payload_json FROM erp_outbox
+                    WHERE (status = %s AND (next_attempt_at IS NULL OR next_attempt_at <= %s))
+                       OR (status = %s AND updated_at < %s)
                     ORDER BY created_at ASC
                     LIMIT %s
+                    FOR UPDATE SKIP LOCKED
                     """,
-                    (ERPEventStatus.PENDING.value, ERPEventStatus.FAILED.value, limit),
+                    (ERPEventStatus.PENDING.value, now, ERPEventStatus.PROCESSING.value, timeout_threshold, limit),
                 )
+                rows = cur.fetchall()
+                if not rows:
+                    return []
+
+                event_ids = [row[0] for row in rows]
+                cur.execute(
+                    """
+                    UPDATE erp_outbox
+                    SET status = %s, updated_at = %s
+                    WHERE event_id = ANY(%s)
+                    """,
+                    (ERPEventStatus.PROCESSING.value, now, event_ids),
+                )
+
                 results: list[ERPSyncPayload] = []
-                for row in cur.fetchall():
-                    data = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                for row in rows:
+                    data = json.loads(row[1]) if isinstance(row[1], str) else row[1]
                     data["total_amount"] = Decimal(str(data["total_amount"]))
                     results.append(ERPSyncPayload(**data))
-                return results
+            conn.commit()
+            return results
         finally:
             self._pool.putconn(conn)
 
-    def mark_sent(self, event_id: str, tx_id: str, adapter_type: ERPAdapterType) -> None:
+    def mark_sent(self, event_id: str, tx_id: str, adapter_type: ERPAdapterType | str) -> None:
         if self._fallback_sqlite:
             self._fallback_sqlite.mark_sent(event_id, tx_id, adapter_type)
             return
         conn = self._pool.getconn()
+        adapter_val = adapter_type.value if hasattr(adapter_type, "value") else str(adapter_type)
         try:
             with conn.cursor() as cur:
                 cur.execute(
@@ -407,7 +550,7 @@ class PostgresOutboxStore(BaseOutboxStore):
                     SET status = %s, transaction_id = %s, adapter_type = %s, last_error = NULL, updated_at = %s
                     WHERE event_id = %s
                     """,
-                    (ERPEventStatus.SENT.value, tx_id, adapter_type.value, time.time(), event_id),
+                    (ERPEventStatus.SENT.value, tx_id, adapter_val, time.time(), event_id),
                 )
             conn.commit()
         finally:
@@ -418,17 +561,59 @@ class PostgresOutboxStore(BaseOutboxStore):
             self._fallback_sqlite.mark_failed(event_id, error)
             return
         conn = self._pool.getconn()
+        now = time.time()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT retry_count FROM erp_outbox WHERE event_id = %s", (event_id,))
+                row = cur.fetchone()
+                current_retry = (row[0] if row else 0) + 1
+                if current_retry >= 3:
+                    cur.execute(
+                        """
+                        UPDATE erp_outbox
+                        SET status = %s, retry_count = %s, last_error = %s, updated_at = %s
+                        WHERE event_id = %s
+                        """,
+                        (ERPEventStatus.DEAD_LETTER.value, current_retry, error, now, event_id),
+                    )
+                else:
+                    delays = [60.0, 300.0, 1800.0]
+                    delay_sec = delays[min(current_retry - 1, len(delays) - 1)]
+                    next_attempt = now + delay_sec
+                    cur.execute(
+                        """
+                        UPDATE erp_outbox
+                        SET status = %s, retry_count = %s, next_attempt_at = %s, last_error = %s, updated_at = %s
+                        WHERE event_id = %s
+                        """,
+                        (ERPEventStatus.PENDING.value, current_retry, next_attempt, error, now, event_id),
+                    )
+            conn.commit()
+        finally:
+            self._pool.putconn(conn)
+
+    def get_by_idempotency_key(self, idempotency_key: str) -> dict[str, Any] | None:
+        if self._fallback_sqlite:
+            return self._fallback_sqlite.get_by_idempotency_key(idempotency_key)
+        conn = self._pool.getconn()
         try:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    UPDATE erp_outbox
-                    SET status = %s, retry_count = retry_count + 1, last_error = %s, updated_at = %s
-                    WHERE event_id = %s
+                    SELECT event_id, po_number, customer, total_amount, currency,
+                           idempotency_key, payload_json, status, retry_count,
+                           transaction_id, adapter_type, last_error, next_attempt_at,
+                           created_at, updated_at
+                    FROM erp_outbox
+                    WHERE idempotency_key = %s
                     """,
-                    (ERPEventStatus.FAILED.value, error, time.time(), event_id),
+                    (idempotency_key,),
                 )
-            conn.commit()
+                row = cur.fetchone()
+                if not row:
+                    return None
+                cols = [desc[0] for desc in cur.description]
+                return dict(zip(cols, row))
         finally:
             self._pool.putconn(conn)
 
@@ -445,19 +630,21 @@ class PostgresOutboxStore(BaseOutboxStore):
                         SUM(CASE WHEN status = 'PROCESSING' THEN 1 ELSE 0 END) as processing,
                         SUM(CASE WHEN status = 'SENT' THEN 1 ELSE 0 END) as sent,
                         SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed,
+                        SUM(CASE WHEN status = 'DEAD_LETTER' THEN 1 ELSE 0 END) as dead_letter,
                         COUNT(*) as total
                     FROM erp_outbox
                     """
                 )
                 row = cur.fetchone()
-                if not row or row[4] == 0:
+                if not row or row[5] == 0:
                     return OutboxStats()
                 return OutboxStats(
                     pending_count=row[0] or 0,
                     processing_count=row[1] or 0,
                     sent_count=row[2] or 0,
                     failed_count=row[3] or 0,
-                    total_events=row[4] or 0,
+                    dead_letter_count=row[4] or 0,
+                    total_events=row[5] or 0,
                 )
         finally:
             self._pool.putconn(conn)
@@ -471,8 +658,8 @@ class PostgresOutboxStore(BaseOutboxStore):
                 cur.execute(
                     """
                     SELECT event_id, po_number, customer, total_amount, currency,
-                           idempotency_key, status, retry_count, transaction_id,
-                           adapter_type, last_error, created_at, updated_at
+                           idempotency_key, payload_json, status, retry_count, transaction_id,
+                           adapter_type, last_error, next_attempt_at, created_at, updated_at
                     FROM erp_outbox
                     ORDER BY created_at DESC
                     LIMIT %s

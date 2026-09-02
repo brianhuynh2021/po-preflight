@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
-from typing import Any
-import urllib.request
 import urllib.error
+import urllib.request
+from typing import Any
 
 from preflight.erp.adapters.base import BaseERPAdapter
+from preflight.erp.exceptions import ERPConfigurationError
 from preflight.erp.schemas import ERPAdapterType, ERPSyncPayload, ERPSyncResponse
+
+logger = logging.getLogger("PreflightSAPLiveAdapter")
 
 
 class SAPLiveAdapter(BaseERPAdapter):
@@ -36,13 +40,18 @@ class SAPLiveAdapter(BaseERPAdapter):
         """Post standard SalesOrder entity to SAP S/4HANA OData service."""
         # Simulated/Dry-run fallback
         if self.dry_run or not self.auth_token:
+            if os.getenv("PREFLIGHT_ENV") == "production":
+                raise ERPConfigurationError("SAP credentials missing in production environment.")
+
+            logger.warning(f"SAP live adapter running in dry_run mode for PO '{payload.po_number}'")
             clean_digits = "".join(filter(str.isdigit, payload.po_number)) or "20268899"
-            sap_id = f"SAP-SO-{clean_digits}"
+            sap_id = f"DRYRUN-SAP-SO-{clean_digits}"
             return ERPSyncResponse(
                 success=True,
                 transaction_id=sap_id,
                 adapter_type=ERPAdapterType.SAP_ODATA_LIVE,
                 idempotency_key=payload.idempotency_key,
+                mode="dry_run",
                 timestamp=time.time(),
                 error_message=None,
             )
@@ -92,6 +101,7 @@ class SAPLiveAdapter(BaseERPAdapter):
                     transaction_id=sap_order_id,
                     adapter_type=ERPAdapterType.SAP_ODATA_LIVE,
                     idempotency_key=payload.idempotency_key,
+                    mode="live",
                     timestamp=time.time(),
                     error_message=None,
                 )
@@ -101,6 +111,7 @@ class SAPLiveAdapter(BaseERPAdapter):
                 transaction_id=None,
                 adapter_type=ERPAdapterType.SAP_ODATA_LIVE,
                 idempotency_key=payload.idempotency_key,
+                mode="live",
                 timestamp=time.time(),
                 error_message=str(exc),
             )
