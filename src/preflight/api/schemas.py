@@ -210,6 +210,11 @@ class CatalogItemResponse(BaseModel):
     unit_price: Decimal = Field(..., description="Standard catalog unit price")
     stock: int = Field(..., description="Available warehouse stock")
     active: bool = Field(True, description="Whether product is active")
+    base_uom: str = Field("PCS", description="Base unit of measure")
+    moq: int = Field(1, description="Minimum order quantity")
+    pack_size: int = Field(1, description="Standard packaging pack size")
+    category: str | None = Field(None, description="Product category")
+    barcode: str | None = Field(None, description="Product barcode")
 
 
 class RuleConfigResponse(BaseModel):

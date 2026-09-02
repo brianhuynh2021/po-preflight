@@ -88,6 +88,7 @@ def parse_csv(path: Path) -> Order:
                     "sku": row.get("sku"),
                     "quantity": row.get("quantity"),
                     "unit_price": row.get("unit_price"),
+                    "uom": row.get("uom", "PCS"),
                 }
                 for row in rows
             ],
@@ -111,11 +112,19 @@ def parse_text(text: str) -> Order:
         if "|" not in line:
             continue
         parts = [part.strip() for part in line.split("|")]
-        if len(parts) != 3 or parts[0].upper() == "SKU":
+        if not parts or parts[0].upper() == "SKU":
             continue
-        items.append(
-            {"sku": parts[0], "quantity": parts[1], "unit_price": parts[2]}
-        )
+
+        if len(parts) == 3:
+            # Format: SKU | QTY | UNIT_PRICE
+            items.append(
+                {"sku": parts[0], "quantity": parts[1], "unit_price": parts[2], "uom": "PCS"}
+            )
+        elif len(parts) >= 4:
+            # Format: SKU | QTY | UOM | UNIT_PRICE
+            items.append(
+                {"sku": parts[0], "quantity": parts[1], "uom": parts[2], "unit_price": parts[3]}
+            )
 
     return _order_from_mapping(
         {
@@ -186,6 +195,7 @@ def parse_order_content(content: str, suffix: str = ".json") -> Order:
                         "sku": row.get("sku"),
                         "quantity": row.get("quantity"),
                         "unit_price": row.get("unit_price"),
+                        "uom": row.get("uom", "PCS"),
                     }
                     for row in rows
                 ],

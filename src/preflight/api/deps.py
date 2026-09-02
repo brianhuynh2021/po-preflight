@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import os
 import time
 from pathlib import Path
 from typing import Generator
@@ -15,6 +14,9 @@ SERVER_START_TIME = time.time()
 
 
 def get_catalog_path() -> Path:
+    env_path = os.getenv("CATALOG_PATH")
+    if env_path:
+        return Path(env_path)
     return DEFAULT_CATALOG_PATH
 
 

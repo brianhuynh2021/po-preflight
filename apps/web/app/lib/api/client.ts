@@ -333,6 +333,23 @@ export function createApiClient(config: ClientConfig = {}) {
 
   const catalog = {
     list: () => request<CatalogItem[]>("/api/v1/catalog"),
+    importCSV: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const url = `${baseUrl}/api/v1/catalog/import`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          ...config.headers,
+        },
+        body: formData,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new ApiError(res.status, res.statusText, data);
+      }
+      return data as { success: boolean; message: string; total_skus: number };
+    },
   };
 
   const rules = {

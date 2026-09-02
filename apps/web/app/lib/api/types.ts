@@ -127,9 +127,14 @@ export interface DashboardStats {
 export interface CatalogItem {
   sku: string;
   name: string;
-  unit_price: number;
+  unit_price: number | string;
   stock: number;
   active: boolean;
+  base_uom?: string;
+  moq?: number;
+  pack_size?: number;
+  category?: string | null;
+  barcode?: string | null;
 }
 
 export interface RuleConfig {

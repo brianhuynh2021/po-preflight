@@ -55,6 +55,22 @@ class Product:
     base_uom: str = "PCS"
     moq: int = 1
     pack_size: int = 1
+    category: str | None = None
+    barcode: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sku": self.sku,
+            "name": self.name,
+            "unit_price": str(self.unit_price),
+            "stock": self.stock,
+            "active": self.active,
+            "base_uom": self.base_uom,
+            "moq": self.moq,
+            "pack_size": self.pack_size,
+            "category": self.category,
+            "barcode": self.barcode,
+        }
 
 
 @dataclass(frozen=True)

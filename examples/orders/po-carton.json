@@ -1,0 +1,13 @@
+{
+  "po_number": "PO-2026-CARTON-01",
+  "customer": "Vingroup Retail Infrastructure",
+  "currency": "VND",
+  "items": [
+    {
+      "sku": "CAB-CAT6-3M",
+      "quantity": 10,
+      "unit_price": 720000,
+      "uom": "CARTON"
+    }
+  ]
+}

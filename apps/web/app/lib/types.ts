@@ -33,7 +33,8 @@ export type FindingCode =
   | "INSUFFICIENT_STOCK"
   | "UNKNOWN_SKU"
   | "INACTIVE_SKU"
-  | "DUPLICATE_PO";
+  | "DUPLICATE_PO"
+  | "UOM_CONVERSION_MISSING";
 
 export type FindingSeverity = "Warning" | "Error";
 
@@ -44,6 +45,7 @@ export const SEVERITY_BY_CODE: Record<FindingCode, FindingSeverity> = {
   UNKNOWN_SKU: "Error",
   INACTIVE_SKU: "Error",
   DUPLICATE_PO: "Error",
+  UOM_CONVERSION_MISSING: "Warning",
 };
 
 export const FINDING_TITLE: Record<FindingCode, string> = {
@@ -52,6 +54,7 @@ export const FINDING_TITLE: Record<FindingCode, string> = {
   UNKNOWN_SKU: "Mã SKU không tồn tại",
   INACTIVE_SKU: "Sản phẩm đã ngừng kinh doanh",
   DUPLICATE_PO: "Trùng lặp mã đơn hàng",
+  UOM_CONVERSION_MISSING: "Thiếu cấu hình quy đổi đơn vị (UOM)",
 };
 
 export interface Finding {
@@ -121,6 +124,11 @@ export interface Product {
   unitPrice: number;
   stock: number;
   active: boolean;
+  baseUom?: string;
+  moq?: number;
+  packSize?: number;
+  category?: string | null;
+  barcode?: string | null;
 }
 
 // ------------------------------------------------------------- prototype UI

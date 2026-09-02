@@ -201,7 +201,20 @@ def analyze_order(
         
         conversion_factor = Decimal("1.0")
         if declared_uom != base_uom:
-            conversion_factor = uom_map.get((item.sku.upper(), declared_uom), Decimal("1.0"))
+            if (item.sku.upper(), declared_uom) in uom_map:
+                conversion_factor = uom_map[(item.sku.upper(), declared_uom)]
+            else:
+                findings.append(
+                    Finding(
+                        code="UOM_CONVERSION_MISSING",
+                        severity="warning",
+                        sku=item.sku,
+                        message=(
+                            f"SKU {item.sku}: ordered in '{declared_uom}' but catalog base UOM is '{base_uom}', "
+                            f"and no conversion factor is configured."
+                        ),
+                    )
+                )
 
         base_quantity = Decimal(str(item.quantity)) * conversion_factor
         moq = getattr(product, "moq", 1)

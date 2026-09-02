@@ -209,6 +209,7 @@ export function findingsByCode(
     UNKNOWN_SKU: 0,
     INACTIVE_SKU: 0,
     DUPLICATE_PO: 0,
+    UOM_CONVERSION_MISSING: 0,
   };
   for (const o of orders) for (const f of o.findings) acc[f.code]++;
   return acc;
