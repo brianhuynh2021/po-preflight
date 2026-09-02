@@ -43,14 +43,17 @@ class TestCompleteIntegrationSuite(unittest.TestCase):
         global_rate_limiter.reset()
         self.tmp_dir = TemporaryDirectory()
         self.db_path = Path(self.tmp_dir.name) / "test_integration.db"
+        import os
+        os.environ["DATABASE_URL"] = f"sqlite:///{self.db_path}"
         self.store = AuditStore(self.db_path)
         self.outbox = OutboxStore(self.db_path)
 
 
     def tearDown(self):
         self.store.close()
-        self.outbox.close()
         self.tmp_dir.cleanup()
+        import os
+        os.environ.pop("DATABASE_URL", None)
 
     def test_full_lifecycle_clean_order(self):
         """Test full happy-path lifecycle: Clean PO -> Ready -> Approval -> ERP Sync."""

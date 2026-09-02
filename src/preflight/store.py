@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS channel_identities (
     created_at TEXT NOT NULL,
     PRIMARY KEY(channel, external_id)
 );
-CREATE TABLE IF NOT EXISTS customer_aliases (
+CREATE TABLE IF NOT EXISTS sku_alias_learning (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     customer_id TEXT NOT NULL,
     raw_query TEXT NOT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS customer_aliases (
     created_at TEXT NOT NULL,
     UNIQUE(customer_id, raw_query)
 );
-CREATE INDEX IF NOT EXISTS idx_customer_aliases ON customer_aliases(customer_id, raw_query);
+CREATE INDEX IF NOT EXISTS idx_sku_alias_learning ON sku_alias_learning(customer_id, raw_query);
 
 CREATE TABLE IF NOT EXISTS audit_blocks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS channel_identities (
 );
 
 
-CREATE TABLE IF NOT EXISTS customer_aliases (
+CREATE TABLE IF NOT EXISTS sku_alias_learning (
     id SERIAL PRIMARY KEY,
     customer_id VARCHAR(255) NOT NULL,
     raw_query VARCHAR(512) NOT NULL,
@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS customer_aliases (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(customer_id, raw_query)
 );
-CREATE INDEX IF NOT EXISTS idx_pg_customer_aliases ON customer_aliases(customer_id, raw_query);
+CREATE INDEX IF NOT EXISTS idx_pg_sku_alias_learning ON sku_alias_learning(customer_id, raw_query);
 
 CREATE TABLE IF NOT EXISTS audit_blocks (
     id SERIAL PRIMARY KEY,
@@ -754,7 +754,7 @@ class AuditStore(BaseAuditStore):
         with self._lock:
             self.connection.execute(
                 """
-                INSERT INTO customer_aliases (customer_id, raw_query, target_sku, confidence, created_at)
+                INSERT INTO sku_alias_learning (customer_id, raw_query, target_sku, confidence, created_at)
                 VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(customer_id, raw_query) DO UPDATE SET
                     target_sku = excluded.target_sku,
@@ -771,7 +771,7 @@ class AuditStore(BaseAuditStore):
         with self._lock:
             row = self.connection.execute(
                 """
-                SELECT target_sku FROM customer_aliases
+                SELECT target_sku FROM sku_alias_learning
                 WHERE customer_id = ? AND raw_query = ?
                 LIMIT 1
                 """,
@@ -784,12 +784,12 @@ class AuditStore(BaseAuditStore):
         with self._lock:
             if customer_id:
                 rows = self.connection.execute(
-                    "SELECT * FROM customer_aliases WHERE customer_id = ? ORDER BY id DESC",
+                    "SELECT * FROM sku_alias_learning WHERE customer_id = ? ORDER BY id DESC",
                     (customer_id.strip(),),
                 ).fetchall()
             else:
                 rows = self.connection.execute(
-                    "SELECT * FROM customer_aliases ORDER BY id DESC"
+                    "SELECT * FROM sku_alias_learning ORDER BY id DESC"
                 ).fetchall()
             return [dict(r) for r in rows]
 
@@ -1367,7 +1367,7 @@ class PostgresAuditStore(BaseAuditStore):
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO customer_aliases (customer_id, raw_query, target_sku, confidence, created_at)
+                    INSERT INTO sku_alias_learning (customer_id, raw_query, target_sku, confidence, created_at)
                     VALUES (%s, %s, %s, %s, %s)
                     ON CONFLICT(customer_id, raw_query) DO UPDATE SET
                         target_sku = EXCLUDED.target_sku,
@@ -1382,7 +1382,7 @@ class PostgresAuditStore(BaseAuditStore):
         with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT target_sku FROM customer_aliases WHERE customer_id = %s AND raw_query = %s LIMIT 1",
+                    "SELECT target_sku FROM sku_alias_learning WHERE customer_id = %s AND raw_query = %s LIMIT 1",
                     (customer_id.strip(), raw_query.strip().lower()),
                 )
                 row = cur.fetchone()
@@ -1392,9 +1392,9 @@ class PostgresAuditStore(BaseAuditStore):
         with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 if customer_id:
-                    cur.execute("SELECT * FROM customer_aliases WHERE customer_id = %s ORDER BY id DESC", (customer_id.strip(),))
+                    cur.execute("SELECT * FROM sku_alias_learning WHERE customer_id = %s ORDER BY id DESC", (customer_id.strip(),))
                 else:
-                    cur.execute("SELECT * FROM customer_aliases ORDER BY id DESC")
+                    cur.execute("SELECT * FROM sku_alias_learning ORDER BY id DESC")
                 return [dict(r) for r in cur.fetchall()]
 
     def append_audit_block(

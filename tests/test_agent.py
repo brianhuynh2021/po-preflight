@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 from decimal import Decimal
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from starlette.testclient import TestClient
 
@@ -41,8 +43,17 @@ class TestLangGraphAgent(unittest.TestCase):
                 active=True,
             ),
         }
+        cls._tmp_dir = TemporaryDirectory()
+        cls._db_path = Path(cls._tmp_dir.name) / "test_agent.db"
+        import os
+        os.environ["DATABASE_URL"] = f"sqlite:///{cls._db_path}"
         cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
 
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp_dir.cleanup()
+        import os
+        os.environ.pop("DATABASE_URL", None)
 
     def setUp(self):
         global_rate_limiter.reset()

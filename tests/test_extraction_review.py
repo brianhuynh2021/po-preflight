@@ -7,6 +7,10 @@ from decimal import Decimal
 
 from starlette.testclient import TestClient
 
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import os
+
 from preflight.api.app import app
 from preflight.security.rate_limiter import global_rate_limiter
 
@@ -14,7 +18,15 @@ from preflight.security.rate_limiter import global_rate_limiter
 class TestExtractionReview(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls._tmp_dir = TemporaryDirectory()
+        cls._db_path = Path(cls._tmp_dir.name) / "test_extract.db"
+        os.environ["DATABASE_URL"] = f"sqlite:///{cls._db_path}"
         cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp_dir.cleanup()
+        os.environ.pop("DATABASE_URL", None)
 
     def setUp(self):
         global_rate_limiter.reset()

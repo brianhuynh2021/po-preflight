@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 import uuid
 from pathlib import Path
@@ -18,7 +19,15 @@ from preflight.store import AuditStore
 class TestFastAPIGateway(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls._tmp_dir = TemporaryDirectory()
+        cls._db_path = Path(cls._tmp_dir.name) / "test_api.db"
+        os.environ["DATABASE_URL"] = f"sqlite:///{cls._db_path}"
         cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp_dir.cleanup()
+        os.environ.pop("DATABASE_URL", None)
 
     def setUp(self):
         global_rate_limiter.reset()

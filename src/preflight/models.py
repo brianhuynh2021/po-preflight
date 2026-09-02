@@ -35,6 +35,10 @@ class Order:
             start=Decimal("0"),
         )
 
+    @property
+    def subtotal(self) -> Decimal:
+        return self.total
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "po_number": self.po_number,
@@ -136,16 +140,19 @@ class CustomerCreditProfile:
         }
 
 
-
 @dataclass(frozen=True)
 class Finding:
     code: str
     severity: str
     message: str
     sku: str | None = None
+    evidence: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+OrderFinding = Finding
 
 
 @dataclass
@@ -174,6 +181,9 @@ class Analysis:
         }
 
 
+OrderAnalysis = Analysis
+
+
 @dataclass(frozen=True)
 class RulePolicy:
     price_tolerance_percent: Decimal = Decimal("0")
@@ -197,4 +207,3 @@ class RulePolicy:
             allow_inactive_sku=bool(data.get("allow_inactive_sku", False)),
             auto_approve_ready=bool(data.get("auto_approve_ready", False)),
         )
-
