@@ -1,6 +1,26 @@
 version: "3.8"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: po-preflight-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: preflight
+      POSTGRES_USER: preflight_user
+      POSTGRES_PASSWORD: preflight_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U preflight_user -d preflight"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - postgres
+
   backend:
     build:
       context: .
@@ -13,19 +33,19 @@ services:
       - PORT=8001
       - PREFLIGHT_ENV=development
       - PREFLIGHT_AUTH_REQUIRED=true
+      - PREFLIGHT_SESSION_SECRET=dev-secret-key-change-in-production
       - PREFLIGHT_ADMIN_KEY=pf_dev_adm_9901
       - PREFLIGHT_MANAGER_KEY=pf_dev_mgr_8802
       - PREFLIGHT_AUDITOR_KEY=pf_dev_aud_7703
       - PREFLIGHT_VIEWER_KEY=pf_dev_view_6604
-      - PREFLIGHT_DB_PATH=/app/runtime/data/preflight.db
+      - DATABASE_URL=sqlite:///runtime/data/preflight.db
       - TELEGRAM_DRY_RUN=true
       - ZALO_DRY_RUN=true
-
     volumes:
       - ./runtime/data:/app/runtime/data
       - ./runtime/uploads:/app/runtime/uploads
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health/live', timeout=3)"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health/ready', timeout=3)"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -40,7 +60,9 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8001
+      - NEXT_PUBLIC_API_URL=http://backend:8001
     depends_on:
       - backend
 
+volumes:
+  pgdata:

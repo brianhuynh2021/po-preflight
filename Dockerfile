@@ -1,10 +1,10 @@
 # ============================================================================
 # Multi-Stage Production Dockerfile for PO Preflight AI Gateway
-# Security: Minimal Debian base, non-root user 'preflight', layer caching
+# Security: Minimal Debian base (Python 3.12-slim), non-root user 'preflight'
 # ============================================================================
 
 # Stage 1: Build & Dependencies
-FROM python:3.11-slim AS builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
@@ -19,14 +19,14 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 COPY pyproject.toml .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir .
+    pip install --no-cache-dir ".[pdf,excel]"
 
 # ----------------------------------------------------------------------------
 # Stage 2: Production Runtime
 # ----------------------------------------------------------------------------
-FROM python:3.11-slim AS runtime
+FROM python:3.12-slim AS runtime
 
-LABEL maintainer="PO Preflight Engineering Team <engineering@po-preflight.ai>"
+LABEL maintainer="Nhật Minh Technology <contact@popreflight.vn>"
 LABEL description="AI-Native Purchase Order Intake, Preflight Rules & ERP Gateway"
 
 WORKDIR /app
@@ -51,9 +51,9 @@ COPY --chown=preflight:preflight examples/ /app/examples/
 # Switch to non-root user
 USER preflight
 
-# Container Healthcheck Probe
+# Container Healthcheck Probe (readiness endpoint)
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/health/live', timeout=3)" || exit 1
+    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/health/ready', timeout=3)" || exit 1
 
 EXPOSE 8001
 

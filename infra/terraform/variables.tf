@@ -19,9 +19,17 @@ variable "instance_type" {
 variable "key_name" {
   description = "Existing EC2 key pair name"
   type        = string
+  default     = "po-preflight-key"
 }
 
 variable "admin_cidr" {
-  description = "CIDR allowed to use SSH, for example 203.0.113.10/32"
+  description = "CIDR allowed to use SSH and Web, for example 0.0.0.0/0 or specific IP"
   type        = string
+  default     = "0.0.0.0/0"
+}
+
+variable "enable_rds" {
+  description = "Flag to optionally provision managed RDS PostgreSQL database"
+  type        = bool
+  default     = false
 }

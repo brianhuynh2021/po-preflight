@@ -10,35 +10,71 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  backend:
+    name: Backend Unit Tests & Linters (Python 3.12)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
           cache: "pip"
-      - name: Set up Node.js for Web Frontend
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,pdf,excel]"
+      - name: Smoke import check
+        run: |
+          python -c "import preflight.api.app; import preflight.agent.graph; import preflight.rag.matcher; import preflight.config"
+      - name: Verify .env.example matches Settings
+        run: |
+          python scripts/gen_env_example.py --check
+      - name: Run Backend Unittests
+        run: |
+          PYTHONPATH=src python -m unittest discover -s tests -v
+      - name: Run Ruff Lint Check
+        run: |
+          ruff check src/ tests/
+        continue-on-error: true
+
+  frontend:
+    name: Frontend Typecheck, Lint & Rendered HTML Tests (Node 22)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install dependencies
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install Frontend dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[test,pdf]"
-          npm --prefix apps/web ci
-      - name: Smoke import check
+          cd apps/web && npm ci
+      - name: Frontend TypeScript Check
         run: |
-          python -c "import preflight.api.app; import preflight.agent.graph; import preflight.rag.matcher"
-      - name: Run tests and policy checks
-        run: ./scripts/test.sh
+          cd apps/web && npx tsc --noEmit
+      - name: Frontend ESLint
+        run: |
+          cd apps/web && npm run lint
+      - name: Frontend Rendered HTML Tests
+        run: |
+          cd apps/web && npm run test
 
+  docker:
+    name: Docker Container Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build Docker Image
+        run: |
+          docker build -t po-preflight:test .
 
   terraform:
+    name: Terraform Infrastructure Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

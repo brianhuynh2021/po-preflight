@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import os
-from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from preflight.api.deps import get_audit_store
+from preflight.config import get_settings
 from preflight.erp.registry import get_adapter
 from preflight.security.rbac import Role, UserPrincipal, require_role
-from preflight.store import AuditStore, PostgresAuditStore
+from preflight.store import PostgresAuditStore
 
 router = APIRouter(prefix="/api/v1/system", tags=["System Configuration & Modes"])
 
@@ -33,21 +33,24 @@ class SystemModesResponse(BaseModel):
 )
 def get_system_modes(
     user: UserPrincipal = Depends(require_role(Role.VIEWER)),
-    store: AuditStore = Depends(get_audit_store),
+    store=Depends(get_audit_store),
 ) -> SystemModesResponse:
-    env = os.getenv("PREFLIGHT_ENV", "development").strip().lower()
-    auth_req = os.getenv("PREFLIGHT_AUTH_REQUIRED", "true").lower() in ("true", "1", "yes")
+    cfg = get_settings()
+
+    # Dynamic env check (supporting monkeypatching in unit tests)
+    env = os.getenv("PREFLIGHT_ENV", cfg.env).strip().lower()
+    auth_req = os.getenv("PREFLIGHT_AUTH_REQUIRED", str(cfg.auth_required)).lower() in ("true", "1", "yes")
 
     # DB mode
     db_mode = "postgresql" if isinstance(store, PostgresAuditStore) else "sqlite"
 
     # OCR mode
-    gemini_key = os.getenv("GEMINI_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY", cfg.gemini_api_key or "")
     ocr_mode = "live" if gemini_key else "unavailable"
 
     # Telegram mode
-    tele_token = os.getenv("TELEGRAM_BOT_TOKEN")
-    tele_dry = os.getenv("TELEGRAM_DRY_RUN", "false").lower() in ("true", "1", "yes")
+    tele_token = os.getenv("TELEGRAM_BOT_TOKEN", cfg.telegram_bot_token or "")
+    tele_dry = os.getenv("TELEGRAM_DRY_RUN", str(cfg.telegram_dry_run)).lower() in ("true", "1", "yes")
     if tele_token:
         tele_mode = "live"
     elif tele_dry:
@@ -56,8 +59,8 @@ def get_system_modes(
         tele_mode = "unconfigured"
 
     # Zalo mode
-    zalo_secret = os.getenv("ZALO_OA_SECRET")
-    zalo_dry = os.getenv("ZALO_DRY_RUN", "false").lower() in ("true", "1", "yes")
+    zalo_secret = os.getenv("ZALO_OA_SECRET", cfg.zalo_oa_secret or "")
+    zalo_dry = os.getenv("ZALO_DRY_RUN", str(cfg.zalo_dry_run)).lower() in ("true", "1", "yes")
     if zalo_secret:
         zalo_mode = "live"
     elif zalo_dry:
@@ -66,7 +69,7 @@ def get_system_modes(
         zalo_mode = "unconfigured"
 
     # ERP mode
-    adapter_name = os.getenv("PREFLIGHT_ERP_ADAPTER", "MOCK_SAP")
+    adapter_name = os.getenv("PREFLIGHT_ERP_ADAPTER", cfg.erp_default_adapter)
     adapter = get_adapter(adapter_name)
     erp_info = {
         "adapter": adapter_name,
@@ -74,10 +77,10 @@ def get_system_modes(
     }
 
     # FX mode
-    fx_key = os.getenv("EXCHANGE_RATE_API_KEY")
-    fx_mode = "live" if fx_key else "static"
+    fx_key = os.getenv("EXCHANGE_RATE_API_KEY", cfg.exchange_rate_api_key or "")
+    fx_mode = "live" if (fx_key or cfg.fx_live) else "static"
 
-    company = os.getenv("PREFLIGHT_COMPANY_NAME", "PO Preflight Enterprise").strip()
+    company = os.getenv("PREFLIGHT_COMPANY_NAME", cfg.company_name).strip()
 
     return SystemModesResponse(
         company_name=company,

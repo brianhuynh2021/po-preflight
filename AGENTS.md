@@ -1,11 +1,13 @@
 # AGENTS.md
 
-Scope: the customer-facing frontend prototype in `apps/web`. Backend (Python under `src/`, `tests/`) and Terraform (`infra/`) are out of scope.
+Scope: the customer-facing frontend prototype in `apps/web` and backend integration contracts.
 
 ## Frontend Stack (non-obvious bits)
 
 - **Next.js 16 on Vite via `vinext`** (not the classic Next dev server), bundled with the Cloudflare Vite plugin for Workers deployment. All `npm run dev/build/start` go through `vinext` with `WRANGLER_LOG_PATH` set.
 - React 19 + React Server Components + App Router.
+- Separate Route Groups: `app/(marketing)` for public marketing pages (`/`, `/pricing`, `/security`) and `app/(protected)` for operational app screens (`/overview`, `/orders`, `/catalog`, `/rules`, `/settings`, `/audit-log`, `/erp-sync`, `/agent-graph`, `/rag-playground`, `/audit-certificate`, `/staging`).
+- Session-based authentication with `pf_session` cookie and `/login` gateway.
 - Tailwind CSS 4 via PostCSS is installed, but the app uses **extensive custom CSS** in `app/globals.css` with CSS custom properties (theme tokens + status colors). Check globals.css before assuming Tailwind utilities.
 - TypeScript strict, path alias `@/*` → `./*` (from `apps/web`).
 - Node >= 22.13.
@@ -22,7 +24,7 @@ npm run lint       # ESLint 9 flat config (eslint.config.mjs)
 ```
 
 - Tests use Node's built-in `node:test` + `node:assert` (no vitest/jest). The single spec imports the built worker from `dist/server/index.js`, so **`npm test` must build before running** (it does).
-- `npm run test` and `npm run lint` do **not** run as part of CI; the root `./scripts/test.sh` only checks Python + scripts. Run them locally.
+- Root `./scripts/test.sh` executes Python tests, secret scanning, AND full frontend verification (`tsc`, `lint`, `test`).
 
 ## Architecture & data
 

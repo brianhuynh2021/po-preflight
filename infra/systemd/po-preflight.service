@@ -1,0 +1,23 @@
+[Unit]
+Description=PO Preflight AI-Native Purchase Order Gateway
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=preflight
+Group=preflight
+WorkingDirectory=/opt/po-preflight
+EnvironmentFile=/etc/po-preflight.env
+ExecStart=/opt/po-preflight/.venv/bin/python -m uvicorn preflight.api.app:app --host 0.0.0.0 --port 8001 --workers 4
+Restart=always
+RestartSec=5s
+LimitNOFILE=65535
+
+# Sandboxing & Security Hardening
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

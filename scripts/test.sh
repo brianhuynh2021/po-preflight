@@ -14,9 +14,11 @@ elif [[ -x "${repo_root}/.venv/bin/python" ]]; then
   PYTHON_BIN="${repo_root}/.venv/bin/python"
 fi
 
+echo "🧪 Running backend unittest suite..."
 PYTHONPATH="${repo_root}/src" "${PYTHON_BIN}" -m unittest discover \
   -s "${repo_root}/tests" -v
 
+echo "🔒 Verifying no secret patterns committed..."
 if grep -RInE --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.venv --exclude-dir=.wrangler --exclude='*.example.*' \
   '(sk-ant-[A-Za-z0-9_-]{12,}|xox[baprs]-[A-Za-z0-9-]{12,}|BEGIN (RSA |OPENSSH )?PRIVATE KEY)' \
   "${repo_root}"; then
@@ -25,10 +27,8 @@ if grep -RInE --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.venv 
 fi
 
 if command -v npm >/dev/null 2>&1 && [[ -d "${repo_root}/apps/web" ]]; then
-  echo "Running frontend web tests..."
-  npm --prefix "${repo_root}/apps/web" run lint
-  npm --prefix "${repo_root}/apps/web" run test
+  echo "🌐 Running frontend web tests & checks..."
+  (cd "${repo_root}/apps/web" && npx tsc --noEmit && npm run lint && npm run test)
 fi
 
-echo "All checks passed."
-
+echo "✔ All checks passed."
