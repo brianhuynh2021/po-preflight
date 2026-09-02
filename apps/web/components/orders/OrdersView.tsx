@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Search,
   Plus,
@@ -11,9 +11,11 @@ import {
   XCircle,
   FileText,
   User,
+  RotateCw,
+  AlertCircle,
 } from "lucide-react";
 
-import type { ActivityEvent, OrderStatus, PurchaseOrder } from "@/app/lib/types";
+import type { DecisionType, OrderStatus, PurchaseOrder } from "@/app/lib/types";
 import { useAppState } from "@/components/app/AppStateProvider";
 import { money } from "@/app/lib/derive";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -22,21 +24,45 @@ import { UploadModal } from "@/components/orders/UploadModal";
 import { DecisionModal } from "@/components/orders/DecisionModal";
 import { SideBySideViewer } from "@/components/orders/SideBySideViewer";
 import { useRipple } from "@/app/lib/useRipple";
-import { api } from "@/app/lib/api/client";
+import { api, describeError } from "@/app/lib/api/client";
+import type { DashboardStats } from "@/app/lib/api/types";
 
 export function OrdersView() {
-  const { orders, setOrders, activity, setActivity, refreshOrders } = useAppState();
+  const { orders, isLoading, error, refreshOrders } = useAppState();
   const { createRipple } = useRipple();
 
-
-  const [selectedId, setSelectedId] = useState("PO-10428");
+  const [selectedId, setSelectedId] = useState<string>("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"All" | OrderStatus>("All");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [decisionOpen, setDecisionOpen] = useState(false);
+  const [decisionAction, setDecisionAction] = useState<DecisionType>("APPROVE");
   const [sideBySideOpen, setSideBySideOpen] = useState(false);
   const [decisionNote, setDecisionNote] = useState("");
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const s = await api.dashboard.getStats();
+      setStats(s);
+    } catch {
+      // Keep previous stats
+    }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    api.dashboard
+      .getStats()
+      .then((s) => {
+        if (mounted) setStats(s);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [orders]);
 
   const filteredOrders = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -49,72 +75,103 @@ export function OrdersView() {
     });
   }, [filter, orders, query]);
 
-  const selected = orders.find((order) => order.id === selectedId) ?? orders[0];
+  const selected = useMemo(() => {
+    if (selectedId) {
+      const found = orders.find((o) => o.id === selectedId);
+      if (found) return found;
+    }
+    return orders[0];
+  }, [orders, selectedId]);
+
   const attentionCount = orders.filter(
     (order) => order.status === "Review required" || order.status === "Blocked",
   ).length;
 
-  const showToast = (message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(""), 3200);
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToast({ type, message });
+    window.setTimeout(() => setToast(null), 4000);
   };
 
-  const approveSelected = async () => {
+  const handleDecisionConfirm = async (action: DecisionType) => {
+    if (!selected) return;
+
+    const backendDecisionMap: Record<DecisionType, string> = {
+      APPROVE: "approved",
+      REJECT: "rejected",
+      REQUEST_CHANGES: "needs_changes",
+    };
+
     try {
       await api.orders.decide(selected.id, {
-        decision: "approved",
-        actor: "Admin Maya",
-        note: decisionNote || "Approved after reviewing validation evidence",
+        decision: backendDecisionMap[action],
+        note: decisionNote.trim(),
       });
       await refreshOrders();
-      showToast(`${selected.id} đã được phê duyệt và đồng bộ với Audit Log.`);
-    } catch {
-      setOrders((current) =>
-        current.map((order) =>
-          order.id === selected.id ? { ...order, status: "Approved" } : order,
-        ),
+      await loadStats();
+      setDecisionOpen(false);
+      setDecisionNote("");
+      showToast(
+        action === "APPROVE"
+          ? `Đơn hàng ${selected.id} đã được phê duyệt và ghi nhận vào sổ cái kiểm toán.`
+          : action === "REJECT"
+            ? `Đã từ chối đơn hàng ${selected.id}.`
+            : `Đã chuyển trạng thái yêu cầu sửa đổi cho đơn hàng ${selected.id}.`,
+        "success",
       );
-      showToast(`${selected.id} was approved.`);
+    } catch (err) {
+      showToast(describeError(err), "error");
     }
-    setActivity((current) => [
-      {
-        title: "Order approved",
-        detail: decisionNote || "Approved after reviewing validation evidence",
-        time: "Just now",
-        type: "human",
-      } as ActivityEvent,
-      ...current,
-    ]);
-    setDecisionOpen(false);
+  };
+
+  const openDecisionModal = (action: DecisionType) => {
+    setDecisionAction(action);
     setDecisionNote("");
+    setDecisionOpen(true);
   };
 
-  const requestChanges = async () => {
-    try {
-      await api.orders.decide(selected.id, {
-        decision: "needs_changes",
-        actor: "Admin Maya",
-        note: "Yêu cầu khách hàng điều chỉnh thông tin đơn hàng",
-      });
-      await refreshOrders();
-      showToast(`Đã gửi yêu cầu chỉnh sửa cho đơn hàng ${selected.id}.`);
-    } catch {
-      showToast(`A change request was sent to the owner of ${selected.id}.`);
-    }
-    setDecisionOpen(false);
-  };
-
+  if (error && orders.length === 0) {
+    return (
+      <div className="page orders-page page-enter">
+        <div className="page-heading">
+          <div>
+            <p className="eyebrow">QUẢN LÝ ĐƠN HÀNG</p>
+            <h1>Đơn đặt hàng (Purchase Orders)</h1>
+          </div>
+        </div>
+        <div
+          className="content-card"
+          style={{
+            padding: "var(--space-8)",
+            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "var(--space-3)",
+          }}
+        >
+          <AlertCircle size={40} color="#ef4444" />
+          <h2>Không kết nối được máy chủ</h2>
+          <p style={{ color: "var(--color-outline)", maxWidth: 460 }}>{error}</p>
+          <button
+            className="primary-button interactive"
+            onClick={() => void refreshOrders()}
+            style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)", marginTop: "var(--space-2)" }}
+          >
+            <RotateCw size={16} />
+            <span>Thử lại kết nối</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page orders-page page-enter">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">ORDER OPERATIONS</p>
-          <h1>Purchase orders</h1>
-          <p>
-            Review extracted orders, resolve findings, and record controlled
-            decisions.
-          </p>
+          <p className="eyebrow">QUẢN LÝ ĐƠN HÀNG · Purchase orders</p>
+          <h1>Đơn đặt hàng (Purchase orders)</h1>
+          <p>Kiểm tra dữ liệu bóc tách, rà soát cảnh báo vi phạm và thực hiện quyết định phê duyệt.</p>
         </div>
         <button
           className="primary-button interactive"
@@ -125,77 +182,101 @@ export function OrdersView() {
           style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
         >
           <Plus size={16} strokeWidth={2.2} aria-hidden="true" />
-          <span>Upload purchase order</span>
+          <span>Tải lên đơn hàng (Upload purchase order)</span>
         </button>
       </div>
 
-      <OrdersMetrics orders={orders} attentionCount={attentionCount} />
+      <OrdersMetrics orders={orders} attentionCount={attentionCount} stats={stats} />
 
-      <div className="workspace-grid">
-        <OrderQueue
-          orders={filteredOrders}
-          selectedId={selected.id}
-          query={query}
-          filter={filter}
-          onQueryChange={setQuery}
-          onFilterChange={setFilter}
-          onSelect={setSelectedId}
-        />
+      {isLoading && orders.length === 0 ? (
+        <div style={{ padding: "var(--space-6)", textAlign: "center", color: "var(--color-outline)" }}>
+          Đang tải dữ liệu đơn hàng...
+        </div>
+      ) : (
+        <div className="workspace-grid">
+          <OrderQueue
+            orders={filteredOrders}
+            selectedId={selected?.id || ""}
+            query={query}
+            filter={filter}
+            onQueryChange={setQuery}
+            onFilterChange={setFilter}
+            onSelect={setSelectedId}
+          />
 
-        <OrderDetail
-          order={selected}
-          activity={activity}
-          onOpenDecision={() => setDecisionOpen(true)}
-          onOpenSideBySide={() => setSideBySideOpen(true)}
-          onRequestChanges={requestChanges}
-        />
-      </div>
+          {selected ? (
+            <OrderDetail
+              order={selected}
+              onOpenDecision={() => openDecisionModal("APPROVE")}
+              onRequestChanges={() => openDecisionModal("REQUEST_CHANGES")}
+              onRejectOrder={() => openDecisionModal("REJECT")}
+              onOpenSideBySide={() => setSideBySideOpen(true)}
+            />
+          ) : (
+            <div className="content-card" style={{ padding: "var(--space-6)", textAlign: "center" }}>
+              <FileText size={32} style={{ opacity: 0.3, marginBottom: "var(--space-2)" }} />
+              <p>Chưa có đơn hàng nào được chọn.</p>
+            </div>
+          )}
+        </div>
+      )}
 
-      {sideBySideOpen ? (
+      {sideBySideOpen && selected && (
         <SideBySideViewer
           order={selected}
           onClose={() => setSideBySideOpen(false)}
         />
-      ) : null}
+      )}
 
-      {uploadOpen ? (
+      {uploadOpen && (
         <UploadModal
           onClose={() => setUploadOpen(false)}
           onFile={async (name, file) => {
             setUploadOpen(false);
             if (file) {
-              showToast(`Đang tải lên và trích xuất ${name}...`);
+              showToast(`Đang tải lên và xử lý ${name}...`);
               try {
-                const res = await api.ingest.extract(file, name);
+                await api.orders.upload(file, name);
                 await refreshOrders();
-                showToast(`Đã bóc tách thành công ${name} (${res.items.length} dòng hàng)`);
-              } catch {
-                showToast(`${name} đã được thêm vào hàng đợi xử lý.`);
+                await loadStats();
+                showToast(`Đã tải lên và kiểm tra xong đơn hàng ${name}.`, "success");
+              } catch (err) {
+                showToast(describeError(err), "error");
               }
-            } else {
-              showToast(`${name} was added to the processing queue.`);
             }
           }}
         />
-      ) : null}
+      )}
 
-
-      {decisionOpen ? (
+      {decisionOpen && selected && (
         <DecisionModal
           order={selected}
+          initialAction={decisionAction}
           note={decisionNote}
           onNoteChange={setDecisionNote}
           onClose={() => setDecisionOpen(false)}
-          onConfirm={approveSelected}
+          onConfirm={handleDecisionConfirm}
         />
-      ) : null}
+      )}
 
-      {toast ? (
-        <div className="toast" role="status">
-          <Check size={16} strokeWidth={2.5} />
-          <span>{toast}</span>
+      {toast && (
+        <div
+          className="toast"
+          role="status"
+          style={{
+            borderColor: toast.type === "success" ? "#10b981" : "#ef4444",
+            backgroundColor: toast.type === "success" ? "var(--color-surface)" : "#fef2f2",
+            color: toast.type === "success" ? "inherit" : "#dc2626",
+          }}
+        >
+          {toast.type === "success" ? (
+            <Check size={16} strokeWidth={2.5} color="#10b981" />
+          ) : (
+            <AlertCircle size={16} strokeWidth={2.5} color="#ef4444" />
+          )}
+          <span>{toast.message}</span>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
@@ -203,44 +284,53 @@ export function OrdersView() {
 function OrdersMetrics({
   orders,
   attentionCount,
+  stats,
 }: {
   orders: PurchaseOrder[];
   attentionCount: number;
+  stats: DashboardStats | null;
 }) {
+  const readyCount = stats?.ready_count ?? orders.filter((o) => o.status === "Ready").length;
+  const approvedToday = stats?.approved_today ?? orders.filter((o) => o.status === "Approved").length;
+  const avgDecision = stats?.avg_decision_minutes != null ? `${stats.avg_decision_minutes}m` : "—";
+  const trend7Days = stats?.orders_last_7_days || [0, 0, 0, 0, 0, 0, orders.length];
+  const maxTrend = Math.max(...trend7Days, 1);
+
   return (
     <div className="metrics-row">
       <div className="metric">
-        <span>Needs attention</span>
+        <span>Cần xử lý</span>
         <strong className="tabular-nums">{attentionCount}</strong>
         <small>
-          <i className="metric-dot amber" /> Review or correction required
+          <i className="metric-dot amber" /> Cần xem xét hoặc chỉnh sửa
         </small>
       </div>
       <div className="metric">
-        <span>Ready for approval</span>
-        <strong className="tabular-nums">{orders.filter((o) => o.status === "Ready").length}</strong>
+        <span>Sẵn sàng duyệt</span>
+        <strong className="tabular-nums">{readyCount}</strong>
         <small>
-          <i className="metric-dot green" /> All validation rules passed
+          <i className="metric-dot green" /> Đạt tất cả kiểm tra quy tắc
         </small>
       </div>
       <div className="metric">
-        <span>Approved today</span>
-        <strong className="tabular-nums">{orders.filter((o) => o.status === "Approved").length}</strong>
+        <span>Đã duyệt hôm nay</span>
+        <strong className="tabular-nums">{approvedToday}</strong>
         <small>
-          <i className="metric-dot blue" /> Average decision time 6m
+          <i className="metric-dot blue" /> Thời gian xử lý TB: {avgDecision}
         </small>
       </div>
       <div className="metric metric-chart">
-        <span>Orders this week</span>
-        <strong className="tabular-nums">42</strong>
-        <div className="spark" aria-label="Orders increased during the week">
-          <i style={{ height: "28%" }} />
-          <i style={{ height: "48%" }} />
-          <i style={{ height: "38%" }} />
-          <i style={{ height: "70%" }} />
-          <i style={{ height: "56%" }} />
-          <i style={{ height: "84%" }} />
-          <i style={{ height: "66%" }} />
+        <span>Tổng đơn 7 ngày qua</span>
+        <strong className="tabular-nums">{trend7Days.reduce((a, b) => a + b, 0)}</strong>
+        <div className="spark" aria-label="Biểu đồ đơn hàng 7 ngày qua">
+          {trend7Days.map((val, idx) => (
+            <i
+              key={idx}
+              style={{
+                height: `${Math.max(15, Math.round((val / maxTrend) * 100))}%`,
+              }}
+            />
+          ))}
         </div>
       </div>
     </div>
@@ -267,32 +357,34 @@ function OrderQueue({
   const { createRipple } = useRipple();
 
   return (
-    <section className="queue-panel" aria-label="Order queue">
+    <section className="queue-panel" aria-label="Danh sách đơn hàng">
       <div className="panel-toolbar">
         <label className="search">
           <Search size={15} strokeWidth={2} style={{ opacity: 0.6 }} aria-hidden="true" />
           <input
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search PO or customer"
+            placeholder="Tìm mã PO hoặc khách hàng"
           />
         </label>
         <select
           value={filter}
           onChange={(event) => onFilterChange(event.target.value as typeof filter)}
-          aria-label="Filter orders by status"
+          aria-label="Lọc đơn hàng theo trạng thái"
         >
-          <option>All</option>
-          <option>Review required</option>
-          <option>Blocked</option>
-          <option>Ready</option>
-          <option>Approved</option>
+          <option value="All">Tất cả trạng thái</option>
+          <option value="Review required">Cần xem xét</option>
+          <option value="Blocked">Bị chặn</option>
+          <option value="Ready">Sẵn sàng duyệt</option>
+          <option value="Approved">Đã duyệt</option>
+          <option value="Changes requested">Yêu cầu sửa</option>
+          <option value="Rejected">Đã từ chối</option>
         </select>
       </div>
       <div className="queue-header">
-        <span>Order</span>
-        <span>Status</span>
-        <span>Value</span>
+        <span>Đơn hàng</span>
+        <span>Trạng thái</span>
+        <span>Giá trị</span>
       </div>
       <div className="queue-list">
         {orders.map((order) => (
@@ -315,8 +407,7 @@ function OrderQueue({
               <StatusBadge status={order.status} />
               {order.findings.length > 0 ? (
                 <small className="finding-count tabular-nums">
-                  {order.findings.length}{" "}
-                  {order.findings.length === 1 ? "finding" : "findings"}
+                  {order.findings.length} cảnh báo
                 </small>
               ) : null}
             </span>
@@ -329,7 +420,7 @@ function OrderQueue({
         {orders.length === 0 ? (
           <div className="empty-state">
             <FileText size={28} strokeWidth={1.5} style={{ opacity: 0.4, marginBottom: "var(--space-2)" }} />
-            <p>No orders match this view.</p>
+            <p>Không có đơn hàng nào khớp với bộ lọc.</p>
           </div>
         ) : null}
       </div>
@@ -339,21 +430,21 @@ function OrderQueue({
 
 function OrderDetail({
   order,
-  activity,
   onOpenDecision,
-  onOpenSideBySide,
   onRequestChanges,
+  onRejectOrder,
+  onOpenSideBySide,
 }: {
   order: PurchaseOrder;
-  activity: ActivityEvent[];
   onOpenDecision: () => void;
-  onOpenSideBySide: () => void;
   onRequestChanges: () => void;
+  onRejectOrder: () => void;
+  onOpenSideBySide: () => void;
 }) {
   const { createRipple } = useRipple();
 
   return (
-    <section className="detail-panel" aria-label={`${order.id} details`}>
+    <section className="detail-panel" aria-label={`Chi tiết đơn hàng ${order.id}`}>
       <div className="detail-header">
         <div>
           <div className="detail-title">
@@ -361,7 +452,7 @@ function OrderDetail({
             <StatusBadge status={order.status} />
           </div>
           <p>
-            {order.customer} · Submitted <SubmittedAt iso={order.submittedAt} />
+            {order.customer} · Tiếp nhận <SubmittedAt iso={order.submittedAt} />
           </p>
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
@@ -374,25 +465,25 @@ function OrderDetail({
             style={{ fontSize: "var(--text-xs)", padding: "6px 10px", display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
           >
             <Split size={14} strokeWidth={2} />
-            <span>Side-by-Side</span>
+            <span>Đối chiếu gốc (Side-by-Side)</span>
           </button>
         </div>
       </div>
       <div className="order-summary">
         <div>
-          <span>Order value</span>
+          <span>Tổng giá trị</span>
           <strong className="tabular-nums">{money(order.value, order.currency)}</strong>
         </div>
         <div>
-          <span>Line items</span>
+          <span>Số dòng hàng</span>
           <strong className="tabular-nums">{order.lines.length}</strong>
         </div>
         <div>
-          <span>Owner</span>
+          <span>Người phụ trách</span>
           <strong>{order.owner}</strong>
         </div>
         <div>
-          <span>Source</span>
+          <span>Tệp nguồn</span>
           <strong className="source-name">{order.sourceFile}</strong>
         </div>
       </div>
@@ -400,8 +491,8 @@ function OrderDetail({
       <div className="detail-body">
         <div className="section-title">
           <div>
-            <h3>Validation findings</h3>
-            <p>Evidence from active company rules</p>
+            <h3>Phát hiện kiểm tra (Validation findings)</h3>
+            <p>Bằng chứng đối chiếu từ hệ thống quy tắc định trước</p>
           </div>
           <span className="finding-pill tabular-nums">{order.findings.length}</span>
         </div>
@@ -422,7 +513,7 @@ function OrderDetail({
                 <div>
                   <div className="finding-top">
                     <strong>{finding.title}</strong>
-                    <span>{finding.severity}</span>
+                    <span>{finding.severity === "Error" ? "Lỗi chặn" : "Cảnh báo"}</span>
                   </div>
                   <p>{finding.detail}</p>
                   <code>{finding.evidence}</code>
@@ -436,33 +527,30 @@ function OrderDetail({
               <CheckCircle2 size={20} strokeWidth={2.2} />
             </span>
             <div>
-              <strong>All validation rules passed</strong>
-              <p>
-                This order has no pricing, catalog, stock, or duplicate
-                findings.
-              </p>
+              <strong>Đạt tất cả kiểm tra quy tắc</strong>
+              <p>Đơn hàng không có phát hiện sai khác về giá, tồn kho hay trùng lặp.</p>
             </div>
           </div>
         )}
 
         <div className="section-title line-title">
           <div>
-            <h3>Normalized line items</h3>
-            <p>Extracted values compared with company data</p>
+            <h3>Dòng hàng chuẩn hóa</h3>
+            <p>Dữ liệu trích xuất đối chiếu với Danh mục sản phẩm công ty</p>
           </div>
-          <button className="text-button interactive" onClick={createRipple}>
-            View source
+          <button className="text-button interactive" onClick={onOpenSideBySide}>
+            Xem tệp gốc
           </button>
         </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>SKU / Product</th>
-                <th style={{ textAlign: "right" }}>Qty</th>
-                <th style={{ textAlign: "right" }}>Available</th>
-                <th style={{ textAlign: "right" }}>Unit price</th>
-                <th style={{ textAlign: "right" }}>Catalog</th>
+                <th>SKU / Sản phẩm</th>
+                <th style={{ textAlign: "right" }}>Số lượng</th>
+                <th style={{ textAlign: "right" }}>Tồn kho</th>
+                <th style={{ textAlign: "right" }}>Đơn giá PO</th>
+                <th style={{ textAlign: "right" }}>Giá Catalog</th>
               </tr>
             </thead>
             <tbody>
@@ -472,10 +560,7 @@ function OrderDetail({
                     <strong>{line.sku}</strong>
                     <small>{line.product}</small>
                   </td>
-                  <td
-                    className="tabular-nums"
-                    style={{ textAlign: "right" }}
-                  >
+                  <td className="tabular-nums" style={{ textAlign: "right" }}>
                     {line.quantity}
                   </td>
                   <td
@@ -488,15 +573,10 @@ function OrderDetail({
                     className={`tabular-nums ${line.catalogPrice > 0 && line.unitPrice !== line.catalogPrice ? "cell-warning" : ""}`}
                     style={{ textAlign: "right" }}
                   >
-                    ${line.unitPrice.toFixed(2)}
+                    {money(line.unitPrice, order.currency)}
                   </td>
-                  <td
-                    className="tabular-nums"
-                    style={{ textAlign: "right" }}
-                  >
-                    {line.catalogPrice
-                      ? `$${line.catalogPrice.toFixed(2)}`
-                      : "—"}
+                  <td className="tabular-nums" style={{ textAlign: "right" }}>
+                    {line.catalogPrice ? money(line.catalogPrice, order.currency) : "—"}
                   </td>
                 </tr>
               ))}
@@ -506,42 +586,69 @@ function OrderDetail({
 
         <div className="section-title timeline-title">
           <div>
-            <h3>Activity</h3>
-            <p>Complete evidence and decision history</p>
+            <h3>Lịch sử xử lý &amp; Quyết định (Activity)</h3>
+            <p>Toàn bộ bằng chứng và tiến trình phê duyệt của đơn hàng</p>
           </div>
         </div>
         <div className="timeline">
-          {activity.map((event, index) => (
-            <div className="timeline-event" key={`${event.title}-${index}`}>
-              <span
-                className={`timeline-mark ${event.type}`}
-                style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
-              >
-                {event.type === "human" ? (
+          {order.decisions && order.decisions.length > 0 ? (
+            order.decisions.map((dec, index) => (
+              <div className="timeline-event" key={index}>
+                <span
+                  className="timeline-mark human"
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
                   <User size={13} strokeWidth={2.2} />
-                ) : (
-                  <Check size={13} strokeWidth={2.5} />
-                )}
-              </span>
-              <div>
-                <strong>{event.title}</strong>
-                <p>{event.detail}</p>
+                </span>
+                <div>
+                  <strong>
+                    {dec.type === "APPROVE"
+                      ? "Đã duyệt đơn hàng"
+                      : dec.type === "REJECT"
+                        ? "Đã từ chối đơn hàng"
+                        : "Đã gửi yêu cầu chỉnh sửa"}
+                  </strong>
+                  <p>{dec.note || `Thực hiện bởi: ${dec.actor}`}</p>
+                </div>
+                <time>{new Date(dec.createdAt).toLocaleTimeString("vi-VN")}</time>
               </div>
-              <time>{event.time}</time>
+            ))
+          ) : (
+            <div style={{ color: "var(--color-outline)", fontSize: "0.875rem", padding: "var(--space-2) 0" }}>
+              Chưa có quyết định nào được ghi nhận cho đơn hàng này.
             </div>
-          ))}
+          )}
         </div>
       </div>
 
-      <div className="decision-bar">
+      <div className="decision-bar" style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
         <button
           className="secondary-button interactive"
           onClick={(e) => {
             createRipple(e);
             onRequestChanges();
           }}
+          disabled={order.status === "Approved" || order.status === "Rejected"}
         >
-          Request changes
+          Yêu cầu sửa (Request changes)
+        </button>
+        <button
+          className="danger-button interactive"
+          onClick={(e) => {
+            createRipple(e);
+            onRejectOrder();
+          }}
+          disabled={order.status === "Approved" || order.status === "Rejected"}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--color-error)",
+            backgroundColor: "transparent",
+            color: "var(--color-error)",
+            cursor: order.status === "Approved" || order.status === "Rejected" ? "not-allowed" : "pointer",
+          }}
+        >
+          Từ chối
         </button>
         <button
           className="approve-button interactive"
@@ -549,15 +656,13 @@ function OrderDetail({
             createRipple(e);
             onOpenDecision();
           }}
-          disabled={
-            order.status === "Blocked" || order.status === "Approved"
-          }
+          disabled={order.status === "Blocked" || order.status === "Approved" || order.status === "Rejected"}
         >
           {order.status === "Approved"
-            ? "Approved"
+            ? "Đã duyệt"
             : order.status === "Blocked"
-              ? "Resolve block first"
-              : "Review and approve"}
+              ? "Cần giải quyết lỗi chặn"
+              : "Xem xét & Duyệt đơn (Review and approve)"}
         </button>
       </div>
     </section>

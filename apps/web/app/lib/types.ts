@@ -26,6 +26,15 @@ export const STATUS_TONE: Record<OrderStatus, string> = {
   Rejected: "#57534e",
 };
 
+export const STATUS_LABEL_VI: Record<OrderStatus, string> = {
+  Ready: "Sẵn sàng duyệt",
+  "Review required": "Cần xem xét",
+  Blocked: "Bị chặn",
+  Approved: "Đã duyệt",
+  "Changes requested": "Yêu cầu sửa",
+  Rejected: "Đã từ chối",
+};
+
 // --------------------------------------------------------------- findings
 
 export type FindingCode =

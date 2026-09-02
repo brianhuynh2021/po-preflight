@@ -58,7 +58,7 @@ export function RAGPlaygroundView() {
         confidence: match.confidence_score,
         latencyMs: latencyMs > 0 ? latencyMs : 8,
         tierReason: match.explanation || "Resolved via 4-tier waterfall engine",
-        candidates: (match.candidates || []).map((c) => ({
+        candidates: (match.candidates || []).map((c: { sku: string; name: string; unit_price?: number; confidence_score?: number }) => ({
           sku: c.sku,
           name: c.name,
           price: Number(c.unit_price || 0),

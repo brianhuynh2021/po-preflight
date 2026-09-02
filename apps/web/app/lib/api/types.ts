@@ -108,12 +108,49 @@ export interface ConfirmExtractionRequest {
   currency?: string;
 }
 
+export interface AuthUser {
+  user: string;
+  role: "ADMIN" | "MANAGER" | "AUDITOR" | "VIEWER" | string;
+  role_id: number;
+  api_key_id?: string | null;
+}
+
+export interface AuditEvent {
+  id: string;
+  event_type: string;
+  timestamp: string;
+  po_number: string;
+  action: string;
+  actor: string;
+  detail: string;
+  hash?: string | null;
+}
+
+export interface SystemModes {
+  company_name: string;
+  database: string;
+  ocr: string;
+  telegram: string;
+  zalo: string;
+  erp: {
+    adapter: string;
+    mode: string;
+  };
+  fx: string;
+  environment: string;
+  auth_required: boolean;
+}
+
 export interface DashboardStats {
   total_orders: number;
   ready_count: number;
   review_required_count: number;
   blocked_count: number;
   approved_count: number;
+  approved_today?: number;
+  avg_decision_minutes?: number | null;
+  orders_last_7_days?: number[];
+  straight_through_rate?: number;
   pass_rate_percent: number;
   total_pipeline_value: number;
   violations_breakdown: Array<{
@@ -241,11 +278,19 @@ export interface AgentRunResponse {
   audit_trail: string[];
 }
 
+export interface IngestionJobStatus {
+  job_id: string;
+  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+  extracted_order?: ExtractedOrder | null;
+  error?: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // ERP & Outbox Schemas
 // ---------------------------------------------------------------------------
 export type ERPAdapterType =
   | "MOCK_SAP"
+  | "SAP_S4HANA_MOCK"
   | "MOCK_ODOO"
   | "ODOO_LIVE"
   | "SAP_ODATA_LIVE"

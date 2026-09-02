@@ -344,6 +344,17 @@ class BaseAuditStore(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def list_audit_events(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        po_number: str | None = None,
+        actor: str | None = None,
+        action: str | None = None,
+    ) -> list[dict[str, Any]]:
+        pass
+
+    @abc.abstractmethod
     def set_customer_pricing(self, pricing: CustomerPriceAgreement) -> None:
         pass
 
@@ -783,6 +794,59 @@ class AuditStore(BaseAuditStore):
                 "SELECT block_index as [index], timestamp, po_number, action, actor, payload_hash, previous_hash, block_hash FROM audit_blocks WHERE po_number = ? ORDER BY block_index ASC",
                 (po_number,),
             ).fetchall()
+            return [dict(r) for r in rows]
+
+    def list_audit_events(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        po_number: str | None = None,
+        actor: str | None = None,
+        action: str | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._lock:
+            query = """
+                SELECT 
+                    'block_' || id AS id,
+                    'AUDIT_BLOCK' AS event_type,
+                    datetime(timestamp, 'unixepoch') AS timestamp,
+                    po_number,
+                    action,
+                    actor,
+                    'Block #' || block_index || ' (Hash: ' || substr(block_hash, 1, 12) || '...)' AS detail,
+                    block_hash AS hash
+                FROM audit_blocks
+                UNION ALL
+                SELECT
+                    'decision_' || id AS id,
+                    'DECISION' AS event_type,
+                    created_at AS timestamp,
+                    po_number,
+                    UPPER(decision) AS action,
+                    actor,
+                    COALESCE(note, '') AS detail,
+                    NULL AS hash
+                FROM decisions
+            """
+            params: list[Any] = []
+            where_clauses: list[str] = []
+            if po_number:
+                where_clauses.append("po_number LIKE ?")
+                params.append(f"%{po_number}%")
+            if actor:
+                where_clauses.append("actor LIKE ?")
+                params.append(f"%{actor}%")
+            if action:
+                where_clauses.append("action = ?")
+                params.append(action.upper())
+
+            outer_query = f"SELECT * FROM ({query})"
+            if where_clauses:
+                outer_query += " WHERE " + " AND ".join(where_clauses)
+            outer_query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
+
+            rows = self.connection.execute(outer_query, params).fetchall()
             return [dict(r) for r in rows]
 
     def set_customer_pricing(self, pricing: CustomerPriceAgreement) -> None:
@@ -1292,6 +1356,60 @@ class PostgresAuditStore(BaseAuditStore):
                     "SELECT block_index as index, timestamp, po_number, action, actor, payload_hash, previous_hash, block_hash FROM audit_blocks WHERE po_number = %s ORDER BY block_index ASC",
                     (po_number,),
                 )
+                return [dict(r) for r in cur.fetchall()]
+
+    def list_audit_events(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        po_number: str | None = None,
+        actor: str | None = None,
+        action: str | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT 
+                        'block_' || id::text AS id,
+                        'AUDIT_BLOCK' AS event_type,
+                        to_timestamp(timestamp)::text AS timestamp,
+                        po_number,
+                        action,
+                        actor,
+                        'Block #' || block_index::text || ' (Hash: ' || substring(block_hash from 1 for 12) || '...)' AS detail,
+                        block_hash AS hash
+                    FROM audit_blocks
+                    UNION ALL
+                    SELECT
+                        'decision_' || id::text AS id,
+                        'DECISION' AS event_type,
+                        created_at::text AS timestamp,
+                        po_number,
+                        UPPER(decision) AS action,
+                        actor,
+                        COALESCE(note, '') AS detail,
+                        NULL AS hash
+                    FROM decisions
+                """
+                params: list[Any] = []
+                where_clauses: list[str] = []
+                if po_number:
+                    where_clauses.append("po_number ILIKE %s")
+                    params.append(f"%{po_number}%")
+                if actor:
+                    where_clauses.append("actor ILIKE %s")
+                    params.append(f"%{actor}%")
+                if action:
+                    where_clauses.append("action = %s")
+                    params.append(action.upper())
+
+                outer_query = f"SELECT * FROM ({query}) sub"
+                if where_clauses:
+                    outer_query += " WHERE " + " AND ".join(where_clauses)
+                outer_query += " ORDER BY timestamp DESC LIMIT %s OFFSET %s"
+                params.extend([limit, offset])
+
+                cur.execute(outer_query, params)
                 return [dict(r) for r in cur.fetchall()]
 
     def set_customer_pricing(self, pricing: CustomerPriceAgreement) -> None:

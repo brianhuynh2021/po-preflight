@@ -1,204 +1,241 @@
 "use client";
 
-import React, { useState } from "react";
-import { money } from "@/app/lib/derive";
-
-interface OutboxItem {
-  id: number;
-  poNumber: string;
-  customer: string;
-  adapter: string;
-  amount: number;
-  currency: string;
-  status: "DELIVERED" | "PENDING" | "DEAD_LETTER";
-  retries: number;
-  erpReference?: string;
-  lastAttempt: string;
-}
+import { useEffect, useState } from "react";
+import { api, describeError } from "@/app/lib/api/client";
+import type { OutboxStats } from "@/app/lib/api/types";
+import { RefreshCw, CheckCircle2, AlertTriangle, Play } from "lucide-react";
+import { useRipple } from "@/app/lib/useRipple";
 
 export function ERPSyncView() {
-  const [items, setItems] = useState<OutboxItem[]>([
-    {
-      id: 1,
-      poNumber: "PO-10427",
-      customer: "Alpha Distribution Corp",
-      adapter: "SAP S/4HANA (BAPI_SALESORDER_CREATEFROMDAT2)",
-      amount: 145000000,
-      currency: "VND",
-      status: "DELIVERED",
-      retries: 0,
-      erpReference: "SAP-SO-99210427",
-      lastAttempt: "2026-09-01 08:30:12",
-    },
-    {
-      id: 2,
-      poNumber: "PO-10428",
-      customer: "Northstar Retail",
-      adapter: "SAP S/4HANA (OData v4)",
-      amount: 18500000,
-      currency: "VND",
-      status: "DELIVERED",
-      retries: 0,
-      erpReference: "SAP-SO-99210428",
-      lastAttempt: "2026-09-01 08:35:44",
-    },
-    {
-      id: 3,
-      poNumber: "PO-10433",
-      customer: "Nexus Cloud Systems",
-      adapter: "Odoo Enterprise v17 (XML-RPC)",
-      amount: 8500,
-      currency: "USD",
-      status: "DELIVERED",
-      retries: 0,
-      erpReference: "ODOO-SO-2026-004",
-      lastAttempt: "2026-09-01 08:41:00",
-    },
-    {
-      id: 4,
-      poNumber: "PO-10430",
-      customer: "Vingroup Retail",
-      adapter: "SAP S/4HANA (BAPI)",
-      amount: 48000000,
-      currency: "VND",
-      status: "PENDING",
-      retries: 1,
-      lastAttempt: "2026-09-01 08:45:00",
-    },
-  ]);
+  const { createRipple } = useRipple();
+  const [stats, setStats] = useState<OutboxStats | null>(null);
+  const [events, setEvents] = useState<Array<Record<string, unknown>>>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  const [filter, setFilter] = useState<"ALL" | "DELIVERED" | "PENDING" | "DEAD_LETTER">("ALL");
+  const fetchOutboxData = async () => {
+    setIsLoading(true);
+    try {
+      const [s, evs] = await Promise.all([
+        api.erp.getOutboxStatus(),
+        api.erp.getOutboxEvents(50),
+      ]);
+      setStats(s);
+      setEvents(evs);
+    } catch {
+      // Offline fallback
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const filteredItems = items.filter((it) => (filter === "ALL" ? true : it.status === filter));
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([api.erp.getOutboxStatus(), api.erp.getOutboxEvents(50)])
+      .then(([s, evs]) => {
+        if (mounted) {
+          setStats(s);
+          setEvents(evs);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-  const triggerRetry = (id: number) => {
-    setItems((prev) =>
-      prev.map((it) =>
-        it.id === id
-          ? {
-              ...it,
-              status: "DELIVERED",
-              retries: it.retries + 1,
-              erpReference: `SAP-SO-${Math.floor(Math.random() * 900000 + 100000)}`,
-              lastAttempt: "Just now",
-            }
-          : it
-      )
-    );
+  const handleProcessOutbox = async () => {
+    setIsProcessing(true);
+    setFeedback(null);
+    try {
+      const res = await api.erp.processOutbox(20);
+      setFeedback({
+        type: "success",
+        message: `Đã xử lý xong ${res.processed_count} sự kiện Outbox ERP.`,
+      });
+      await fetchOutboxData();
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        message: describeError(err),
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
-    <div className="page erp-sync-page">
+    <div className="page erp-sync-page page-enter">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">ENTERPRISE ERP INTEGRATION (ISSUE #9)</p>
-          <h1>ERP Synchronization & Outbox Center</h1>
+          <p className="eyebrow">TÍCH HỢP HỆ THỐNG DOANH NGHIỆP · ERP Synchronization</p>
+          <h1>Đồng bộ ERP (ERP Synchronization) &amp; Outbox Center</h1>
           <p>
-            Transactional Outbox guarantees exactly-once order delivery into SAP S/4HANA, Odoo, and NetSuite with zero duplicate risk.
+            Mô hình Transactional Outbox bảo đảm chuyển phát đơn hàng chính xác một lần (Exactly-Once Delivery) sang SAP S/4HANA, Odoo, MISA AMIS với mã Idempotency chống trùng lặp tuyệt đối.
           </p>
         </div>
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          <button
+            className="secondary-button interactive"
+            onClick={(e) => {
+              createRipple(e);
+              void fetchOutboxData();
+            }}
+            disabled={isLoading}
+            style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
+          >
+            <RefreshCw size={15} className={isLoading ? "animate-spin" : ""} />
+            <span>Làm mới</span>
+          </button>
+          <button
+            className="primary-button interactive"
+            onClick={(e) => {
+              createRipple(e);
+              void handleProcessOutbox();
+            }}
+            disabled={isProcessing}
+            style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
+          >
+            <Play size={15} />
+            <span>{isProcessing ? "Đang đẩy dữ liệu..." : "Chạy xử lý đồng bộ Outbox"}</span>
+          </button>
+        </div>
       </div>
+
+      {feedback && (
+        <div
+          style={{
+            margin: "0 0 var(--space-4) 0",
+            padding: "var(--space-3) var(--space-4)",
+            borderRadius: "var(--radius-md)",
+            border: feedback.type === "success" ? "1px solid #10b981" : "1px solid #ef4444",
+            backgroundColor: feedback.type === "success" ? "rgba(16, 185, 129, 0.08)" : "rgba(239, 68, 68, 0.08)",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            color: feedback.type === "success" ? "#10b981" : "#ef4444",
+            fontSize: "0.875rem",
+          }}
+        >
+          {feedback.type === "success" ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+          <strong>{feedback.message}</strong>
+        </div>
+      )}
 
       {/* Metrics Row */}
-      <div className="metrics-row">
+      <div className="metrics-row" style={{ marginBottom: "var(--space-5)" }}>
         <div className="metric">
-          <span>TOTAL OUTBOX DISPATCHES</span>
-          <strong>{items.length}</strong>
-          <small>Transactional messages</small>
+          <span>Chờ phát (Pending)</span>
+          <strong className="tabular-nums">{stats?.pending_count ?? 0}</strong>
+          <small>
+            <i className="metric-dot amber" /> Sẵn sàng xử lý
+          </small>
         </div>
         <div className="metric">
-          <span>DELIVERED SUCCESS</span>
-          <strong style={{ color: "var(--green)" }}>
-            {items.filter((i) => i.status === "DELIVERED").length}
+          <span>Đang gửi (Processing)</span>
+          <strong className="tabular-nums">{stats?.processing_count ?? 0}</strong>
+          <small>
+            <i className="metric-dot blue" /> Đang kết nối Adapter ERP
+          </small>
+        </div>
+        <div className="metric">
+          <span>Đã phát thành công</span>
+          <strong className="tabular-nums">{stats?.sent_count ?? 0}</strong>
+          <small>
+            <i className="metric-dot green" /> Đã xác nhận giao dịch ERP
+          </small>
+        </div>
+        <div className="metric">
+          <span>Lỗi / Hàng đợi chết (Dead-Letter)</span>
+          <strong className="tabular-nums" style={{ color: (stats?.failed_count ?? 0) > 0 ? "#ef4444" : "inherit" }}>
+            {stats?.failed_count ?? 0}
           </strong>
-          <small>100% SLA matched</small>
-        </div>
-        <div className="metric">
-          <span>IN-FLIGHT PENDING</span>
-          <strong style={{ color: "var(--amber)" }}>
-            {items.filter((i) => i.status === "PENDING").length}
-          </strong>
-          <small>Queued for retry</small>
-        </div>
-        <div className="metric">
-          <span>IDEMPOTENCY CONFLICTS</span>
-          <strong style={{ color: "var(--blue)" }}>0</strong>
-          <small>Guaranteed unique</small>
+          <small>
+            <i className="metric-dot red" /> Yêu cầu can thiệp kỹ thuật
+          </small>
         </div>
       </div>
 
-      {/* Outbox Table Card */}
-      <div className="clean-card" style={{ padding: "0", overflow: "hidden" }}>
-        <div style={{ padding: "var(--space-4) var(--space-5)", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--line)" }}>
-          <h3 style={{ margin: 0, fontSize: "var(--text-base)", fontWeight: 600 }}>Transactional Outbox Messages</h3>
-          <div style={{ display: "flex", gap: "var(--space-1)" }}>
-            {(["ALL", "DELIVERED", "PENDING", "DEAD_LETTER"] as const).map((s) => (
-              <button
-                key={s}
-                className={filter === s ? "primary-button" : "secondary-button"}
-                style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-2)", borderRadius: "var(--radius-sm)" }}
-                onClick={() => setFilter(s)}
-              >
-                {s}
-              </button>
-            ))}
+      {/* Outbox Events Table */}
+      <div className="content-card table-card">
+        <div className="panel-toolbar">
+          <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>
+            Danh sách tin nhắn Outbox giao dịch (Transactional Outbox Messages) ({events.length})
           </div>
         </div>
-
         <div className="table-wrap">
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
+          <table>
             <thead>
-              <tr style={{ background: "var(--canvas)", borderBottom: "1px solid var(--line)", textAlign: "left" }}>
-                <th style={{ padding: "var(--space-2) var(--space-4)" }}>PO NUMBER</th>
-                <th style={{ padding: "var(--space-2) var(--space-4)" }}>CUSTOMER</th>
-                <th style={{ padding: "var(--space-2) var(--space-4)" }}>TARGET ERP ADAPTER</th>
-                <th style={{ padding: "var(--space-2) var(--space-4)" }}>AMOUNT</th>
-                <th style={{ padding: "var(--space-2) var(--space-4)" }}>STATUS</th>
-                <th style={{ padding: "var(--space-2) var(--space-4)" }}>ERP REF #</th>
-                <th style={{ padding: "var(--space-2) var(--space-4)", textAlign: "right" }}>ACTION</th>
+              <tr>
+                <th style={{ width: 60 }}>ID</th>
+                <th>Mã đơn hàng</th>
+                <th>Loại sự kiện</th>
+                <th>Mã Idempotency Key</th>
+                <th style={{ textAlign: "center" }}>Trạng thái</th>
+                <th style={{ textAlign: "center" }}>Số lần thử</th>
+                <th>Mã tham chiếu ERP</th>
+                <th>Thời gian</th>
               </tr>
             </thead>
             <tbody>
-              {filteredItems.map((item) => (
-                <tr key={item.id} style={{ borderBottom: "1px solid var(--line)" }}>
-                  <td style={{ padding: "var(--space-3) var(--space-4)", fontWeight: 600, color: "var(--green)" }}>{item.poNumber}</td>
-                  <td style={{ padding: "var(--space-3) var(--space-4)", fontWeight: 500 }}>{item.customer}</td>
-                  <td style={{ padding: "var(--space-3) var(--space-4)", color: "var(--muted)", fontSize: "var(--text-xs)" }}>{item.adapter}</td>
-                  <td style={{ padding: "var(--space-3) var(--space-4)", fontWeight: 600 }}>{money(item.amount, item.currency)}</td>
-                  <td style={{ padding: "var(--space-3) var(--space-4)" }}>
-                    <span
-                      className={`badge-clean ${
-                        item.status === "DELIVERED"
-                          ? "badge-clean-success"
-                          : "badge-clean-warning"
-                      }`}
-                    >
-                      {item.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: "var(--space-3) var(--space-4)" }}>
-                    <span className="code-snippet">{item.erpReference || "—"}</span>
-                  </td>
-                  <td style={{ padding: "var(--space-3) var(--space-4)", textAlign: "right" }}>
-                    {item.status === "PENDING" ? (
-                      <button
-                        className="primary-button"
-                        style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-2)" }}
-                        onClick={() => triggerRetry(item.id)}
+              {events.map((ev, idx) => {
+                const st = String(ev.status || "PENDING").toUpperCase();
+                return (
+                  <tr key={idx}>
+                    <td className="tabular-nums">#{String(ev.id)}</td>
+                    <td>
+                      <strong>{String(ev.aggregate_id || ev.po_number || "—")}</strong>
+                    </td>
+                    <td>{String(ev.event_type || "ORDER_APPROVED")}</td>
+                    <td>
+                      <code style={{ fontSize: "0.75rem" }}>
+                        {String(ev.idempotency_key || "—").slice(0, 16)}...
+                      </code>
+                    </td>
+                    <td style={{ textAlign: "center" }}>
+                      <span
+                        className={
+                          st === "SENT" || st === "DELIVERED"
+                            ? "catalog-state active"
+                            : st === "FAILED" || st === "DEAD_LETTER"
+                              ? "catalog-state inactive"
+                              : "badge"
+                        }
+                        style={{ fontSize: "0.75rem", padding: "2px 6px" }}
                       >
-                        ⚡ Sync
-                      </button>
-                    ) : (
-                      <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Synced</span>
-                    )}
+                        {st}
+                      </span>
+                    </td>
+                    <td className="tabular-nums" style={{ textAlign: "center" }}>
+                      {String(ev.retry_count ?? 0)}
+                    </td>
+                    <td>
+                      {ev.erp_reference ? (
+                        <code style={{ color: "var(--color-primary)", fontWeight: 600 }}>
+                          {String(ev.erp_reference)}
+                        </code>
+                      ) : (
+                        <span style={{ color: "var(--color-outline)" }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ fontSize: "0.8rem", color: "var(--color-outline)" }}>
+                      {String(ev.created_at || "Vừa xong")}
+                    </td>
+                  </tr>
+                );
+              })}
+              {events.length === 0 && (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: "center", padding: "var(--space-6)", color: "var(--color-outline)" }}>
+                    Chưa có sự kiện nào trong hàng đợi Outbox.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
       </div>
-
     </div>
   );
 }

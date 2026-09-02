@@ -57,14 +57,28 @@ def get_api_key_registry() -> dict[str, tuple[str, Role]]:
 from preflight.api.errors import Forbidden, Unauthorized
 
 
+from fastapi import Cookie, Depends, Header, HTTPException, status
+
+
 def get_current_user(
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     authorization: Optional[str] = Header(None),
+    pf_session: Optional[str] = Cookie(None, alias="pf_session"),
 ) -> UserPrincipal:
-    """Validate API Key or Bearer Token and return authenticated UserPrincipal."""
+    """Validate Session Cookie, API Key or Bearer Token and return authenticated UserPrincipal."""
     auth_required = os.getenv("PREFLIGHT_AUTH_REQUIRED", "true").lower() in ("true", "1", "yes")
-    registry = get_api_key_registry()
 
+    # 1. Check Session Cookie
+    if pf_session:
+        from preflight.security.session import verify_session_token
+        try:
+            return verify_session_token(pf_session)
+        except Unauthorized:
+            # If cookie is expired or invalid, fall through to check headers before rejecting
+            pass
+
+    # 2. Check API Key or Authorization Bearer header
+    registry = get_api_key_registry()
     token = None
     if x_api_key:
         token = x_api_key.strip()
@@ -78,7 +92,7 @@ def get_current_user(
         raise Unauthorized("Khóa API không hợp lệ hoặc đã hết hạn.")
 
     if auth_required:
-        raise Unauthorized("Yêu cầu xác thực. Vui lòng cung cấp header 'X-API-Key' hoặc 'Authorization: Bearer <token>'.")
+        raise Unauthorized("Yêu cầu xác thực. Vui lòng cung cấp cookie 'pf_session' hoặc header 'X-API-Key'.")
 
     # Open development mode — never allowed in production
     env_name = os.getenv("PREFLIGHT_ENV", "development").strip().lower()

@@ -49,12 +49,15 @@ export function priceDeltaPercent(poPrice: number, catalogPrice: number): number
   return ((poPrice - catalogPrice) / catalogPrice) * 100;
 }
 
-export const money = (value: number, currency: string) =>
-  new Intl.NumberFormat(currency === "VND" ? "vi-VN" : "en-US", {
+export const money = (value: number, currency: string = "VND") => {
+  const isZeroDecimal = currency.toUpperCase() === "VND";
+  return new Intl.NumberFormat(isZeroDecimal ? "vi-VN" : "en-US", {
     style: "currency",
-    currency,
-    maximumFractionDigits: 0,
+    currency: currency.toUpperCase(),
+    minimumFractionDigits: isZeroDecimal ? 0 : 2,
+    maximumFractionDigits: isZeroDecimal ? 0 : 2,
   }).format(value);
+};
 
 // ------------------------------------------------------------ line flags
 

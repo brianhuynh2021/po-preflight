@@ -1,94 +1,51 @@
-/**
- * PO Preflight Type-Safe API Client SDK
- * Target API Gateway: http://localhost:8001 (FastAPI)
- */
-
 import type {
-  AgentRunRequest,
-  AgentRunResponse,
-  BotConfigStatus,
+  AuditEvent,
+  AuthUser,
   CatalogItem,
   ConfirmExtractionRequest,
   CustomerCreditProfile,
   CustomerPriceAgreement,
   DashboardStats,
-  DecisionRequest,
-  DecisionResponse,
   ERPAdapterType,
   ERPSyncResponse,
-  ExtractedOrder,
+  IngestionJobStatus,
   OrderDetail,
   OrderSummary,
   OutboxStats,
   RuleConfig,
   SKUMatchResult,
+  SystemModes,
   UOMConversion,
 } from "./types";
 
-
-
-export interface ProblemDetails {
-  type?: string;
-  title?: string;
-  status?: number;
-  code?: string;
-  detail?: string;
-  request_id?: string;
-  errors?: Array<{ field?: string; message?: string; type?: string }>;
-}
-
 export class ApiError extends Error {
-  public code: string;
-  public requestId: string;
-  public detailVi: string;
-  public validationErrors?: Array<{ field?: string; message?: string; type?: string }>;
+  public readonly status: number;
+  public readonly statusText: string;
+  public readonly data: unknown;
 
-  constructor(
-    public status: number,
-    public statusText: string,
-    public data: unknown,
-  ) {
-    let message = `API Error ${status} ${statusText}`;
-    let code = "UNKNOWN_ERROR";
-    let requestId = "";
-    let detailVi = "Đã xảy ra lỗi không xác định. Vui lòng thử lại.";
-    let validationErrors: Array<{ field?: string; message?: string; type?: string }> | undefined = undefined;
-
-    if (data && typeof data === "object") {
-      const prob = data as ProblemDetails;
-      if (prob.code) code = prob.code;
-      if (prob.request_id) requestId = prob.request_id;
-      if (prob.detail) detailVi = prob.detail;
-      if (prob.errors) validationErrors = prob.errors;
-      message = `[${code}] ${detailVi} (${status})`;
-    } else if (typeof data === "string") {
-      detailVi = data;
-      message = data;
-    }
-
-    super(message);
+  constructor(status: number, statusText: string, data: unknown) {
+    super(`API Error ${status} ${statusText}`);
     this.name = "ApiError";
-    this.code = code;
-    this.requestId = requestId;
-    this.detailVi = detailVi;
-    this.validationErrors = validationErrors;
+    this.status = status;
+    this.statusText = statusText;
+    this.data = data;
   }
 }
 
 export function describeError(err: unknown): string {
   if (err instanceof ApiError) {
-    if (err.validationErrors && err.validationErrors.length > 0) {
-      const details = err.validationErrors
-        .map((e) => `${e.field ? e.field + ": " : ""}${e.message || "Không hợp lệ"}`)
-        .join("; ");
-      return `${err.detailVi} (${details})`;
+    if (err.data && typeof err.data === "object") {
+      const p = err.data as { detail?: string; title?: string; message?: string };
+      if (p.detail) return String(p.detail);
+      if (p.title) return String(p.title);
+      if (p.message) return String(p.message);
     }
-    return err.detailVi || err.message;
+    return `Lỗi máy chủ (${err.status}: ${err.statusText})`;
   }
   if (err instanceof Error) {
     return err.message;
   }
-  return String(err);
+  return "Đã xảy ra lỗi không xác định";
 }
 
 export interface ClientConfig {
@@ -109,7 +66,11 @@ export function createApiClient(config: ClientConfig = {}) {
       ...options.headers,
     };
 
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(url, {
+      ...options,
+      headers,
+      credentials: "include",
+    });
 
     if (!res.ok) {
       let errorData;
@@ -125,7 +86,24 @@ export function createApiClient(config: ClientConfig = {}) {
   }
 
   // =========================================================================
-  // 1. Purchase Orders API
+  // 1. Auth & Session API
+  // =========================================================================
+  const auth = {
+    login: (apiKey: string) =>
+      request<AuthUser>("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: apiKey }),
+      }),
+    me: () => request<AuthUser>("/api/v1/auth/me"),
+    logout: () =>
+      request<{ success: boolean; message: string }>("/api/v1/auth/logout", {
+        method: "POST",
+      }),
+  };
+
+  // =========================================================================
+  // 2. Purchase Orders API
   // =========================================================================
   const orders = {
     list: (params?: { status?: string; search?: string; limit?: number; offset?: number }) => {
@@ -142,13 +120,33 @@ export function createApiClient(config: ClientConfig = {}) {
       return request<OrderDetail>(`/api/v1/orders/${orderId}`);
     },
 
+    getSourceUrl: (orderId: number | string) => `${baseUrl}/api/v1/orders/${orderId}/source`,
+
     upload: async (file: File | Blob, filename: string, stagedReview = false) => {
       const formData = new FormData();
       formData.append("file", file, filename);
       const queryStr = stagedReview ? "?staged_review=true" : "";
-      return request<OrderDetail>(`/api/v1/orders/upload${queryStr}`, {
+      const url = `${baseUrl}/api/v1/orders/upload${queryStr}`;
+      const res = await fetch(url, {
         method: "POST",
+        headers: {
+          ...config.headers,
+        },
+        credentials: "include",
         body: formData,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new ApiError(res.status, res.statusText, data);
+      }
+      return data as OrderDetail;
+    },
+
+    decide: (orderId: number | string, payload: { decision: string; note?: string }) => {
+      return request<OrderDetail>(`/api/v1/orders/${orderId}/decide`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
     },
 
@@ -159,173 +157,176 @@ export function createApiClient(config: ClientConfig = {}) {
         body: JSON.stringify(payload),
       });
     },
-
-    decide: (orderId: number | string, payload: DecisionRequest) => {
-      return request<DecisionResponse>(`/api/v1/orders/${orderId}/decide`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    },
   };
 
   // =========================================================================
-  // 2. LangGraph Stateful Workflow Agent API
+  // 3. Audit & Cryptographic Blocks API
+  // =========================================================================
+  const audit = {
+    getEvents: (params?: { limit?: number; offset?: number; po_number?: string; actor?: string; action?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.limit) q.append("limit", params.limit.toString());
+      if (params?.offset) q.append("offset", params.offset.toString());
+      if (params?.po_number) q.append("po_number", params.po_number);
+      if (params?.actor) q.append("actor", params.actor);
+      if (params?.action) q.append("action", params.action);
+      const queryStr = q.toString() ? `?${q.toString()}` : "";
+      return request<AuditEvent[]>(`/api/v1/audit/events${queryStr}`);
+    },
+    getBlocks: (poNumber: string) => request<Array<Record<string, unknown>>>(`/api/v1/audit/blocks/${poNumber}`),
+  };
+
+  // =========================================================================
+  // 4. LangGraph Stateful Agent API
   // =========================================================================
   const agent = {
-    run: (payload: AgentRunRequest) => {
-      return request<AgentRunResponse>("/api/v1/agent/run", {
+    start: (poNumber: string, payload?: Record<string, unknown>) => {
+      return request<{ thread_id: string; status: string; current_node: string }>("/api/v1/agent/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ po_number: poNumber, ...payload }),
       });
     },
-
-    resume: (threadId: string, payload: { decision: "APPROVED" | "REJECTED"; decided_by: string; notes?: string }) => {
-      return request<AgentRunResponse>(`/api/v1/agent/resume/${threadId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    resume: (threadId: string, payload: { decision: string; manager_note?: string; actor?: string }) => {
+      return request<{ thread_id: string; status: string; final_state: Record<string, unknown> }>(
+        `/api/v1/agent/${threadId}/resume`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
     },
-
     getState: (threadId: string) => {
-      return request<{
-        thread_id: string;
-        values: Record<string, unknown>;
-        next_nodes: string[];
-        checkpoint_id?: string;
-      }>(`/api/v1/agent/state/${threadId}`);
+      return request<Record<string, unknown>>(`/api/v1/agent/${threadId}/state`);
+    },
+    getHistory: (threadId: string) => {
+      return request<Array<Record<string, unknown>>>(`/api/v1/agent/${threadId}/history`);
     },
   };
 
   // =========================================================================
-  // 3. 4-Tier SKU Resolution RAG API
+  // 5. SKU Waterfall Matcher API
   // =========================================================================
   const sku = {
-    resolve: (rawText: string, customerId?: string) => {
-      return request<SKUMatchResult>("/api/v1/sku/resolve", {
+    match: (query: string, customerId?: string) => {
+      return request<SKUMatchResult>("/api/v1/matcher/sku", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ raw_text: rawText, customer_id: customerId }),
+        body: JSON.stringify({ query, customer_id: customerId }),
       });
     },
-
-    batchResolve: (items: Array<{ raw_text: string; customer_id?: string }>) => {
-      return request<SKUMatchResult[]>("/api/v1/sku/batch-resolve", {
+    resolve: (query: string, customerId?: string) => {
+      return request<SKUMatchResult>("/api/v1/matcher/sku", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ query, customer_id: customerId }),
+      });
+    },
+    teachAlias: (customerId: string, rawQuery: string, targetSku: string) => {
+      return request<{ success: boolean; message: string }>("/api/v1/matcher/alias", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_id: customerId,
+          raw_query: rawQuery,
+          target_sku: targetSku,
+        }),
       });
     },
   };
 
   // =========================================================================
-  // 4. Multimodal Ingestion & Vision OCR API
+  // 6. Intelligent Ingestion API
   // =========================================================================
   const ingest = {
-    extract: async (file: File | Blob, filename: string) => {
+    submitDocument: async (file: File | Blob, filename: string) => {
       const formData = new FormData();
       formData.append("file", file, filename);
-      return request<ExtractedOrder>("/api/v1/ingest/extract", {
+      const res = await fetch(`${baseUrl}/api/v1/ingestion/submit`, {
         method: "POST",
+        headers: {
+          ...config.headers,
+        },
+        credentials: "include",
         body: formData,
       });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new ApiError(res.status, res.statusText, data);
+      }
+      return data as { job_id: string; status: string; format_detected: string };
+    },
+    getJobStatus: (jobId: string) => {
+      return request<IngestionJobStatus>(`/api/v1/ingestion/jobs/${jobId}`);
     },
   };
 
   // =========================================================================
-  // 5. Multi-Channel Approval Bot API (Telegram / Zalo)
+  // 7. Multi-Channel Chatbot Webhook APIs
   // =========================================================================
   const bot = {
-    status: () => {
-      return request<BotConfigStatus>("/api/v1/bot/status");
-    },
-
-    notifyTelegram: (orderId: number | string) => {
-      return request<{ success: boolean; channel: string; order_id: string; dry_run: boolean; details: string }>(
-        `/api/v1/bot/telegram/notify/${orderId}`,
-        { method: "POST" }
-      );
-    },
-
-    notifyZalo: (orderId: number | string) => {
-      return request<{ success: boolean; channel: string; order_id: string; dry_run: boolean; details: string }>(
-        `/api/v1/bot/zalo/notify/${orderId}`,
-        { method: "POST" }
-      );
-    },
+    getStatus: () => request<{ telegram: Record<string, unknown>; zalo: Record<string, unknown> }>("/api/v1/bot/status"),
+    linkTelegram: (telegramChatId: string, telegramUsername?: string) =>
+      request<{ success: boolean; message: string }>("/api/v1/bot/telegram/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telegram_chat_id: telegramChatId, telegram_username: telegramUsername }),
+      }),
   };
 
-
   // =========================================================================
-  // 6. ERP Integration & Transactional Outbox API
+  // 8. ERP Outbox & Synchronization APIs
   // =========================================================================
   const erp = {
-    sync: (orderId: number | string, adapterType: ERPAdapterType = "MOCK_SAP") => {
-      return request<ERPSyncResponse>(`/api/v1/erp/sync/${orderId}?adapter_type=${adapterType}`, {
+    getOutboxStatus: () => request<OutboxStats>("/api/v1/erp/outbox/status"),
+    getOutboxEvents: (limit = 20) => request<Array<Record<string, unknown>>>(`/api/v1/erp/outbox/events?limit=${limit}`),
+    processOutbox: (batchSize = 10) =>
+      request<{ processed_count: number; results: Array<Record<string, unknown>> }>(
+        `/api/v1/erp/outbox/process?batch_size=${batchSize}`,
+        { method: "POST" },
+      ),
+    syncOrder: (orderId: number | string, adapter: ERPAdapterType = "SAP_S4HANA_MOCK") => {
+      return request<ERPSyncResponse>(`/api/v1/erp/sync/${orderId}`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adapter_name: adapter }),
       });
-    },
-
-    processOutbox: (limit = 10, adapterType: ERPAdapterType = "MOCK_SAP") => {
-      return request<{
-        processed_count: number;
-        adapter_used: string;
-        responses: ERPSyncResponse[];
-        outbox_stats: OutboxStats;
-      }>(`/api/v1/erp/outbox/process?limit=${limit}&adapter_type=${adapterType}`, {
-        method: "POST",
-      });
-    },
-
-    getOutboxStatus: (limit = 20) => {
-      return request<{
-        stats: OutboxStats;
-        events: Array<Record<string, unknown>>;
-      }>(`/api/v1/erp/outbox/status?limit=${limit}`);
     },
   };
 
   // =========================================================================
-  // 7. Enterprise B2B Contracts & Risk Master Data APIs
+  // 9. Enterprise B2B Contracts & Risk Master APIs
   // =========================================================================
   const b2b = {
-    getCustomerPrices: (customerId: string) => {
-      return request<CustomerPriceAgreement[]>(`/api/v1/customers/${customerId}/prices`);
-    },
-    setCustomerPrice: (customerId: string, payload: Omit<CustomerPriceAgreement, "customer_id">) => {
-      return request<{ status: string; pricing: CustomerPriceAgreement }>(`/api/v1/customers/${customerId}/prices`, {
+    getPricing: (customerId: string) => request<CustomerPriceAgreement[]>(`/api/v1/b2b/pricing/${customerId}`),
+    setPricing: (payload: CustomerPriceAgreement) =>
+      request<{ success: boolean; message: string }>("/api/v1/b2b/pricing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      });
-    },
-    getCustomerCredit: (customerId: string) => {
-      return request<CustomerCreditProfile>(`/api/v1/customers/${customerId}/credit`);
-    },
-    setCustomerCredit: (customerId: string, payload: Omit<CustomerCreditProfile, "customer_id">) => {
-      return request<{ status: string; profile: CustomerCreditProfile }>(`/api/v1/customers/${customerId}/credit`, {
+      }),
+    getCredit: (customerId: string) => request<CustomerCreditProfile>(`/api/v1/b2b/credits/${customerId}`),
+    setCredit: (payload: CustomerCreditProfile) =>
+      request<{ success: boolean; message: string }>("/api/v1/b2b/credits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      });
-    },
-    getUOMConversions: (sku?: string) => {
+      }),
+    getUOM: (sku?: string) => {
       const q = sku ? `?sku=${encodeURIComponent(sku)}` : "";
-      return request<UOMConversion[]>(`/api/v1/masters/uom-conversions${q}`);
+      return request<UOMConversion[]>(`/api/v1/b2b/uom${q}`);
     },
-    setUOMConversion: (payload: UOMConversion) => {
-      return request<{ status: string; conversion: UOMConversion }>("/api/v1/masters/uom-conversions", {
+    setUOM: (payload: UOMConversion) =>
+      request<{ success: boolean; message: string }>("/api/v1/b2b/uom", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      });
-    },
+      }),
   };
 
   // =========================================================================
-  // 8. System Dashboard, Catalog, Rules & Realtime SSE APIs
+  // 10. System Dashboard, Catalog, Rules & Health APIs
   // =========================================================================
   const dashboard = {
     getStats: () => request<DashboardStats>("/api/v1/dashboard/stats"),
@@ -342,6 +343,7 @@ export function createApiClient(config: ClientConfig = {}) {
         headers: {
           ...config.headers,
         },
+        credentials: "include",
         body: formData,
       });
       const data = await res.json().catch(() => null);
@@ -354,6 +356,21 @@ export function createApiClient(config: ClientConfig = {}) {
 
   const rules = {
     getConfig: () => request<RuleConfig>("/api/v1/rules"),
+    updateConfig: (payload: Partial<RuleConfig>) =>
+      request<{ success: boolean; message: string; policy: RuleConfig }>("/api/v1/rules", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+  };
+
+  const system = {
+    getModes: () => request<SystemModes>("/api/v1/system/modes"),
+  };
+
+  const health = {
+    checkReady: () => request<{ status: string; database?: string }>("/health/ready"),
+    checkLive: () => request<{ status: string }>("/health/live"),
   };
 
   function connectRealtimeStream(
@@ -363,7 +380,9 @@ export function createApiClient(config: ClientConfig = {}) {
     if (typeof window === "undefined" || !window.EventSource) {
       return () => {};
     }
-    const eventSource = new EventSource(`${baseUrl}/api/v1/events/stream`);
+    const eventSource = new EventSource(`${baseUrl}/api/v1/events/stream`, {
+      withCredentials: true,
+    });
 
     eventSource.onmessage = (e) => {
       try {
@@ -384,9 +403,12 @@ export function createApiClient(config: ClientConfig = {}) {
   }
 
   return {
+    auth,
     orders,
+    audit,
     agent,
     sku,
+    rag: sku,
     ingest,
     bot,
     erp,
@@ -394,9 +416,10 @@ export function createApiClient(config: ClientConfig = {}) {
     dashboard,
     catalog,
     rules,
+    system,
+    health,
     connectRealtimeStream,
   };
 }
 
 export const api = createApiClient();
-

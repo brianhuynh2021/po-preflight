@@ -13,6 +13,8 @@ from preflight.api.logging_config import RequestLoggingMiddleware, logger
 from preflight.security.rate_limiter import RateLimitMiddleware
 from preflight.api.routes import (
     agent,
+    audit,
+    auth,
     b2b,
     bot,
     catalog,
@@ -181,6 +183,8 @@ app.include_router(bot.router)
 app.include_router(ingestion.router)
 app.include_router(erp.router)
 app.include_router(events.router)
+app.include_router(auth.router)
+app.include_router(audit.router)
 app.include_router(system.router)
 
 

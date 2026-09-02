@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, UploadFile, File, Request, Response
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from preflight.api.deps import get_audit_store, get_catalog
 from preflight.api.errors import (
@@ -196,6 +196,54 @@ def get_order_detail(
         findings=findings,
         decisions=row.get("decisions", []),
     )
+
+
+@router.get(
+    "/{order_id}/source",
+    summary="Get Original Purchase Order Document",
+    description="Stream the original source file (PDF, image, CSV, JSON, TXT) associated with an ingested purchase order.",
+)
+def get_order_source_file(
+    order_id: int,
+    user: UserPrincipal = Depends(require_role(Role.VIEWER)),
+    store: AuditStore = Depends(get_audit_store),
+) -> FileResponse:
+    row = store.get_order(order_id)
+    if not row:
+        raise NotFound(f"Đơn hàng #{order_id} không tồn tại.")
+
+    source_file = row.get("source_file")
+    if not source_file or source_file == "direct_api_payload":
+        raise NotFound(f"Đơn hàng #{order_id} không có tệp nguồn đính kèm (được tạo trực tiếp qua API).")
+
+    candidate_paths = [
+        Path(source_file),
+        Path("examples/orders") / Path(source_file).name,
+        Path("examples/orders") / source_file,
+        Path("/tmp/preflight_uploads") / Path(source_file).name,
+    ]
+
+    for p in candidate_paths:
+        if p.exists() and p.is_file():
+            # Determine media type based on extension
+            ext = p.suffix.lower()
+            media_type = "application/octet-stream"
+            if ext == ".pdf":
+                media_type = "application/pdf"
+            elif ext in (".png", ".jpg", ".jpeg"):
+                media_type = f"image/{ext.lstrip('.')}"
+            elif ext == ".json":
+                media_type = "application/json"
+            elif ext in (".txt", ".csv"):
+                media_type = "text/plain"
+
+            return FileResponse(
+                path=str(p),
+                media_type=media_type,
+                filename=p.name,
+            )
+
+    raise NotFound(f"Không tìm thấy tệp nguồn '{source_file}' trên hệ thống lưu trữ.")
 
 
 @router.post(

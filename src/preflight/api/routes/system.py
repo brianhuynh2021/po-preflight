@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/v1/system", tags=["System Configuration & Modes"
 
 
 class SystemModesResponse(BaseModel):
+    company_name: str = Field(..., description="Configured company/workspace name")
     database: str = Field(..., description="Database backend type (postgresql or sqlite)")
     ocr: str = Field(..., description="OCR service readiness (live or unavailable)")
     telegram: str = Field(..., description="Telegram bot mode (live, dry_run, or unconfigured)")
@@ -76,7 +77,10 @@ def get_system_modes(
     fx_key = os.getenv("EXCHANGE_RATE_API_KEY")
     fx_mode = "live" if fx_key else "static"
 
+    company = os.getenv("PREFLIGHT_COMPANY_NAME", "PO Preflight Enterprise").strip()
+
     return SystemModesResponse(
+        company_name=company,
         database=db_mode,
         ocr=ocr_mode,
         telegram=tele_mode,
