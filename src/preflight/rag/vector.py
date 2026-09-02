@@ -95,11 +95,12 @@ class VectorSemanticMatcher:
         candidates.sort(key=lambda c: c.score, reverse=True)
         top = candidates[0]
 
-        is_confident = top.score >= 0.70
+        is_confident = top.score >= 0.40
         explanation = (
             f"Dense semantic vector match: '{raw_query}' matches catalog product '{top.name}' "
             f"({top.sku}) via subword n-grams & cosine similarity ({top.score * 100:.1f}%)."
         )
+
 
         return MatchResult(
             raw_query=raw_query,

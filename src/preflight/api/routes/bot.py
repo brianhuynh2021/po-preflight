@@ -70,6 +70,61 @@ def set_telegram_webhook(
     return bot_service.set_webhook(webhook_url=webhook_url, secret_token=secret_token)
 
 
+from pydantic import BaseModel, Field
+
+class LinkChannelIdentityRequest(BaseModel):
+    external_id: str = Field(..., description="External channel identifier (e.g. Telegram numeric ID or Zalo UID)")
+    user_id: str = Field(..., description="Internal system user ID")
+    display_name: str | None = Field(None, description="Human display name")
+    role: Role = Field(Role.MANAGER, description="Authorized role for this channel identity")
+
+
+@router.post(
+    "/telegram/link",
+    summary="Link Telegram User ID with System Identity",
+    description="Authorize a Telegram account for interactive button decisions.",
+)
+def link_telegram_identity(
+    payload: LinkChannelIdentityRequest,
+    user: UserPrincipal = Depends(require_role(Role.ADMIN)),
+    store: AuditStore = Depends(get_store),
+) -> dict[str, Any]:
+    store.upsert_channel_identity(
+        channel="telegram",
+        external_id=payload.external_id,
+        user_id=payload.user_id,
+        display_name=payload.display_name or payload.user_id,
+        role=payload.role.value,
+    )
+    return {
+        "success": True,
+        "message": f"Linked Telegram user {payload.external_id} to internal user {payload.user_id} with role {payload.role.value}.",
+    }
+
+
+@router.post(
+    "/zalo/link",
+    summary="Link Zalo User ID with System Identity",
+    description="Authorize a Zalo OA account for interactive button decisions.",
+)
+def link_zalo_identity(
+    payload: LinkChannelIdentityRequest,
+    user: UserPrincipal = Depends(require_role(Role.ADMIN)),
+    store: AuditStore = Depends(get_store),
+) -> dict[str, Any]:
+    store.upsert_channel_identity(
+        channel="zalo",
+        external_id=payload.external_id,
+        user_id=payload.user_id,
+        display_name=payload.display_name or payload.user_id,
+        role=payload.role.value,
+    )
+    return {
+        "success": True,
+        "message": f"Linked Zalo user {payload.external_id} to internal user {payload.user_id} with role {payload.role.value}.",
+    }
+
+
 @router.post(
     "/telegram/webhook",
     summary="Telegram Webhook Receiver",
@@ -79,21 +134,17 @@ async def telegram_webhook(
     request: Request,
     store: AuditStore = Depends(get_store),
 ) -> dict[str, Any]:
-    # Anti-Spoofing Guard: Verify Secret Token if configured or required in production
-    env_name = os.getenv("PREFLIGHT_ENV", "development").strip().lower()
-    is_production = env_name in ("production", "prod")
+    # Mandatory Secret Token Guard across all environments
     expected_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET") or os.getenv("TELEGRAM_SECRET_TOKEN")
-
-    if is_production and not expected_secret:
+    if not expected_secret:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Telegram webhook secret token is not configured in production environment.",
+            detail="Telegram webhook secret token is not configured on server.",
         )
 
-    if expected_secret:
-        token_header = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-        if not token_header or token_header != expected_secret:
-            raise HTTPException(status_code=403, detail="Invalid or missing Telegram webhook secret token.")
+    token_header = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+    if not token_header or token_header != expected_secret:
+        raise HTTPException(status_code=403, detail="Invalid or missing Telegram webhook secret token.")
 
     try:
         body = await request.json()
@@ -108,12 +159,19 @@ async def telegram_webhook(
         cb_id = str(cb.get("id", ""))
         data = str(cb.get("data", ""))
         from_user = cb.get("from", {})
+        from_user_id = str(from_user.get("id", ""))
         username = from_user.get("username", from_user.get("first_name", "Manager"))
+        msg = cb.get("message", {})
+        msg_id = msg.get("message_id")
+        chat_id = msg.get("chat", {}).get("id")
 
         result = bot_service.handle_callback_action(
             callback_data=data,
+            from_user_id=from_user_id,
             from_username=username,
             callback_query_id=cb_id,
+            chat_id=chat_id,
+            message_id=msg_id,
         )
 
         if result.get("success"):
@@ -189,22 +247,16 @@ async def zalo_webhook(
     signature = request.headers.get("X-Zalo-Signature", "")
     timestamp = request.headers.get("X-Zalo-Timestamp", "")
 
-    env_name = os.getenv("PREFLIGHT_ENV", "development").strip().lower()
-    is_production = env_name in ("production", "prod")
-
     zalo_service = ZaloBotService(store=store)
 
-    if is_production and not zalo_service.secret_key:
+    if not zalo_service.secret_key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Zalo webhook secret key is not configured in production environment.",
+            detail="Zalo webhook secret key is not configured on server.",
         )
 
-    if zalo_service.secret_key:
-        if not signature or not zalo_service.verify_webhook_signature(raw_body, timestamp, signature):
-            raise HTTPException(status_code=401, detail="Invalid or missing Zalo webhook signature.")
-    elif signature and not zalo_service.verify_webhook_signature(raw_body, timestamp, signature):
-        raise HTTPException(status_code=401, detail="Invalid Zalo webhook signature.")
+    if not signature or not zalo_service.verify_webhook_signature(raw_body, timestamp, signature):
+        raise HTTPException(status_code=401, detail="Invalid or missing Zalo webhook signature.")
 
     try:
         body = await request.json()
@@ -213,17 +265,22 @@ async def zalo_webhook(
 
     result = zalo_service.process_webhook_event(body)
 
+    if result.get("status") == "error":
+        err_code = result.get("status_code", 400)
+        raise HTTPException(status_code=err_code, detail=result.get("message", "Zalo decision failed"))
+
     if result.get("status") == "success":
         event_bus.publish(
             "order.decided",
             {
                 "order_id": result.get("po_number", ""),
                 "decision": result.get("action", ""),
-                "actor": "zalo_manager",
+                "actor": f"zalo:{result.get('result', {}).get('actor', 'manager')}",
             },
         )
 
     return {"ok": True, "result": result}
+
 
 
 

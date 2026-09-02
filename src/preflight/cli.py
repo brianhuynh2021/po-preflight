@@ -53,21 +53,33 @@ def main(argv: list[str] | None = None) -> int:
                     print(render_markdown(analysis))
                 return 2 if analysis.status == "blocked" else 0
             if args.command == "decide":
-                decision_id = store.record_decision(
-                    args.po_number, args.decision, args.actor, args.note
+                from preflight.services.decisions import Principal, decide_order
+                principal = Principal(
+                    user_id=args.actor,
+                    display_name=args.actor,
+                    role=Role.MANAGER,
+                    channel="api",
+                )
+                res = decide_order(
+                    store,
+                    order_ref=args.po_number,
+                    decision=args.decision,
+                    note=args.note,
+                    principal=principal,
                 )
                 print(
                     json.dumps(
                         {
-                            "decision_id": decision_id,
-                            "po_number": args.po_number,
-                            "decision": args.decision,
-                            "actor": args.actor,
+                            "decision_id": res.decision_id,
+                            "po_number": res.po_number,
+                            "decision": res.decision,
+                            "actor": res.actor,
                         },
                         ensure_ascii=False,
                     )
                 )
                 return 0
+
             if args.command == "history":
                 print(json.dumps(store.history(args.po_number), ensure_ascii=False, indent=2))
                 return 0

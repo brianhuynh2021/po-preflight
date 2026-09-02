@@ -132,6 +132,9 @@ def run_demo():
         "audit_trail": [],
     }
 
+
+
+
     sub(f"Invoking StateGraph for thread '{thread_id}'...")
     paused_state = graph.invoke(initial_state, config=config)
 
@@ -150,6 +153,13 @@ def run_demo():
     header(5, "MULTI-CHANNEL TELEGRAM ALERT & MANAGER APPROVAL WEBHOOK")
     from preflight.bot.telegram import TelegramBotService
 
+    store.upsert_channel_identity(
+        channel="telegram",
+        external_id="10099",
+        user_id="chief_operations_officer",
+        display_name="Chief Operations Officer",
+        role="MANAGER",
+    )
     bot = TelegramBotService(store=store)
     sub("Formatting rich HTML Telegram alert card...")
     sub("Generated inline keyboard: [✅ Duyệt Đơn (Approve)] [❌ Từ Chối] [📝 Yêu Cầu Sửa]")
@@ -163,9 +173,11 @@ def run_demo():
     sub("Simulating Manager clicking [✅ Duyệt Đơn] on Telegram mobile app...")
     bot_res = bot.handle_callback_action(
         callback_data="approve:PO-2026-8899",
+        from_user_id="10099",
         from_username="chief_operations_officer",
     )
-    success(f"Telegram Webhook callback processed: {bot_res.get('message')}")
+    success(f"Telegram Webhook callback processed: {bot_res.get('popup_message') or bot_res.get('message')}")
+
 
     time.sleep(0.3)
 

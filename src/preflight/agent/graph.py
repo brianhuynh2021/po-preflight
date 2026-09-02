@@ -27,11 +27,12 @@ def route_after_audit(state: PreflightAgentState) -> Literal["erp_sync", "hitl_d
 
 
 def route_after_human_approval(state: PreflightAgentState) -> Literal["erp_sync", "__end__"]:
-    """Conditional Edge: Route approved orders to ERP, or rejected orders to END."""
+    """Conditional Edge: Route approved orders to ERP, or rejected/decision-errored orders to END."""
     status = state.get("status", "approved")
-    if status == "approved":
+    if status == "approved" and not state.get("decision_error"):
         return "erp_sync"
     return "__end__"
+
 
 
 def build_preflight_graph(

@@ -159,18 +159,18 @@ class DecisionRequest(BaseModel):
     decision: Literal["approved", "rejected", "needs_changes"] = Field(
         ..., description="Human decision action"
     )
-    actor: str = Field("operations_manager", description="Username or email of the reviewer")
-    note: str = Field("", description="Optional justification or rejection reason")
+    actor: str | None = Field(None, description="DEPRECATED: Authenticated user principal is used automatically")
+    note: str | None = Field("", description="Optional justification or rejection reason")
 
     model_config = {
         "json_schema_extra": {
             "example": {
                 "decision": "approved",
-                "actor": "manager@company.com",
                 "note": "Approved with price exception per customer email agreement.",
             }
         }
     }
+
 
 
 class DecisionResponse(BaseModel):

@@ -3,26 +3,38 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
 import tempfile
+import time
 import unittest
 from decimal import Decimal
+from unittest.mock import patch
+
 
 from starlette.testclient import TestClient
 
 from preflight.api.app import app
 from preflight.bot.zalo import ZaloBotService, format_zalo_notification
 from preflight.models import Analysis, LineItem, Order
+from preflight.api.deps import get_audit_store, get_store
 from preflight.security.rate_limiter import global_rate_limiter
 from preflight.store import AuditStore
 
 
 class TestZaloBot(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
-
     def setUp(self):
         global_rate_limiter.reset()
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.store = AuditStore(f"{self.temp_dir.name}/test_zalo.db")
+        app.dependency_overrides[get_store] = lambda: self.store
+        app.dependency_overrides[get_audit_store] = lambda: self.store
+        self.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
+
+    def tearDown(self):
+        app.dependency_overrides.clear()
+        self.store.close()
+        self.temp_dir.cleanup()
+
 
 
     def test_format_zalo_notification(self):
@@ -62,12 +74,17 @@ class TestZaloBot(unittest.TestCase):
             )
             analysis = Analysis(order=order, findings=[], status="review_required")
             store.record_analysis(analysis, "test.json")
+            store.upsert_channel_identity("zalo", "zalo_uid_88", "zalo_mgr", "Zalo Manager", "MANAGER")
 
             secret_key = "zalo_test_secret_key_123"
             app_id = "123456789"
             service = ZaloBotService(app_id=app_id, secret_key=secret_key, store=store)
 
-            raw_body = json.dumps({"event_name": "user_send_text", "message": {"text": "APPROVE:PO-ZALO-5566"}}).encode("utf-8")
+            raw_body = json.dumps({
+                "event_name": "user_send_text",
+                "message": {"text": "APPROVE:PO-ZALO-5566"},
+                "sender": {"id": "zalo_uid_88"},
+            }).encode("utf-8")
             timestamp = "1725200000"
 
             # Compute valid signature
@@ -91,10 +108,40 @@ class TestZaloBot(unittest.TestCase):
 
     def test_zalo_webhook_endpoint(self):
         """Test POST /api/v1/bot/zalo/webhook HTTP endpoint."""
-        payload = {"event_name": "user_click_button", "message": {"text": "APPROVE:PO-2026-1002"}}
-        res = self.client.post("/api/v1/bot/zalo/webhook", json=payload)
-        self.assertEqual(res.status_code, 200)
-        self.assertTrue(res.json()["ok"])
+        app_id = "123456"
+        secret_key = "test_zalo_secret"
+        self.store.upsert_channel_identity("zalo", "zalo_u1", "mgr_zalo", "Manager Zalo", "MANAGER")
+
+        order = Order(
+            po_number="PO-2026-1002",
+            customer="Northstar Retail",
+            items=(LineItem(sku="LAPTOP-A14", quantity=1, unit_price=Decimal("18500000")),),
+        )
+        self.store.record_analysis(Analysis(order=order, findings=[], status="review_required"), "test.json")
+
+        payload = {
+            "event_name": "user_click_button",
+            "message": {"text": "APPROVE:PO-2026-1002"},
+            "sender": {"id": "zalo_u1"},
+        }
+        body_bytes = json.dumps(payload).encode("utf-8")
+        ts = str(int(time.time()))
+        data_to_sign = f"{app_id}{body_bytes.decode('utf-8')}{ts}{secret_key}".encode("utf-8")
+        sig = hashlib.sha256(data_to_sign).hexdigest()
+
+        with patch.dict(os.environ, {"ZALO_APP_ID": app_id, "ZALO_SECRET_KEY": secret_key}, clear=False):
+            res = self.client.post(
+                "/api/v1/bot/zalo/webhook",
+                data=body_bytes,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Zalo-Signature": sig,
+                    "X-Zalo-Timestamp": ts,
+                },
+            )
+            self.assertEqual(res.status_code, 200)
+            self.assertTrue(res.json()["ok"])
+
 
 
 if __name__ == "__main__":

@@ -193,20 +193,62 @@ def hitl_dispatch_node(state: PreflightAgentState, catalog: dict[str, Product], 
 
 def human_approval_node(state: PreflightAgentState, catalog: dict[str, Product], store: AuditStore) -> dict[str, Any]:
     """Node 5: Human Approval Checkpoint Node (Interrupt Target).
-    When graph resumes after human approval, this node verifies decision.
+    When graph resumes after human approval, this node executes decision through single DecisionService gate.
     """
+    from preflight.security.rbac import Role
+    from preflight.services.decisions import DecisionError, Principal, decide_order
+
     decision = state.get("decision", "APPROVED")
     decided_by = state.get("decided_by", "Manager")
+    notes = state.get("notes") or state.get("decision_notes", "Decision executed via Agentic Workflow")
+    po_num = state.get("po_number", "")
     trail = list(state.get("audit_trail", []))
-    trail.append(f"[{time.strftime('%H:%M:%S')}] Human decision recorded: '{decision}' by '{decided_by}'.")
 
-    # Update status to reflect human decision
-    updated_status = "approved" if decision == "APPROVED" else "rejected"
+    clean_decision = "approved" if str(decision).upper() == "APPROVED" else ("rejected" if str(decision).upper() == "REJECTED" else "needs_changes")
+    
+    # If order was already decided in store (e.g. by bot webhook before resume), reuse decided state
+    existing = store.get_order(po_num) or store.get_order_by_po(po_num)
+    if existing and existing.get("status") in {"approved", "rejected", "needs_changes"}:
+        decided_status = existing.get("status")
+        trail.append(f"[{time.strftime('%H:%M:%S')}] Human decision recorded: '{decision}' by '{decided_by}'.")
+        return {
+            "status": decided_status,
+            "decision_error": None,
+            "audit_trail": trail,
+        }
 
-    return {
-        "status": updated_status,
-        "audit_trail": trail,
-    }
+    principal = Principal(
+        user_id=decided_by,
+        display_name=decided_by,
+        role=Role.MANAGER,
+        channel="agent",
+    )
+
+
+    try:
+        decide_order(
+            store=store,
+            order_ref=po_num,
+            decision=clean_decision,
+            note=notes,
+            principal=principal,
+        )
+        trail.append(f"[{time.strftime('%H:%M:%S')}] Human decision recorded: '{decision}' by '{decided_by}'.")
+        return {
+            "status": clean_decision,
+            "decision_error": None,
+            "audit_trail": trail,
+        }
+
+    except DecisionError as err:
+        trail.append(f"[{time.strftime('%H:%M:%S')}] Decision failed governance validation: {err.message}")
+        return {
+            "status": "decision_rejected",
+            "decision_error": err.message,
+            "error": err.message,
+            "audit_trail": trail,
+        }
+
 
 
 def erp_sync_node(state: PreflightAgentState, catalog: dict[str, Product], store: AuditStore) -> dict[str, Any]:

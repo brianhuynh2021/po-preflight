@@ -43,7 +43,18 @@ CREATE TABLE IF NOT EXISTS decisions (
     decision TEXT NOT NULL,
     actor TEXT NOT NULL,
     note TEXT NOT NULL,
+    display_name TEXT,
+    channel TEXT,
     created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS channel_identities (
+    channel TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(channel, external_id)
 );
 CREATE TABLE IF NOT EXISTS customer_aliases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,8 +147,21 @@ CREATE TABLE IF NOT EXISTS decisions (
     decision VARCHAR(64) NOT NULL,
     actor VARCHAR(255) NOT NULL,
     note TEXT NOT NULL,
+    display_name VARCHAR(255),
+    channel VARCHAR(64),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS channel_identities (
+    channel VARCHAR(64) NOT NULL,
+    external_id VARCHAR(255) NOT NULL,
+    user_id VARCHAR(255) NOT NULL,
+    display_name VARCHAR(255) NOT NULL,
+    role VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(channel, external_id)
+);
+
 
 CREATE TABLE IF NOT EXISTS customer_aliases (
     id SERIAL PRIMARY KEY,
@@ -237,9 +261,31 @@ class BaseAuditStore(abc.ABC):
 
     @abc.abstractmethod
     def record_decision(
-        self, po_number: str, decision: str, actor: str, note: str = ""
+        self,
+        po_number: str,
+        decision: str,
+        actor: str,
+        note: str = "",
+        display_name: str | None = None,
+        channel: str | None = None,
     ) -> int:
         pass
+
+    @abc.abstractmethod
+    def get_channel_identity(self, channel: str, external_id: str) -> dict[str, Any] | None:
+        pass
+
+    @abc.abstractmethod
+    def upsert_channel_identity(
+        self,
+        channel: str,
+        external_id: str,
+        user_id: str,
+        display_name: str,
+        role: str,
+    ) -> None:
+        pass
+
 
     @abc.abstractmethod
     def history(self, po_number: str) -> dict[str, list[dict[str, object]]]:
@@ -328,6 +374,11 @@ class BaseAuditStore(abc.ABC):
     def get_policy(self) -> RulePolicy:
         pass
 
+    @abc.abstractmethod
+    def get_order_by_po(self, po_number: str) -> dict[str, Any] | None:
+        pass
+
+
 
 
 
@@ -354,6 +405,16 @@ class AuditStore(BaseAuditStore):
             except Exception:
                 pass
             self.connection.executescript(SQLITE_SCHEMA)
+            try:
+                self.connection.execute("ALTER TABLE decisions ADD COLUMN display_name TEXT;")
+            except Exception:
+                pass
+            try:
+                self.connection.execute("ALTER TABLE decisions ADD COLUMN channel TEXT;")
+            except Exception:
+                pass
+            self.connection.commit()
+
 
     def close(self) -> None:
         with self._lock:
@@ -457,7 +518,13 @@ class AuditStore(BaseAuditStore):
                 )
 
     def record_decision(
-        self, po_number: str, decision: str, actor: str, note: str = ""
+        self,
+        po_number: str,
+        decision: str,
+        actor: str,
+        note: str = "",
+        display_name: str | None = None,
+        channel: str | None = None,
     ) -> int:
         if decision not in {"approved", "rejected", "needs_changes"}:
             raise ValueError("Decision must be approved, rejected, or needs_changes")
@@ -467,10 +534,18 @@ class AuditStore(BaseAuditStore):
             with self.connection:
                 cursor = self.connection.execute(
                     """
-                    INSERT INTO decisions (po_number, decision, actor, note, created_at)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO decisions (po_number, decision, actor, note, display_name, channel, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (po_number, decision, actor, note, datetime.now(UTC).isoformat()),
+                    (
+                        po_number,
+                        decision,
+                        actor,
+                        note,
+                        display_name or actor,
+                        channel or "api",
+                        datetime.now(UTC).isoformat(),
+                    ),
                 )
                 self.connection.execute(
                     "UPDATE analyses SET status = ? WHERE po_number = ?",
@@ -480,9 +555,16 @@ class AuditStore(BaseAuditStore):
                     po_number,
                     f"DECISION_{decision.upper()}",
                     actor,
-                    {"decision": decision, "note": note, "actor": actor},
+                    {
+                        "decision": decision,
+                        "note": note,
+                        "actor": actor,
+                        "display_name": display_name or actor,
+                        "channel": channel or "api",
+                    },
                 )
                 return int(cursor.lastrowid)
+
 
 
     def history(self, po_number: str) -> dict[str, list[dict[str, object]]]:
@@ -564,7 +646,11 @@ class AuditStore(BaseAuditStore):
             ]
             return data
 
+    def get_order_by_po(self, po_number: str) -> dict[str, Any] | None:
+        return self.get_order(po_number)
+
     def get_dashboard_stats(self) -> dict[str, Any]:
+
         with self._lock:
             total_orders = self.connection.execute(
                 "SELECT COUNT(*) AS c FROM analyses"
@@ -866,6 +952,47 @@ class AuditStore(BaseAuditStore):
             data = json.loads(row["policy_json"])
             return RulePolicy.from_dict(data)
 
+    def get_channel_identity(self, channel: str, external_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT * FROM channel_identities WHERE channel = ? AND external_id = ? LIMIT 1",
+                (channel.strip().lower(), str(external_id).strip()),
+            ).fetchone()
+            if not row:
+                return None
+            return dict(row)
+
+    def upsert_channel_identity(
+        self,
+        channel: str,
+        external_id: str,
+        user_id: str,
+        display_name: str,
+        role: str,
+    ) -> None:
+        with self._lock:
+            self.connection.execute(
+                """
+                INSERT INTO channel_identities (channel, external_id, user_id, display_name, role, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(channel, external_id) DO UPDATE SET
+                    user_id = excluded.user_id,
+                    display_name = excluded.display_name,
+                    role = excluded.role,
+                    created_at = excluded.created_at
+                """,
+                (
+                    channel.strip().lower(),
+                    str(external_id).strip(),
+                    user_id.strip(),
+                    display_name.strip(),
+                    role.strip().upper(),
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+            self.connection.commit()
+
+
 
 
 class PostgresAuditStore(BaseAuditStore):
@@ -989,25 +1116,44 @@ class PostgresAuditStore(BaseAuditStore):
         finally:
             self._pool.putconn(conn)
 
-    def record_decision(self, po_number: str, decision: str, actor: str, note: str = "") -> int:
+    def record_decision(
+        self,
+        po_number: str,
+        decision: str,
+        actor: str,
+        note: str = "",
+        display_name: str | None = None,
+        channel: str | None = None,
+    ) -> int:
         if self._fallback_sqlite:
-            return self._fallback_sqlite.record_decision(po_number, decision, actor, note)
+            return self._fallback_sqlite.record_decision(
+                po_number, decision, actor, note, display_name=display_name, channel=channel
+            )
         conn = self._pool.getconn()
         try:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO decisions (po_number, decision, actor, note, created_at)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO decisions (po_number, decision, actor, note, display_name, channel, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """,
-                    (po_number, decision, actor, note, datetime.now(UTC).isoformat()),
+                    (
+                        po_number,
+                        decision,
+                        actor,
+                        note,
+                        display_name or actor,
+                        channel or "api",
+                        datetime.now(UTC).isoformat(),
+                    ),
                 )
                 d_id = int(cur.fetchone()[0])
             conn.commit()
             return d_id
         finally:
             self._pool.putconn(conn)
+
 
     def history(self, po_number: str) -> dict[str, list[dict[str, object]]]:
         if self._fallback_sqlite:
@@ -1079,7 +1225,13 @@ class PostgresAuditStore(BaseAuditStore):
         finally:
             self._pool.putconn(conn)
 
+    def get_order_by_po(self, po_number: str) -> dict[str, Any] | None:
+        if self._fallback_sqlite:
+            return self._fallback_sqlite.get_order_by_po(po_number)
+        return self.get_order(po_number)
+
     def get_dashboard_stats(self) -> dict[str, Any]:
+
         if self._fallback_sqlite:
             return self._fallback_sqlite.get_dashboard_stats()
         conn = self._pool.getconn()
@@ -1428,6 +1580,63 @@ class PostgresAuditStore(BaseAuditStore):
                 return RulePolicy.from_dict(data)
         finally:
             self._pool.putconn(conn)
+
+    def get_channel_identity(self, channel: str, external_id: str) -> dict[str, Any] | None:
+        if self._fallback_sqlite:
+            return self._fallback_sqlite.get_channel_identity(channel, external_id)
+        conn = self._pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM channel_identities WHERE channel = %s AND external_id = %s LIMIT 1",
+                    (channel.strip().lower(), str(external_id).strip()),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                return dict(row)
+        finally:
+            self._pool.putconn(conn)
+
+    def upsert_channel_identity(
+        self,
+        channel: str,
+        external_id: str,
+        user_id: str,
+        display_name: str,
+        role: str,
+    ) -> None:
+        if self._fallback_sqlite:
+            self._fallback_sqlite.upsert_channel_identity(
+                channel, external_id, user_id, display_name, role
+            )
+            return
+        conn = self._pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO channel_identities (channel, external_id, user_id, display_name, role, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(channel, external_id) DO UPDATE SET
+                        user_id = EXCLUDED.user_id,
+                        display_name = EXCLUDED.display_name,
+                        role = EXCLUDED.role,
+                        created_at = EXCLUDED.created_at
+                    """,
+                    (
+                        channel.strip().lower(),
+                        str(external_id).strip(),
+                        user_id.strip(),
+                        display_name.strip(),
+                        role.strip().upper(),
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+            conn.commit()
+        finally:
+            self._pool.putconn(conn)
+
 
 
 

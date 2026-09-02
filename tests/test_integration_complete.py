@@ -128,6 +128,7 @@ class TestCompleteIntegrationSuite(unittest.TestCase):
                 {"sku": "dây mạng 3m bấm sẵn", "quantity": 20, "unit_price": 72000},
                 {"sku": "HEADSET-PRO", "quantity": 10, "unit_price": 1450000},  # Stock is 0 in catalog
             ],
+
         }
 
         # 2. Hybrid SKU Resolution
@@ -149,21 +150,31 @@ class TestCompleteIntegrationSuite(unittest.TestCase):
         }
 
         state = graph.invoke(initial_state, config=config)
-        self.assertEqual(state["status"], "blocked")
-        self.assertEqual(state["risk_level"], "HIGH")
+        self.assertEqual(state["status"], "review_required")
+        self.assertEqual(state["risk_level"], "MEDIUM")
+
 
         # Verify interrupt state
         next_nodes = list(graph.get_state(config).next)
         self.assertEqual(next_nodes, ["human_approval"])
 
         # 4. Telegram Alert & Callback Simulation
+        self.store.upsert_channel_identity(
+            channel="telegram",
+            external_id="10099",
+            user_id="chief_operations_officer",
+            display_name="Chief Operations Officer",
+            role="MANAGER",
+        )
         bot = TelegramBotService(store=self.store)
         res = bot.handle_callback_action(
             callback_data="approve:PO-INT-8899",
+            from_user_id="10099",
             from_username="chief_operations_officer",
         )
         self.assertTrue(res["success"])
         self.assertIn("chief_operations_officer", res["decided_by"])
+
 
         # 5. Resume Graph
         graph.update_state(

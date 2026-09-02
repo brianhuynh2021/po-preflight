@@ -8,7 +8,7 @@ from pathlib import Path
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from preflight.api.deps import get_audit_store, get_catalog
@@ -28,8 +28,9 @@ from preflight.parsers import parse_order
 from preflight.rules import DecisionValidationError, analyze_order, validate_order_decision
 from preflight.rules_context import build_rule_context
 from preflight.security.rbac import Role, UserPrincipal, require_role
-
+from preflight.services.decisions import DecisionError, Principal, decide_order
 from preflight.store import AuditStore
+
 
 router = APIRouter(prefix="/api/v1/orders", tags=["Purchase Orders & Preflight Operations"])
 
@@ -333,69 +334,48 @@ def confirm_extraction(
     "/{order_id}/decide",
     response_model=DecisionResponse,
     summary="Record Human Approval Decision",
-    description="Authorize or reject a Purchase Order. Triggers audit record creation with actor and timestamp.",
+    description="Authorize or reject a Purchase Order via unified DecisionService. Audits authenticated actor and channel.",
 )
 def record_decision(
     order_id: str,
     payload: DecisionRequest,
+    request: Request,
+    response: Response,
     user: UserPrincipal = Depends(require_role(Role.MANAGER)),
     store: AuditStore = Depends(get_audit_store),
 ) -> DecisionResponse:
-    row = store.get_order(order_id)
-    if not row:
-        raise HTTPException(status_code=404, detail=f"Order {order_id} not found.")
+    if payload.actor is not None:
+        response.headers["X-Deprecated-Field"] = "actor"
 
-    po_number = row["po_number"]
-    current_status = row.get("status", "ready_for_approval")
-    findings_raw = row.get("findings_json") or "[]"
-    try:
-        findings_list = json.loads(findings_raw) if isinstance(findings_raw, str) else findings_raw
-    except Exception:
-        findings_list = []
-    error_count = sum(1 for f in findings_list if isinstance(f, dict) and f.get("severity") == "error")
+    channel = "web" if request.headers.get("X-Client") == "web" else "api"
+    principal = Principal(
+        user_id=user.username,
+        display_name=user.username,
+        role=user.role,
+        channel=channel,
+    )
 
-    # Enforce SOX 404 / SOC2 Type II business constraints
     try:
-        validate_order_decision(
-            current_status=current_status,
+        result = decide_order(
+            store=store,
+            order_ref=order_id,
             decision=payload.decision,
             note=payload.note,
-            error_count=error_count,
+            principal=principal,
+            event_bus=event_bus,
         )
-    except DecisionValidationError as err:
-        raise HTTPException(status_code=err.status_code, detail=err.message)
-
-    try:
-        decision_id = store.record_decision(
-            po_number=po_number,
-            decision=payload.decision,
-            actor=payload.actor,
-            note=payload.note,
-        )
-        history = store.history(po_number)
-        latest = history["decisions"][-1]
-
-        event_bus.publish(
-            "order.decided",
-            {
-                "id": str(order_id),
-                "po_number": po_number,
-                "decision": payload.decision,
-                "actor": payload.actor,
-            },
-        )
-
         return DecisionResponse(
             success=True,
-            id=decision_id,
-            po_number=po_number,
-            decision=latest["decision"],
-            actor=latest["actor"],
-            note=latest["note"],
-            created_at=latest["created_at"],
+            id=result.decision_id,
+            po_number=result.po_number,
+            decision=result.decision,
+            actor=result.actor,
+            note=result.note,
+            created_at=result.created_at,
         )
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    except DecisionError as err:
+        raise HTTPException(status_code=err.status_code, detail=err.message)
+
 
 
 

@@ -26,6 +26,8 @@ class PreflightAgentState(TypedDict, total=False):
     decision: str | None  # "APPROVED" | "REJECTED" | "CHANGES_REQUESTED"
     decided_by: str | None
     decision_notes: str | None
+    decision_error: str | None
+
 
     # Bot Notification Tracking
     telegram_notified: bool

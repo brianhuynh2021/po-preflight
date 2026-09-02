@@ -144,9 +144,10 @@ class TestFastAPIGateway(unittest.TestCase):
         res = self.client.post(f"/api/v1/orders/{order_id}/decide", json=decision_payload)
         self.assertEqual(res.status_code, 200)
         data = res.json()
-        self.assertTrue(data["success"])
         self.assertEqual(data["decision"], "approved")
-        self.assertEqual(data["actor"], "lead_reviewer@company.com")
+        self.assertEqual(data["actor"], "api:system_administrator")
+        self.assertEqual(res.headers.get("x-deprecated-field"), "actor")
+
 
     def test_cannot_approve_blocked_order_returns_409(self):
         uid = uuid.uuid4().hex[:6]

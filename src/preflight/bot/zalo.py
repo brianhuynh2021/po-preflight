@@ -175,29 +175,87 @@ class ZaloBotService:
             )
 
     def verify_webhook_signature(self, raw_body: bytes, timestamp: str, signature: str) -> bool:
-        """Verify HMAC-SHA256 signature from Zalo Webhook callback."""
-        if not self.secret_key:
-            return True  # Dev mode
+        """Verify HMAC-SHA256 signature from Zalo Webhook callback. Fails closed if secret_key is missing."""
+        if not self.secret_key or not signature or not timestamp:
+            return False
         
         # Zalo signature format: sha256(app_id + raw_body + timestamp + secret_key)
-        data_to_sign = f"{self.app_id}{raw_body.decode('utf-8', errors='ignore')}{timestamp}{self.secret_key}".encode("utf-8")
+        body_text = raw_body.decode('utf-8', errors='ignore') if isinstance(raw_body, bytes) else str(raw_body)
+        data_to_sign = f"{self.app_id}{body_text}{timestamp}{self.secret_key}".encode("utf-8")
         expected_sig = hashlib.sha256(data_to_sign).hexdigest()
         return hmac.compare_digest(expected_sig, signature)
 
     def process_webhook_event(self, event_data: dict[str, Any]) -> dict[str, Any]:
-        """Parse incoming user click event and update preflight order state."""
+        """Parse incoming user click event and update preflight order state through single DecisionService."""
+        from preflight.security.rbac import Role
+        from preflight.services.decisions import DecisionError, Principal, decide_order
+
         event_name = event_data.get("event_name", "")
         payload_str = event_data.get("message", {}).get("text", "") or event_data.get("user_id_by_app", "")
+        sender_id = str(
+            event_data.get("sender", {}).get("id")
+            or event_data.get("user_id_by_app", "")
+            or event_data.get("recipient", {}).get("id", "")
+        )
 
         if ":" in payload_str and self.store:
             action, po_number = payload_str.split(":", 1)
             action_lower = action.lower()
 
-            if action_lower in ["approve", "approved"]:
-                self.store.record_decision(po_number, "approved", "zalo_manager", "Approved via Zalo OA 1-touch interactive card")
-                return {"status": "success", "action": "approved", "po_number": po_number}
-            elif action_lower in ["reject", "rejected"]:
-                self.store.record_decision(po_number, "rejected", "zalo_manager", "Rejected via Zalo OA")
-                return {"status": "success", "action": "rejected", "po_number": po_number}
+            if action_lower not in ["approve", "approved", "reject", "rejected", "needs_changes", "request_changes"]:
+                return {"status": "ignored", "event_name": event_name}
+
+            decision = "approved" if action_lower in ["approve", "approved"] else ("rejected" if action_lower in ["reject", "rejected"] else "needs_changes")
+
+            identity = self.store.get_channel_identity("zalo", sender_id) if sender_id else None
+            if not identity:
+                return {
+                    "status": "error",
+                    "error": "UNLINKED_ACCOUNT",
+                    "message": "Zalo account is not linked to any system user. Contact admin.",
+                    "status_code": 403,
+                }
+
+            role_raw = identity.get("role", "VIEWER")
+            if isinstance(role_raw, str):
+                role_enum = getattr(Role, role_raw.strip().upper(), Role.VIEWER)
+            elif isinstance(role_raw, int):
+                try:
+                    role_enum = Role(role_raw)
+                except ValueError:
+                    role_enum = Role.VIEWER
+            else:
+                role_enum = Role.VIEWER
+
+
+            principal = Principal(
+                user_id=identity["user_id"],
+                display_name=identity["display_name"],
+                role=role_enum,
+                channel="zalo",
+            )
+
+            try:
+                result = decide_order(
+                    store=self.store,
+                    order_ref=po_number,
+                    decision=decision,
+                    note="Processed via Zalo OA 1-touch interactive card",
+                    principal=principal,
+                )
+                return {
+                    "status": "success",
+                    "action": decision,
+                    "po_number": po_number,
+                    "result": result.to_dict(),
+                }
+            except DecisionError as err:
+                return {
+                    "status": "error",
+                    "error": err.code,
+                    "message": err.message,
+                    "status_code": err.status_code,
+                }
 
         return {"status": "ignored", "event_name": event_name}
+

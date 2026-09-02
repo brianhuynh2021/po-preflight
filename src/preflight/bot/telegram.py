@@ -207,22 +207,72 @@ class TelegramBotService:
                 return json.loads(response.read().decode("utf-8"))
         except Exception as exc:
             logger.error(f"Failed to set Telegram webhook: {exc}")
-            return {"ok": False, "description": str(exc)}
+    def answer_callback_query(
+        self, callback_query_id: str, text: str = "", show_alert: bool = False
+    ) -> None:
+        """Acknowledge Telegram callback query with optional notification/alert popup."""
+        if not self.is_configured or not callback_query_id:
+            return
+        url = f"https://api.telegram.org/bot{self.token}/answerCallbackQuery"
+        payload = {
+            "callback_query_id": callback_query_id,
+            "text": text,
+            "show_alert": show_alert,
+        }
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=5):
+                pass
+        except Exception as exc:
+            logger.warning(f"Could not answer callback query: {exc}")
+
+    def disable_reply_markup(self, chat_id: int | str, message_id: int) -> None:
+        """Remove inline action buttons after decision is processed."""
+        if not self.is_configured or not chat_id or not message_id:
+            return
+        url = f"https://api.telegram.org/bot{self.token}/editMessageReplyMarkup"
+        payload = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "reply_markup": {"inline_keyboard": []},
+        }
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=5):
+                pass
+        except Exception as exc:
+            logger.warning(f"Could not disable reply markup: {exc}")
 
     def handle_callback_action(
         self,
         callback_data: str,
+        from_user_id: str | int | None = None,
         from_username: str | None = None,
         callback_query_id: str | None = None,
+        chat_id: int | str | None = None,
+        message_id: int | None = None,
     ) -> dict[str, Any]:
-        """Process inline button click callback query."""
+        """Process inline button click callback query with authenticated identity and single decision gate."""
+        from preflight.security.rbac import Role
+        from preflight.services.decisions import DecisionError, Principal, decide_order
+
         parts = callback_data.split(":", 1)
         if len(parts) != 2:
             return {"success": False, "message": "Invalid callback data format"}
 
         action, order_id_str = parts[0], parts[1]
         try:
-            order_id = int(order_id_str)
+            order_id: int | str = int(order_id_str)
         except ValueError:
             order_id = order_id_str
 
@@ -237,29 +287,79 @@ class TelegramBotService:
             return {"success": False, "message": f"Unknown action '{action}'"}
 
         store_decision, display_decision, user_msg = decision_map[action]
-        decided_by = f"Telegram:@{from_username}" if from_username else "Telegram:Manager"
 
-        # Record decision in store if available
-        if self.store is not None:
-            po_num = str(order_id)
-            if isinstance(order_id, int) or (isinstance(order_id, str) and order_id.isdigit()):
-                order = self.store.get_order(int(order_id))
-                if order:
-                    po_num = order["po_number"]
+        if not self.store:
+            return {"success": False, "message": "Store is not configured"}
+
+        # 1. Lookup channel identity for telegram user id
+        identity = self.store.get_channel_identity("telegram", str(from_user_id)) if from_user_id else None
+        if not identity:
+            msg = "Tài khoản Telegram chưa được liên kết. Liên hệ quản trị."
+            if callback_query_id:
+                self.answer_callback_query(callback_query_id, text=msg, show_alert=True)
+            return {
+                "success": False,
+                "popup_message": msg,
+                "show_alert": True,
+                "error": "UNLINKED_ACCOUNT",
+            }
+
+        role_raw = identity.get("role", "VIEWER")
+        if isinstance(role_raw, str):
+            role_enum = getattr(Role, role_raw.strip().upper(), Role.VIEWER)
+        elif isinstance(role_raw, int):
             try:
-                self.store.record_decision(
-                    po_number=po_num,
-                    decision=store_decision,
-                    actor=decided_by,
-                    note=f"Processed via Telegram Inline Button Action [{action}]",
-                )
-            except Exception as exc:
-                logger.warning(f"Could not record decision in store: {exc}")
+                role_enum = Role(role_raw)
+            except ValueError:
+                role_enum = Role.VIEWER
+        else:
+            role_enum = Role.VIEWER
 
-        return {
-            "success": True,
-            "order_id": order_id,
-            "decision": display_decision,
-            "decided_by": decided_by,
-            "popup_message": user_msg,
-        }
+
+        principal = Principal(
+            user_id=identity["user_id"],
+            display_name=identity["display_name"],
+            role=role_enum,
+            channel="telegram",
+        )
+
+        try:
+            result = decide_order(
+                store=self.store,
+                order_ref=order_id,
+                decision=store_decision,
+                note=f"Processed via Telegram Inline Button Action [{action}]",
+                principal=principal,
+            )
+            if callback_query_id:
+                self.answer_callback_query(callback_query_id, text=user_msg, show_alert=False)
+            if chat_id and message_id:
+                self.disable_reply_markup(chat_id, message_id)
+
+            return {
+                "success": True,
+                "order_id": order_id,
+                "decision": display_decision,
+                "decided_by": f"telegram:{identity['user_id']}",
+                "popup_message": user_msg,
+                "decision_result": result.to_dict(),
+            }
+        except DecisionError as err:
+            if err.status_code == 409:
+                popup_msg = "Đơn đang bị chặn, không thể duyệt." if "blocked" in err.message.lower() else f"Không thể duyệt: {err.message}"
+            elif err.status_code == 422:
+                popup_msg = "Cần ghi chú ≥10 ký tự — hãy duyệt trên web."
+            else:
+                popup_msg = f"Lỗi ({err.status_code}): {err.message}"
+
+            if callback_query_id:
+                self.answer_callback_query(callback_query_id, text=popup_msg, show_alert=True)
+
+            return {
+                "success": False,
+                "popup_message": popup_msg,
+                "show_alert": True,
+                "error": err.code,
+                "status_code": err.status_code,
+            }
+

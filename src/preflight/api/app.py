@@ -62,14 +62,21 @@ def seed_initial_data() -> None:
 
         # Seed an approval decision on PO-10427 for testing
         if store.has_po("PO-10427"):
-            store.record_decision(
-                po_number="PO-10427",
-                decision="approved",
-                actor="operations_manager",
-                note="Auto-verified clean PO, approved for ERP sync.",
-            )
+            from preflight.services.decisions import Principal, decide_order
+            principal = Principal(user_id="operations_manager", display_name="operations_manager", role=Role.MANAGER, channel="api")
+            try:
+                decide_order(
+                    store,
+                    order_ref="PO-10427",
+                    decision="approved",
+                    note="Auto-verified clean PO, approved for ERP sync.",
+                    principal=principal,
+                )
+            except Exception as e:
+                logger.warning(f"Could not seed initial decision for PO-10427: {e}")
     finally:
         store.close()
+
 
 
 @asynccontextmanager
