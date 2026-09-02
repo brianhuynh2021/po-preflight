@@ -52,7 +52,8 @@ class TestERPPayloadHTTP(unittest.TestCase):
         order_id = self.store.record_analysis(analysis, source_file="po3.json")
 
         # 2. Approve order via decide_order
-        manager = Principal(user_id="mgr1", display_name="Manager 1", role=3, channel="web")
+        from preflight.security.rbac import Role
+        manager = Principal(user_id="mgr1", display_name="Manager 1", role=Role.MANAGER, channel="web")
         decide_order(
             self.store,
             order_ref=order_id,
@@ -173,7 +174,8 @@ class TestERPPayloadHTTP(unittest.TestCase):
         )
         analysis = Analysis(order=order, findings=[], status="ready_for_approval")
         order_id = self.store.record_analysis(analysis, source_file="idemp.json")
-        manager = Principal(user_id="mgr1", display_name="Manager 1", role=3, channel="web")
+        from preflight.security.rbac import Role
+        manager = Principal(user_id="mgr1", display_name="Manager 1", role=Role.MANAGER, channel="web")
         decide_order(
             self.store,
             order_ref=order_id,

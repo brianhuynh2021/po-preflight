@@ -38,7 +38,7 @@ class TestRevisionsAndDuplicates(unittest.TestCase):
             ),
         }
         app.dependency_overrides[get_audit_store] = lambda: self.store
-        self.client = TestClient(app, headers={"X-API-Key": "pf_dev_mgr_8802"})
+        self.client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})
 
         self.store.create_customer(CustomerMaster(code="CUST-ALPHA", name="Alpha Corp"))
         self.store.create_customer(CustomerMaster(code="CUST-BETA", name="Beta Corp"))

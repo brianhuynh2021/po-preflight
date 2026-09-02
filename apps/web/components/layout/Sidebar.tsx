@@ -7,6 +7,7 @@ import {
   ScanLine,
   Package,
   Users,
+  UserCheck,
   Workflow,
   Zap,
   ShieldCheck,
@@ -63,6 +64,7 @@ export function Sidebar() {
           {
             name: "QUẢN TRỊ HỆ THỐNG",
             items: [
+              { label: "Người dùng & Phân quyền", href: "/users", icon: UserCheck },
               { label: "Luật & Chính sách", href: "/rules", icon: ShieldCheck },
               { label: "Đồng bộ ERP Outbox", href: "/erp-sync", icon: RefreshCw },
               { label: "Kiểm thử SKU (RAG)", href: "/rag-playground", icon: Zap },

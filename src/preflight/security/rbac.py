@@ -11,8 +11,33 @@ from fastapi import Depends, Header, HTTPException, status
 class Role(enum.IntEnum):
     VIEWER = 1
     AUDITOR = 2
-    MANAGER = 3
-    ADMIN = 4
+    SALES_ADMIN = 3
+    MANAGER = 4
+    DIRECTOR = 5
+    ADMIN = 6
+
+
+ROLE_MAP: dict[str, Role] = {
+    "viewer": Role.VIEWER,
+    "auditor": Role.AUDITOR,
+    "sales_admin": Role.SALES_ADMIN,
+    "salesadmin": Role.SALES_ADMIN,
+    "manager": Role.MANAGER,
+    "director": Role.DIRECTOR,
+    "admin": Role.ADMIN,
+    "administrator": Role.ADMIN,
+}
+
+
+def role_from_str(role_str: str | Role) -> Role:
+    if isinstance(role_str, Role):
+        return role_str
+    norm = str(role_str).strip().lower()
+    return ROLE_MAP.get(norm, Role.VIEWER)
+
+
+def role_to_str(role: Role) -> str:
+    return role.name.lower()
 
 
 @dataclass(frozen=True)
@@ -27,7 +52,9 @@ import secrets
 # Default dev keys for local development and test harness outside production
 DEFAULT_API_KEYS: dict[str, tuple[str, Role]] = {
     "pf_dev_adm_9901": ("system_administrator", Role.ADMIN),
+    "pf_dev_dir_9905": ("board_director", Role.DIRECTOR),
     "pf_dev_mgr_8802": ("operations_manager", Role.MANAGER),
+    "pf_dev_sales_8803": ("sales_admin_lead", Role.SALES_ADMIN),
     "pf_dev_aud_7703": ("compliance_auditor", Role.AUDITOR),
     "pf_dev_view_6604": ("readonly_viewer", Role.VIEWER),
 }
@@ -44,7 +71,9 @@ def get_api_key_registry() -> dict[str, tuple[str, Role]]:
 
     for env_key, role in [
         ("PREFLIGHT_ADMIN_KEY", Role.ADMIN),
+        ("PREFLIGHT_DIRECTOR_KEY", Role.DIRECTOR),
         ("PREFLIGHT_MANAGER_KEY", Role.MANAGER),
+        ("PREFLIGHT_SALES_KEY", Role.SALES_ADMIN),
         ("PREFLIGHT_AUDITOR_KEY", Role.AUDITOR),
         ("PREFLIGHT_VIEWER_KEY", Role.VIEWER),
     ]:

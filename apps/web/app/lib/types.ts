@@ -195,3 +195,29 @@ export interface AuditEntry {
   detail: string;
   type: ActivityEventType;
 }
+
+// ------------------------------------------------------------- users & auth
+
+export type UserRole = "viewer" | "auditor" | "sales_admin" | "manager" | "director" | "admin";
+
+export interface UserAccount {
+  id?: number | null;
+  org_id?: string;
+  username: string;
+  display_name: string;
+  email: string;
+  role: UserRole;
+  is_active: boolean;
+  failed_attempts?: number;
+  locked_until?: string | null;
+  created_at?: string;
+}
+
+export const ROLE_LABEL_VI: Record<UserRole, string> = {
+  viewer: "Người xem",
+  auditor: "Kiểm toán viên",
+  sales_admin: "Sales Admin",
+  manager: "Trưởng phòng (Quản lý)",
+  director: "Giám đốc phê duyệt",
+  admin: "Quản trị hệ thống",
+};

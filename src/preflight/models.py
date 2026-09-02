@@ -52,7 +52,7 @@ class LineItem:
         }
 
 
-@dataclass(frozen=True)
+@dataclass
 class Order:
     po_number: str
     customer: str
@@ -64,6 +64,8 @@ class Order:
     declared_subtotal: Decimal | None = None
     declared_tax: Decimal | None = None
     declared_total: Decimal | None = None
+    created_by: str = ""
+    last_modified_by: str = ""
 
     @property
     def subtotal(self) -> Decimal:
@@ -93,6 +95,8 @@ class Order:
             "declared_subtotal": str(self.declared_subtotal) if self.declared_subtotal is not None else None,
             "declared_tax": str(self.declared_tax) if self.declared_tax is not None else None,
             "declared_total": str(self.declared_total) if self.declared_total is not None else None,
+            "created_by": self.created_by,
+            "last_modified_by": self.last_modified_by,
             "items": [item.to_dict() for item in self.items],
             "subtotal": str(self.subtotal),
             "tax_amount": str(self.tax_amount),
@@ -250,6 +254,20 @@ OrderAnalysis = Analysis
 
 
 @dataclass(frozen=True)
+class ApprovalTier:
+    max_amount: Decimal | None
+    required_role: str = "manager"
+    description: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "max_amount": str(self.max_amount) if self.max_amount is not None else None,
+            "required_role": self.required_role,
+            "description": self.description,
+        }
+
+
+@dataclass(frozen=True)
 class RulePolicy:
     price_tolerance_percent: Decimal = Decimal("0")
     stock_safety_margin: int = 0
@@ -259,10 +277,34 @@ class RulePolicy:
     overdue_grace_days: int = 30
     credit_limit_block_percent: Decimal = Decimal("20")
     credit_hold_behaviour: str = "review"  # "block" | "review"
+    approval_tiers: tuple[ApprovalTier, ...] = (
+        ApprovalTier(max_amount=Decimal("50000000"), required_role="manager", description="Dưới 50 triệu"),
+        ApprovalTier(max_amount=None, required_role="director", description="Trên 50 triệu"),
+    )
+    credit_exception_min_role: str = "director"
+    enforce_separation_of_duties: bool = True
     version: str = "2.0"
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> RulePolicy:
+        tiers = data.get("approval_tiers")
+        if tiers is not None:
+            parsed_tiers = []
+            for t in tiers:
+                if isinstance(t, ApprovalTier):
+                    parsed_tiers.append(t)
+                elif isinstance(t, dict):
+                    max_amt = Decimal(str(t["max_amount"])) if t.get("max_amount") is not None else None
+                    req_role = str(t.get("required_role") or t.get("min_role") or "manager").strip().lower()
+                    desc = t.get("description")
+                    parsed_tiers.append(ApprovalTier(max_amount=max_amt, required_role=req_role, description=desc))
+            approval_tuple = tuple(parsed_tiers)
+        else:
+            approval_tuple = (
+                ApprovalTier(max_amount=Decimal("50000000"), required_role="manager", description="Dưới 50 triệu"),
+                ApprovalTier(max_amount=None, required_role="director", description="Trên 50 triệu"),
+            )
+
         return cls(
             price_tolerance_percent=Decimal(str(data.get("price_tolerance_percent", "0"))),
             stock_safety_margin=int(data.get("stock_safety_margin", 0)),
@@ -272,6 +314,9 @@ class RulePolicy:
             overdue_grace_days=int(data.get("overdue_grace_days", 30)),
             credit_limit_block_percent=Decimal(str(data.get("credit_limit_block_percent", "20"))),
             credit_hold_behaviour=str(data.get("credit_hold_behaviour", "review")).strip().lower(),
+            approval_tiers=approval_tuple,
+            credit_exception_min_role=str(data.get("credit_exception_min_role", "director")).strip().lower(),
+            enforce_separation_of_duties=bool(data.get("enforce_separation_of_duties", True)),
             version=str(data.get("version", "2.0")),
         )
 
@@ -285,7 +330,39 @@ class RulePolicy:
             "overdue_grace_days": self.overdue_grace_days,
             "credit_limit_block_percent": str(self.credit_limit_block_percent),
             "credit_hold_behaviour": self.credit_hold_behaviour,
+            "approval_tiers": [t.to_dict() for t in self.approval_tiers],
+            "credit_exception_min_role": self.credit_exception_min_role,
+            "enforce_separation_of_duties": self.enforce_separation_of_duties,
             "version": self.version,
+        }
+
+
+@dataclass
+class User:
+    username: str
+    display_name: str
+    email: str
+    password_hash: str | None = None
+    role: str = "viewer"  # viewer, auditor, sales_admin, manager, director, admin
+    org_id: str = "org_default"
+    is_active: bool = True
+    failed_attempts: int = 0
+    locked_until: str | None = None
+    id: int | None = None
+    created_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "org_id": self.org_id,
+            "username": self.username,
+            "display_name": self.display_name,
+            "email": self.email,
+            "role": self.role,
+            "is_active": self.is_active,
+            "failed_attempts": self.failed_attempts,
+            "locked_until": self.locked_until,
+            "created_at": self.created_at,
         }
 
 

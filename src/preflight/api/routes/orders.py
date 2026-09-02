@@ -301,6 +301,8 @@ async def upload_order(
         # Parse order in dedicated guarded try-block
         try:
             order = parse_order(temp_path)
+            order.created_by = user.username
+            order.last_modified_by = user.username
         except Exception as exc:
             logger.warning(f"Failed to parse PO document '{filename}': {exc}")
             raise ParseError(
@@ -436,11 +438,16 @@ def confirm_extraction(
     if not items:
         raise ValidationFailed("Đơn hàng phải có ít nhất một dòng sản phẩm.")
 
+    orig_json = json.loads(row.get("order_json", "{}")) if row.get("order_json") else {}
+    created_by_user = orig_json.get("created_by") or user.username
+
     updated_order = Order(
         po_number=po_number,
         customer=customer,
         items=items,
         currency=payload.currency,
+        created_by=created_by_user,
+        last_modified_by=user.username,
     )
 
     # Run deterministic preflight rules on confirmed order with RuleContext

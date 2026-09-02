@@ -47,6 +47,26 @@ def build_parser() -> argparse.ArgumentParser:
     db_sub.add_parser("upgrade", help="Run Alembic migrations to head")
     db_sub.add_parser("check", help="Verify schema alignment and connectivity")
 
+    # Users Subcommands
+    users_cmd = subparsers.add_parser("users", help="User and RBAC security management")
+    users_sub = users_cmd.add_subparsers(dest="users_command", required=True)
+    
+    u_list = users_sub.add_parser("list", help="List all users")
+    
+    u_create = users_sub.add_parser("create", help="Create a new user")
+    u_create.add_argument("username", help="Username")
+    u_create.add_argument("display_name", help="Full name")
+    u_create.add_argument("email", help="Email address")
+    u_create.add_argument("--role", default="viewer", choices=("admin", "director", "manager", "sales_admin", "auditor", "viewer"), help="User role")
+    u_create.add_argument("--password", default=None, help="Password (prompted if omitted)")
+    
+    u_reset = users_sub.add_parser("reset-password", help="Reset user password")
+    u_reset.add_argument("username", help="Username to reset")
+    u_reset.add_argument("--password", default=None, help="New password (prompted if omitted)")
+    
+    u_unlock = users_sub.add_parser("unlock", help="Unlock a locked user account")
+    u_unlock.add_argument("username", help="Username to unlock")
+
     # Seed Demo Subcommand
     subparsers.add_parser("seed-demo", help="Seed demo organization, catalog, customers, and sample orders")
 
@@ -157,6 +177,72 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "seed-demo":
         return run_seed_demo()
+
+    if args.command == "users":
+        from preflight.models import User
+        from preflight.security.password import hash_password, validate_password_strength
+        from preflight.security.rbac import role_from_str
+        import getpass
+
+        store = AuditStore(args.db)
+        try:
+            if args.users_command == "list":
+                users = store.list_users()
+                print(f"{'ID':<4} {'USERNAME':<16} {'ROLE':<12} {'ACTIVE':<8} {'LOCKED':<8} {'NAME':<24} {'EMAIL'}")
+                print("-" * 88)
+                for u in users:
+                    locked_str = "YES" if store.is_user_locked(u.username) else "NO"
+                    print(f"{u.id or '-':<4} {u.username:<16} {u.role:<12} {'YES' if u.is_active else 'NO':<8} {locked_str:<8} {u.display_name:<24} {u.email}")
+                return 0
+
+            if args.users_command == "create":
+                pwd = args.password
+                if not pwd:
+                    pwd = getpass.getpass(f"Enter password for '{args.username}': ")
+                valid_pwd, pwd_err = validate_password_strength(pwd)
+                if not valid_pwd:
+                    print(f"Error: {pwd_err}", file=sys.stderr)
+                    return 1
+                role_val = role_from_str(args.role).name.lower()
+                new_u = User(
+                    username=args.username.strip().lower(),
+                    display_name=args.display_name.strip(),
+                    email=args.email.strip().lower(),
+                    role=role_val,
+                    password_hash=hash_password(pwd),
+                    is_active=True,
+                )
+                created = store.create_user(new_u)
+                print(f"✔ User '{created.username}' created successfully with role '{created.role}'.")
+                return 0
+
+            if args.users_command == "reset-password":
+                pwd = args.password
+                if not pwd:
+                    pwd = getpass.getpass(f"Enter new password for '{args.username}': ")
+                valid_pwd, pwd_err = validate_password_strength(pwd)
+                if not valid_pwd:
+                    print(f"Error: {pwd_err}", file=sys.stderr)
+                    return 1
+                u = store.get_user(args.username.strip().lower())
+                if not u:
+                    print(f"Error: User '{args.username}' not found.", file=sys.stderr)
+                    return 1
+                store.update_user(args.username.strip().lower(), password_hash=hash_password(pwd))
+                store.reset_failed_logins(args.username.strip().lower())
+                print(f"✔ Password reset successfully for user '{args.username}'.")
+                return 0
+
+            if args.users_command == "unlock":
+                u = store.get_user(args.username.strip().lower())
+                if not u:
+                    print(f"Error: User '{args.username}' not found.", file=sys.stderr)
+                    return 1
+                store.reset_failed_logins(args.username.strip().lower())
+                print(f"✔ Account '{args.username}' unlocked successfully.")
+                return 0
+        finally:
+            store.close()
 
     try:
         with AuditStore(args.db) as store:

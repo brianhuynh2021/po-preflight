@@ -3,6 +3,7 @@ import type {
   AuthUser,
   CatalogItem,
   ConfirmExtractionRequest,
+  CreateUserPayload,
   CustomerCreditProfile,
   CustomerMaster,
   CustomerPriceAgreement,
@@ -17,6 +18,8 @@ import type {
   SKUMatchResult,
   SystemModes,
   UOMConversion,
+  UpdateUserPayload,
+  UserAccount,
 } from "./types";
 
 export class ApiError extends Error {
@@ -452,6 +455,37 @@ export function createApiClient(config: ClientConfig = {}) {
     };
   }
 
+  const users = {
+    list: () => request<UserAccount[]>("/api/v1/users"),
+    get: (username: string) => request<UserAccount>(`/api/v1/users/${encodeURIComponent(username)}`),
+    create: (payload: CreateUserPayload) =>
+      request<UserAccount>("/api/v1/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    update: (username: string, payload: UpdateUserPayload) =>
+      request<UserAccount>(`/api/v1/users/${encodeURIComponent(username)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    delete: (username: string) =>
+      request<{ success: boolean; message: string }>(`/api/v1/users/${encodeURIComponent(username)}`, {
+        method: "DELETE",
+      }),
+    resetPassword: (username: string, newPassword: string) =>
+      request<{ success: boolean; message: string }>(`/api/v1/users/${encodeURIComponent(username)}/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ new_password: newPassword }),
+      }),
+    unlock: (username: string) =>
+      request<{ success: boolean; message: string }>(`/api/v1/users/${encodeURIComponent(username)}/unlock`, {
+        method: "POST",
+      }),
+  };
+
   return {
     auth,
     orders,
@@ -466,6 +500,7 @@ export function createApiClient(config: ClientConfig = {}) {
     dashboard,
     catalog,
     customers,
+    users,
     rules,
     system,
     health,

@@ -19,7 +19,9 @@ from preflight.models import (
     CustomerPriceAgreement,
     RulePolicy,
     UOMConversion,
+    User,
 )
+from preflight.security.password import hash_password
 from preflight.utils.text import normalize_vietnamese_name
 
 from preflight.security.audit_chain import calculate_hash, compute_payload_hash
@@ -168,6 +170,33 @@ CREATE TABLE IF NOT EXISTS customer_aliases (
     UNIQUE(customer_id, normalized_alias)
 );
 CREATE INDEX IF NOT EXISTS idx_customer_aliases_norm ON customer_aliases(normalized_alias);
+
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    org_id TEXT NOT NULL DEFAULT 'org_default',
+    username TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    password_hash TEXT,
+    role TEXT NOT NULL DEFAULT 'viewer',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+
+CREATE TABLE IF NOT EXISTS api_keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    username TEXT NOT NULL,
+    key_hash TEXT NOT NULL UNIQUE,
+    label TEXT,
+    last_used_at TEXT,
+    revoked_at TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 """
 
 
@@ -317,6 +346,33 @@ CREATE TABLE IF NOT EXISTS customer_aliases (
     UNIQUE(customer_id, normalized_alias)
 );
 CREATE INDEX IF NOT EXISTS idx_pg_customer_aliases_norm ON customer_aliases(normalized_alias);
+
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    org_id VARCHAR(64) NOT NULL DEFAULT 'org_default',
+    username VARCHAR(128) NOT NULL UNIQUE,
+    display_name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    password_hash TEXT,
+    role VARCHAR(32) NOT NULL DEFAULT 'viewer',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pg_users_username ON users(username);
+
+CREATE TABLE IF NOT EXISTS api_keys (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER,
+    username VARCHAR(128) NOT NULL,
+    key_hash VARCHAR(255) NOT NULL UNIQUE,
+    label VARCHAR(255),
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    revoked_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pg_api_keys_hash ON api_keys(key_hash);
 """
 
 
@@ -551,6 +607,54 @@ class BaseAuditStore(abc.ABC):
     def list_customer_master_aliases(self, customer_id: str | None = None) -> list[dict[str, Any]]:
         pass
 
+    @abc.abstractmethod
+    def create_user(self, user: User) -> User:
+        pass
+
+    @abc.abstractmethod
+    def get_user(self, username: str) -> User | None:
+        pass
+
+    @abc.abstractmethod
+    def get_user_by_id(self, user_id: int) -> User | None:
+        pass
+
+    @abc.abstractmethod
+    def list_users(self) -> list[User]:
+        pass
+
+    @abc.abstractmethod
+    def update_user(
+        self,
+        username: str,
+        display_name: str | None = None,
+        email: str | None = None,
+        role: str | None = None,
+        password_hash: str | None = None,
+        is_active: bool | None = None,
+    ) -> User | None:
+        pass
+
+    @abc.abstractmethod
+    def delete_user(self, username: str) -> bool:
+        pass
+
+    @abc.abstractmethod
+    def record_failed_login(self, username: str) -> int:
+        pass
+
+    @abc.abstractmethod
+    def reset_failed_logins(self, username: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def is_user_locked(self, username: str) -> bool:
+        pass
+
+    @abc.abstractmethod
+    def seed_initial_admin(self) -> None:
+        pass
+
 
 
 
@@ -570,6 +674,22 @@ class AuditStore(BaseAuditStore):
                 # Enable WAL mode for high concurrency
                 self.connection.execute("PRAGMA journal_mode=WAL;")
                 self.connection.execute("PRAGMA busy_timeout=30000;")
+            except Exception:
+                pass
+            try:
+                self.connection.execute("ALTER TABLE customers ADD COLUMN normalized_name TEXT;")
+            except Exception:
+                pass
+            try:
+                self.connection.execute("ALTER TABLE customer_aliases ADD COLUMN normalized_alias TEXT;")
+            except Exception:
+                pass
+            try:
+                self.connection.execute("ALTER TABLE users ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0;")
+            except Exception:
+                pass
+            try:
+                self.connection.execute("ALTER TABLE users ADD COLUMN locked_until TEXT;")
             except Exception:
                 pass
             self.connection.executescript(SQLITE_SCHEMA)
@@ -608,6 +728,10 @@ class AuditStore(BaseAuditStore):
             self.connection.commit()
             try:
                 self.seed_default_customers()
+            except Exception:
+                pass
+            try:
+                self.seed_initial_admin()
             except Exception:
                 pass
 
@@ -1566,6 +1690,249 @@ class AuditStore(BaseAuditStore):
                 for d in defaults:
                     self.create_customer(d)
 
+    def create_user(self, user: User) -> User:
+        with self._lock:
+            now_iso = datetime.now(UTC).isoformat()
+            self.connection.execute(
+                """
+                INSERT INTO users (org_id, username, display_name, email, password_hash, role, is_active, failed_attempts, locked_until, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(username) DO UPDATE SET
+                    display_name = excluded.display_name,
+                    email = excluded.email,
+                    password_hash = COALESCE(excluded.password_hash, users.password_hash),
+                    role = excluded.role,
+                    is_active = excluded.is_active
+                """,
+                (
+                    user.org_id,
+                    user.username.strip().lower(),
+                    user.display_name.strip(),
+                    user.email.strip().lower(),
+                    user.password_hash,
+                    user.role.strip().lower(),
+                    1 if user.is_active else 0,
+                    user.failed_attempts,
+                    user.locked_until,
+                    user.created_at or now_iso,
+                ),
+            )
+            self.connection.commit()
+            return self.get_user(user.username) or user
+
+    def get_user(self, username: str) -> User | None:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT * FROM users WHERE username = ? COLLATE NOCASE",
+                (username.strip(),),
+            ).fetchone()
+            if not row:
+                return None
+            return User(
+                id=row["id"],
+                org_id=row["org_id"],
+                username=row["username"],
+                display_name=row["display_name"],
+                email=row["email"],
+                password_hash=row["password_hash"],
+                role=row["role"],
+                is_active=bool(row["is_active"]),
+                failed_attempts=row["failed_attempts"],
+                locked_until=row["locked_until"],
+                created_at=row["created_at"],
+            )
+
+    def get_user_by_id(self, user_id: int) -> User | None:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT * FROM users WHERE id = ?",
+                (user_id,),
+            ).fetchone()
+            if not row:
+                return None
+            return User(
+                id=row["id"],
+                org_id=row["org_id"],
+                username=row["username"],
+                display_name=row["display_name"],
+                email=row["email"],
+                password_hash=row["password_hash"],
+                role=row["role"],
+                is_active=bool(row["is_active"]),
+                failed_attempts=row["failed_attempts"],
+                locked_until=row["locked_until"],
+                created_at=row["created_at"],
+            )
+
+    def list_users(self) -> list[User]:
+        with self._lock:
+            rows = self.connection.execute("SELECT * FROM users ORDER BY id ASC").fetchall()
+            return [
+                User(
+                    id=row["id"],
+                    org_id=row["org_id"],
+                    username=row["username"],
+                    display_name=row["display_name"],
+                    email=row["email"],
+                    password_hash=row["password_hash"],
+                    role=row["role"],
+                    is_active=bool(row["is_active"]),
+                    failed_attempts=row["failed_attempts"],
+                    locked_until=row["locked_until"],
+                    created_at=row["created_at"],
+                )
+                for row in rows
+            ]
+
+    def update_user(
+        self,
+        username: str,
+        display_name: str | None = None,
+        email: str | None = None,
+        role: str | None = None,
+        password_hash: str | None = None,
+        is_active: bool | None = None,
+    ) -> User | None:
+        with self._lock:
+            user = self.get_user(username)
+            if not user:
+                return None
+            new_disp = display_name if display_name is not None else user.display_name
+            new_email = email if email is not None else user.email
+            new_role = role if role is not None else user.role
+            new_pwd = password_hash if password_hash is not None else user.password_hash
+            new_active = is_active if is_active is not None else user.is_active
+
+            self.connection.execute(
+                """
+                UPDATE users
+                SET display_name = ?, email = ?, role = ?, password_hash = ?, is_active = ?
+                WHERE username = ? COLLATE NOCASE
+                """,
+                (
+                    new_disp.strip(),
+                    new_email.strip().lower(),
+                    new_role.strip().lower(),
+                    new_pwd,
+                    1 if new_active else 0,
+                    username.strip(),
+                ),
+            )
+            self.connection.commit()
+            return self.get_user(username)
+
+    def delete_user(self, username: str) -> bool:
+        with self._lock:
+            cursor = self.connection.execute(
+                "DELETE FROM users WHERE username = ? COLLATE NOCASE",
+                (username.strip(),),
+            )
+            self.connection.commit()
+            return cursor.rowcount > 0
+
+    def record_failed_login(self, username: str) -> int:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT failed_attempts FROM users WHERE username = ? COLLATE NOCASE",
+                (username.strip(),),
+            ).fetchone()
+            if not row:
+                return 0
+            attempts = row["failed_attempts"] + 1
+            locked_until = None
+            if attempts >= 5:
+                # Lock for 15 minutes (900 seconds)
+                locked_until = datetime.fromtimestamp(time.time() + 900, tz=UTC).isoformat()
+            self.connection.execute(
+                "UPDATE users SET failed_attempts = ?, locked_until = ? WHERE username = ? COLLATE NOCASE",
+                (attempts, locked_until, username.strip()),
+            )
+            self.connection.commit()
+            return attempts
+
+    def reset_failed_logins(self, username: str) -> None:
+        with self._lock:
+            self.connection.execute(
+                "UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE username = ? COLLATE NOCASE",
+                (username.strip(),),
+            )
+            self.connection.commit()
+
+    def is_user_locked(self, username: str) -> bool:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT locked_until FROM users WHERE username = ? COLLATE NOCASE",
+                (username.strip(),),
+            ).fetchone()
+            if not row or not row["locked_until"]:
+                return False
+            try:
+                locked_dt = datetime.fromisoformat(row["locked_until"])
+                if locked_dt > datetime.now(UTC):
+                    return True
+                else:
+                    self.reset_failed_logins(username)
+                    return False
+            except Exception:
+                return False
+
+    def seed_initial_admin(self) -> None:
+        with self._lock:
+            count = self.connection.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
+            if count == 0:
+                defaults = [
+                    User(
+                        username="admin",
+                        display_name="Hệ Thống Quản Trị",
+                        email="admin@preflight.vn",
+                        password_hash=hash_password("Admin@123456"),
+                        role="admin",
+                        created_at=datetime.now(UTC).isoformat(),
+                    ),
+                    User(
+                        username="director",
+                        display_name="Giám Đốc Phê Duyệt",
+                        email="director@preflight.vn",
+                        password_hash=hash_password("Director@123456"),
+                        role="director",
+                        created_at=datetime.now(UTC).isoformat(),
+                    ),
+                    User(
+                        username="manager",
+                        display_name="Trưởng Phòng Vận Hành",
+                        email="manager@preflight.vn",
+                        password_hash=hash_password("Manager@123456"),
+                        role="manager",
+                        created_at=datetime.now(UTC).isoformat(),
+                    ),
+                    User(
+                        username="sales_admin",
+                        display_name="Nhân Viên Sales Admin",
+                        email="sales@preflight.vn",
+                        password_hash=hash_password("Sales@123456"),
+                        role="sales_admin",
+                        created_at=datetime.now(UTC).isoformat(),
+                    ),
+                    User(
+                        username="auditor",
+                        display_name="Kiểm Toán Viên",
+                        email="auditor@preflight.vn",
+                        password_hash=hash_password("Auditor@123456"),
+                        role="auditor",
+                        created_at=datetime.now(UTC).isoformat(),
+                    ),
+                    User(
+                        username="viewer",
+                        display_name="Người Xem Báo Cáo",
+                        email="viewer@preflight.vn",
+                        password_hash=hash_password("Viewer@123456"),
+                        role="viewer",
+                        created_at=datetime.now(UTC).isoformat(),
+                    ),
+                ]
+                for u in defaults:
+                    self.create_user(u)
+
 
 
 
@@ -1606,6 +1973,10 @@ class PostgresAuditStore(BaseAuditStore):
             with conn.cursor() as cur:
                 cur.execute(POSTGRES_SCHEMA)
             conn.commit()
+        try:
+            self.seed_initial_admin()
+        except Exception:
+            pass
 
     def close(self) -> None:
         if hasattr(self, "_pool"):
@@ -2413,6 +2784,236 @@ class PostgresAuditStore(BaseAuditStore):
                     cur.execute("SELECT * FROM customer_aliases ORDER BY id DESC")
                 rows = cur.fetchall()
                 return [dict(r) for r in rows]
+
+    def create_user(self, user: User) -> User:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO users (org_id, username, display_name, email, password_hash, role, is_active, failed_attempts, locked_until)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(username) DO UPDATE SET
+                        display_name = EXCLUDED.display_name,
+                        email = EXCLUDED.email,
+                        password_hash = COALESCE(EXCLUDED.password_hash, users.password_hash),
+                        role = EXCLUDED.role,
+                        is_active = EXCLUDED.is_active
+                    """,
+                    (
+                        user.org_id,
+                        user.username.strip().lower(),
+                        user.display_name.strip(),
+                        user.email.strip().lower(),
+                        user.password_hash,
+                        user.role.strip().lower(),
+                        user.is_active,
+                        user.failed_attempts,
+                        user.locked_until,
+                    ),
+                )
+            conn.commit()
+            return self.get_user(user.username) or user
+
+    def get_user(self, username: str) -> User | None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM users WHERE username = %s LIMIT 1", (username.strip().lower(),))
+                row = cur.fetchone()
+                if not row:
+                    return None
+                created_at = row["created_at"].isoformat() if isinstance(row.get("created_at"), datetime) else str(row.get("created_at"))
+                locked_until = row["locked_until"].isoformat() if isinstance(row.get("locked_until"), datetime) else (str(row.get("locked_until")) if row.get("locked_until") else None)
+                return User(
+                    id=row["id"],
+                    org_id=row["org_id"],
+                    username=row["username"],
+                    display_name=row["display_name"],
+                    email=row["email"],
+                    password_hash=row["password_hash"],
+                    role=row["role"],
+                    is_active=bool(row["is_active"]),
+                    failed_attempts=int(row.get("failed_attempts", 0)),
+                    locked_until=locked_until,
+                    created_at=created_at,
+                )
+
+    def get_user_by_id(self, user_id: int) -> User | None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM users WHERE id = %s LIMIT 1", (user_id,))
+                row = cur.fetchone()
+                if not row:
+                    return None
+                created_at = row["created_at"].isoformat() if isinstance(row.get("created_at"), datetime) else str(row.get("created_at"))
+                locked_until = row["locked_until"].isoformat() if isinstance(row.get("locked_until"), datetime) else (str(row.get("locked_until")) if row.get("locked_until") else None)
+                return User(
+                    id=row["id"],
+                    org_id=row["org_id"],
+                    username=row["username"],
+                    display_name=row["display_name"],
+                    email=row["email"],
+                    password_hash=row["password_hash"],
+                    role=row["role"],
+                    is_active=bool(row["is_active"]),
+                    failed_attempts=int(row.get("failed_attempts", 0)),
+                    locked_until=locked_until,
+                    created_at=created_at,
+                )
+
+    def list_users(self) -> list[User]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT username FROM users ORDER BY id ASC")
+                rows = cur.fetchall()
+                results = []
+                for r in rows:
+                    u = self.get_user(r["username"])
+                    if u:
+                        results.append(u)
+                return results
+
+    def update_user(
+        self,
+        username: str,
+        display_name: str | None = None,
+        email: str | None = None,
+        role: str | None = None,
+        password_hash: str | None = None,
+        is_active: bool | None = None,
+    ) -> User | None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                user = self.get_user(username)
+                if not user:
+                    return None
+                new_disp = display_name if display_name is not None else user.display_name
+                new_email = email if email is not None else user.email
+                new_role = role if role is not None else user.role
+                new_pwd = password_hash if password_hash is not None else user.password_hash
+                new_active = is_active if is_active is not None else user.is_active
+
+                cur.execute(
+                    """
+                    UPDATE users
+                    SET display_name = %s, email = %s, role = %s, password_hash = %s, is_active = %s
+                    WHERE username = %s
+                    """,
+                    (new_disp.strip(), new_email.strip().lower(), new_role.strip().lower(), new_pwd, new_active, username.strip().lower()),
+                )
+            conn.commit()
+            return self.get_user(username)
+
+    def delete_user(self, username: str) -> bool:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM users WHERE username = %s", (username.strip().lower(),))
+                affected = cur.rowcount > 0
+            conn.commit()
+            return affected
+
+    def record_failed_login(self, username: str) -> int:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT failed_attempts FROM users WHERE username = %s", (username.strip().lower(),))
+                row = cur.fetchone()
+                if not row:
+                    return 0
+                attempts = int(row.get("failed_attempts", 0)) + 1
+                locked_until = None
+                if attempts >= 5:
+                    locked_until = datetime.fromtimestamp(time.time() + 900, tz=UTC)
+                cur.execute(
+                    "UPDATE users SET failed_attempts = %s, locked_until = %s WHERE username = %s",
+                    (attempts, locked_until, username.strip().lower()),
+                )
+            conn.commit()
+            return attempts
+
+    def reset_failed_logins(self, username: str) -> None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE username = %s", (username.strip().lower(),))
+            conn.commit()
+
+    def is_user_locked(self, username: str) -> bool:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT locked_until FROM users WHERE username = %s", (username.strip().lower(),))
+                row = cur.fetchone()
+                if not row or not row.get("locked_until"):
+                    return False
+                try:
+                    locked_val = row["locked_until"]
+                    locked_dt = locked_val if isinstance(locked_val, datetime) else datetime.fromisoformat(str(locked_val))
+                    if locked_dt.tzinfo is None:
+                        locked_dt = locked_dt.replace(tzinfo=UTC)
+                    if locked_dt > datetime.now(UTC):
+                        return True
+                    else:
+                        self.reset_failed_logins(username)
+                        return False
+                except Exception:
+                    return False
+
+    def seed_initial_admin(self) -> None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) AS c FROM users")
+                row = cur.fetchone()
+                count = int(row["c"]) if row else 0
+                if count == 0:
+                    defaults = [
+                        User(
+                            username="admin",
+                            display_name="Hệ Thống Quản Trị",
+                            email="admin@preflight.vn",
+                            password_hash=hash_password("Admin@123456"),
+                            role="admin",
+                            created_at=datetime.now(UTC).isoformat(),
+                        ),
+                        User(
+                            username="director",
+                            display_name="Giám Đốc Phê Duyệt",
+                            email="director@preflight.vn",
+                            password_hash=hash_password("Director@123456"),
+                            role="director",
+                            created_at=datetime.now(UTC).isoformat(),
+                        ),
+                        User(
+                            username="manager",
+                            display_name="Trưởng Phòng Vận Hành",
+                            email="manager@preflight.vn",
+                            password_hash=hash_password("Manager@123456"),
+                            role="manager",
+                            created_at=datetime.now(UTC).isoformat(),
+                        ),
+                        User(
+                            username="sales_admin",
+                            display_name="Nhân Viên Sales Admin",
+                            email="sales@preflight.vn",
+                            password_hash=hash_password("Sales@123456"),
+                            role="sales_admin",
+                            created_at=datetime.now(UTC).isoformat(),
+                        ),
+                        User(
+                            username="auditor",
+                            display_name="Kiểm Toán Viên",
+                            email="auditor@preflight.vn",
+                            password_hash=hash_password("Auditor@123456"),
+                            role="auditor",
+                            created_at=datetime.now(UTC).isoformat(),
+                        ),
+                        User(
+                            username="viewer",
+                            display_name="Người Xem Báo Cáo",
+                            email="viewer@preflight.vn",
+                            password_hash=hash_password("Viewer@123456"),
+                            role="viewer",
+                            created_at=datetime.now(UTC).isoformat(),
+                        ),
+                    ]
+                    for u in defaults:
+                        self.create_user(u)
 
 
 

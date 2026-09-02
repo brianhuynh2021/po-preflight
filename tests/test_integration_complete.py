@@ -167,7 +167,7 @@ class TestCompleteIntegrationSuite(unittest.TestCase):
             external_id="10099",
             user_id="chief_operations_officer",
             display_name="Chief Operations Officer",
-            role="MANAGER",
+            role="DIRECTOR",
         )
         bot = TelegramBotService(store=self.store)
         res = bot.handle_callback_action(
@@ -231,6 +231,7 @@ class TestCompleteIntegrationSuite(unittest.TestCase):
                     "application/json",
                 )
             },
+            headers={"X-API-Key": "pf_dev_sales_8803"},
         )
         self.assertEqual(upload_res.status_code, 201)
         order_id = upload_res.json()["id"]
@@ -245,15 +246,16 @@ class TestCompleteIntegrationSuite(unittest.TestCase):
             f"/api/v1/orders/{order_id}/decide",
             json={
                 "decision": "approved",
-                "actor": "integration_tester@mit.edu",
+                "actor": "operations_manager",
                 "note": "Verified end-to-end integration pass.",
             },
+            headers={"X-API-Key": "pf_dev_mgr_8802"},
         )
         self.assertEqual(dec_res.status_code, 200)
         self.assertEqual(dec_res.json()["decision"], "approved")
 
         # 4. Trigger ERP Sync via API
-        erp_res = self.client.post(f"/api/v1/erp/sync/{order_id}")
+        erp_res = self.client.post(f"/api/v1/erp/sync/{order_id}", headers={"X-API-Key": "pf_dev_mgr_8802"})
         self.assertEqual(erp_res.status_code, 200)
         self.assertTrue(erp_res.json()["success"])
 

@@ -146,3 +146,11 @@ test("renders the Settings view at /settings", async () => {
   assert.match(html, /Telegram Bot/);
   assert.match(html, /Zalo Official Account/);
 });
+
+test("renders the Users & Approval Matrix view at /users", async () => {
+  const response = await render("/users");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Quản lý Người dùng &amp; Ma trận Phê duyệt/);
+  assert.match(html, /Tổng người dùng/);
+});

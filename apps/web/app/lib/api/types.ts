@@ -353,3 +353,32 @@ export interface CustomerMaster {
   created_at?: string | null;
 }
 
+export interface UserAccount {
+  id?: number | null;
+  org_id?: string;
+  username: string;
+  display_name: string;
+  email: string;
+  role: "viewer" | "auditor" | "sales_admin" | "manager" | "director" | "admin" | string;
+  is_active: boolean;
+  failed_attempts?: number;
+  locked_until?: string | null;
+  created_at?: string;
+}
+
+export interface CreateUserPayload {
+  username: string;
+  display_name: string;
+  email: string;
+  password: string;
+  role?: string;
+  org_id?: string;
+}
+
+export interface UpdateUserPayload {
+  display_name?: string;
+  email?: string;
+  role?: string;
+  is_active?: boolean;
+}
+

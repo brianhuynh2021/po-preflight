@@ -30,6 +30,7 @@ from preflight.api.routes import (
     orders,
     rules,
     system,
+    users,
 )
 
 from preflight.parsers import parse_order
@@ -189,6 +190,7 @@ app.include_router(events.router)
 app.include_router(auth.router)
 app.include_router(audit.router)
 app.include_router(system.router)
+app.include_router(users.router)
 app.include_router(leads.router)
 
 
