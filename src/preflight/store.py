@@ -15,8 +15,10 @@ from preflight.models import (
     Analysis,
     CustomerCreditProfile,
     CustomerPriceAgreement,
+    RulePolicy,
     UOMConversion,
 )
+
 from preflight.security.audit_chain import calculate_hash, compute_payload_hash
 
 
@@ -103,7 +105,15 @@ CREATE TABLE IF NOT EXISTS customer_credits (
     updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_customer_credits ON customer_credits(customer_id);
+
+CREATE TABLE IF NOT EXISTS rule_policies (
+    id INTEGER PRIMARY KEY,
+    policy_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    updated_by TEXT NOT NULL DEFAULT 'system'
+);
 """
+
 
 POSTGRES_SCHEMA = """
 CREATE TABLE IF NOT EXISTS analyses (
@@ -190,6 +200,12 @@ CREATE TABLE IF NOT EXISTS customer_credits (
 );
 CREATE INDEX IF NOT EXISTS idx_pg_customer_credits ON customer_credits(customer_id);
 
+CREATE TABLE IF NOT EXISTS rule_policies (
+    id INT PRIMARY KEY,
+    policy_json JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_by VARCHAR(255) NOT NULL DEFAULT 'system'
+);
 """
 
 
@@ -303,6 +319,15 @@ class BaseAuditStore(abc.ABC):
     @abc.abstractmethod
     def get_customer_credit(self, customer_id: str) -> CustomerCreditProfile | None:
         pass
+
+    @abc.abstractmethod
+    def set_policy(self, policy: RulePolicy, updated_by: str = "system") -> None:
+        pass
+
+    @abc.abstractmethod
+    def get_policy(self) -> RulePolicy:
+        pass
+
 
 
 
@@ -702,9 +727,14 @@ class AuditStore(BaseAuditStore):
     def get_customer_pricing(self, customer_id: str) -> list[CustomerPriceAgreement]:
         with self._lock:
             rows = self.connection.execute(
-                "SELECT * FROM customer_pricing WHERE customer_id = ? ORDER BY sku ASC, min_quantity DESC",
+                "SELECT * FROM customer_pricing WHERE customer_id = ? COLLATE NOCASE ORDER BY sku ASC, min_quantity DESC",
                 (customer_id.strip(),),
             ).fetchall()
+            if not rows:
+                from preflight.rules_context import normalize_customer_key
+                norm_target = normalize_customer_key(customer_id)
+                all_rows = self.connection.execute("SELECT * FROM customer_pricing ORDER BY sku ASC, min_quantity DESC").fetchall()
+                rows = [r for r in all_rows if normalize_customer_key(r["customer_id"]) == norm_target]
             return [
                 CustomerPriceAgreement(
                     customer_id=r["customer_id"],
@@ -787,9 +817,17 @@ class AuditStore(BaseAuditStore):
     def get_customer_credit(self, customer_id: str) -> CustomerCreditProfile | None:
         with self._lock:
             row = self.connection.execute(
-                "SELECT * FROM customer_credits WHERE customer_id = ? LIMIT 1",
+                "SELECT * FROM customer_credits WHERE customer_id = ? COLLATE NOCASE LIMIT 1",
                 (customer_id.strip(),),
             ).fetchone()
+            if not row:
+                from preflight.rules_context import normalize_customer_key
+                norm_target = normalize_customer_key(customer_id)
+                all_rows = self.connection.execute("SELECT * FROM customer_credits").fetchall()
+                for r in all_rows:
+                    if normalize_customer_key(r["customer_id"]) == norm_target:
+                        row = r
+                        break
             if not row:
                 return None
             return CustomerCreditProfile(
@@ -800,6 +838,34 @@ class AuditStore(BaseAuditStore):
                 oldest_overdue_days=int(row["oldest_overdue_days"]),
                 status=row["status"],
             )
+
+
+    def set_policy(self, policy: RulePolicy, updated_by: str = "system") -> None:
+        with self._lock:
+            now = datetime.now(UTC).isoformat()
+            self.connection.execute(
+                """
+                INSERT INTO rule_policies (id, policy_json, updated_at, updated_by)
+                VALUES (1, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    policy_json = excluded.policy_json,
+                    updated_at = excluded.updated_at,
+                    updated_by = excluded.updated_by
+                """,
+                (json.dumps(policy.to_dict()), now, updated_by),
+            )
+            self.connection.commit()
+
+    def get_policy(self) -> RulePolicy:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT policy_json FROM rule_policies WHERE id = 1 LIMIT 1"
+            ).fetchone()
+            if not row:
+                return RulePolicy()
+            data = json.loads(row["policy_json"])
+            return RulePolicy.from_dict(data)
+
 
 
 class PostgresAuditStore(BaseAuditStore):
@@ -1324,6 +1390,45 @@ class PostgresAuditStore(BaseAuditStore):
                 )
         finally:
             self._pool.putconn(conn)
+
+    def set_policy(self, policy: RulePolicy, updated_by: str = "system") -> None:
+        if self._fallback_sqlite:
+            self._fallback_sqlite.set_policy(policy, updated_by)
+            return
+        conn = self._pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO rule_policies (id, policy_json, updated_at, updated_by)
+                    VALUES (1, %s, %s, %s)
+                    ON CONFLICT(id) DO UPDATE SET
+                        policy_json = EXCLUDED.policy_json,
+                        updated_at = EXCLUDED.updated_at,
+                        updated_by = EXCLUDED.updated_by
+                    """,
+                    (json.dumps(policy.to_dict()), datetime.now(UTC).isoformat(), updated_by),
+                )
+            conn.commit()
+        finally:
+            self._pool.putconn(conn)
+
+    def get_policy(self) -> RulePolicy:
+        if self._fallback_sqlite:
+            return self._fallback_sqlite.get_policy()
+        conn = self._pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT policy_json FROM rule_policies WHERE id = 1 LIMIT 1")
+                row = cur.fetchone()
+                if not row:
+                    return RulePolicy()
+                val = row["policy_json"]
+                data = json.loads(val) if isinstance(val, str) else val
+                return RulePolicy.from_dict(data)
+        finally:
+            self._pool.putconn(conn)
+
 
 
 

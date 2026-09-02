@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any, Mapping
 
-from preflight.currency import fx_engine
 from preflight.models import (
     Analysis,
     CustomerCreditProfile,
@@ -13,11 +13,12 @@ from preflight.models import (
     UOMConversion,
 )
 from preflight.rag.matcher import HybridSKUMatcher
+from preflight.rules_context import RuleContext
 
 
 def analyze_order(
     order: Order,
-    catalog: dict[str, Product],
+    ctx: RuleContext | dict[str, Product],
     *,
     duplicate: bool = False,
     price_tolerance_percent: Decimal = Decimal("0"),
@@ -25,9 +26,47 @@ def analyze_order(
     uom_conversions: list[UOMConversion] | None = None,
     customer_credit: CustomerCreditProfile | None = None,
 ) -> Analysis:
+    """Pure rule evaluation engine.
+    
+    Given an order and an immutable RuleContext, deterministically evaluates:
+    - Customer credit status & exposure limits
+    - Duplicate PO detection
+    - Item quantity & price sanity
+    - Hybrid SKU recognition & active catalog status
+    - Unit of Measure (UOM) conversions & MOQ/packaging validation
+    - Warehouse stock availability with safety margin thresholds
+    - Tiered volume customer contract pricing
+    - Multi-currency FX conversion and tolerance thresholding
+    """
+    if isinstance(ctx, dict):
+        # Gracefully wrap legacy catalog dict into RuleContext
+        fx_rates: dict[str, Decimal] = {}
+        fx_source = "static"
+        order_currency = (order.currency or "VND").strip().upper()
+        if order_currency != "VND":
+            from preflight.currency import fx_engine
+            rate_val, fx_source = fx_engine.get_rate_info(order_currency, "VND")
+            fx_rates[f"{order_currency}_VND"] = rate_val
+
+        context = RuleContext(
+            catalog=ctx,
+            pricing_agreements=tuple(pricing_agreements or ()),
+            uom_conversions=tuple(uom_conversions or ()),
+            customer_credit=customer_credit,
+            price_tolerance_percent=price_tolerance_percent,
+            duplicate=duplicate,
+            fx_rates=fx_rates,
+            fx_source=fx_source,
+        )
+    else:
+        context = ctx
+
+
     findings: list[Finding] = []
+    catalog = context.catalog
     matcher = HybridSKUMatcher(catalog)
-    if duplicate:
+
+    if context.duplicate:
         findings.append(
             Finding(
                 code="DUPLICATE_PO",
@@ -37,8 +76,9 @@ def analyze_order(
         )
 
     # -------------------------------------------------------------
-    # 1. Customer Credit & Debt Risk Rules (Issue #74)
+    # 1. Customer Credit & Debt Risk Rules
     # -------------------------------------------------------------
+    customer_credit = context.customer_credit
     if customer_credit:
         if customer_credit.status == "BLOCKED":
             findings.append(
@@ -77,16 +117,22 @@ def analyze_order(
 
     # Fast lookup for pricing agreements by (customer_id, sku)
     agreements_map: dict[tuple[str, str], CustomerPriceAgreement] = {}
-    if pricing_agreements:
-        for pa in pricing_agreements:
-            agreements_map[(pa.customer_id.strip().upper(), pa.sku.strip().upper())] = pa
+    for pa in context.pricing_agreements:
+        agreements_map[(pa.customer_id.strip().upper(), pa.sku.strip().upper())] = pa
+        from preflight.rules_context import normalize_customer_key
+        norm_key = normalize_customer_key(pa.customer_id)
+        if norm_key:
+            agreements_map[(norm_key, pa.sku.strip().upper())] = pa
+
 
     # Fast lookup for UOM conversions by (sku, uom_code)
     uom_map: dict[tuple[str, str], Decimal] = {}
-    if uom_conversions:
-        for u in uom_conversions:
-            uom_map[(u.sku.strip().upper(), u.uom_code.strip().upper())] = u.conversion_factor
+    for u in context.uom_conversions:
+        uom_map[(u.sku.strip().upper(), u.uom_code.strip().upper())] = u.conversion_factor
 
+    # -------------------------------------------------------------
+    # 2. Line Item Rules & Validations
+    # -------------------------------------------------------------
     for item in order.items:
         if item.quantity <= 0:
             findings.append(
@@ -137,17 +183,18 @@ def analyze_order(
             continue
 
         if not product.active:
+            inactive_severity = "warning" if context.allow_inactive_sku else "error"
             findings.append(
                 Finding(
                     code="INACTIVE_SKU",
-                    severity="error",
+                    severity=inactive_severity,
                     sku=item.sku,
                     message=f"SKU {item.sku} is inactive.",
                 )
             )
 
         # -------------------------------------------------------------
-        # 2. UOM & MOQ / Pack Multiplier Rules (Issue #73)
+        # UOM & MOQ / Pack Multiplier Rules
         # -------------------------------------------------------------
         declared_uom = (getattr(item, "uom", None) or "PCS").strip().upper()
         base_uom = (getattr(product, "base_uom", None) or "PCS").strip().upper()
@@ -186,8 +233,10 @@ def analyze_order(
                 )
             )
 
-        # Warehouse stock verification against base inventory units
-        if int(base_quantity) > product.stock:
+        # Warehouse stock verification against base inventory units & safety margin
+        effective_stock = max(0, product.stock - context.stock_safety_margin)
+        if int(base_quantity) > effective_stock:
+            safety_note = f" (safety margin: {context.stock_safety_margin})" if context.stock_safety_margin > 0 else ""
             findings.append(
                 Finding(
                     code="INSUFFICIENT_STOCK",
@@ -195,43 +244,63 @@ def analyze_order(
                     sku=item.sku,
                     message=(
                         f"SKU {item.sku}: ordered {item.quantity} {declared_uom} (~{base_quantity:.0f} {base_uom}), "
-                        f"only {product.stock} {base_uom} in stock."
+                        f"only {product.stock} {base_uom} in stock{safety_note}."
                     ),
                 )
             )
 
         # -------------------------------------------------------------
-        # 3. Contract Pricing & Tiered Volume Discounts (Issue #72)
+        # Contract Pricing & Multi-Currency FX Tolerance
         # -------------------------------------------------------------
+        from preflight.rules_context import normalize_customer_key
+        norm_order_cust = normalize_customer_key(order.customer)
+        cust_agreement = agreements_map.get((order.customer.strip().upper(), item.sku.strip().upper())) or agreements_map.get((norm_order_cust, item.sku.strip().upper()))
+        
         expected_price = product.unit_price
-        cust_agreement = agreements_map.get((order.customer.strip().upper(), item.sku.strip().upper()))
         if cust_agreement and item.quantity >= cust_agreement.min_quantity:
             discount_mult = Decimal("1") - (cust_agreement.discount_percent / Decimal("100"))
             expected_price = cust_agreement.contract_price * discount_mult
 
+        if declared_uom != base_uom and conversion_factor > Decimal("0"):
+            expected_price = expected_price * conversion_factor
+
+
         if expected_price > 0:
-            order_curr = (order.currency or "VND").upper()
+            order_curr = (order.currency or "VND").strip().upper()
             if order_curr != "VND":
-                converted_price = Decimal(str(fx_engine.convert(item.unit_price, order_curr, "VND")))
-                difference = abs(converted_price - expected_price)
-                percent = (difference / expected_price) * Decimal("100")
-                if percent > price_tolerance_percent:
+                fx_key = f"{order_curr}_VND"
+                fx_rate = context.fx_rates.get(fx_key)
+                if fx_rate is None or fx_rate <= Decimal("0"):
                     findings.append(
                         Finding(
-                            code="PRICE_MISMATCH",
-                            severity="warning",
+                            code="FX_RATE_UNAVAILABLE",
+                            severity="error",
                             sku=item.sku,
-                            message=(
-                                f"SKU {item.sku}: PO price {item.unit_price:,.2f} {order_curr} "
-                                f"(~{converted_price:,.0f} VND), target price {expected_price:,.0f} VND "
-                                f"({percent:.2f}% difference at FX rate {fx_engine.get_rate(order_curr, 'VND'):,.2f})."
-                            ),
+                            message=f"Tỷ giá cho cặp tiền {order_curr}/VND không khả dụng.",
                         )
                     )
+                else:
+                    converted_price = Decimal(str(item.unit_price)) * fx_rate
+                    difference = abs(converted_price - expected_price)
+                    percent = (difference / expected_price) * Decimal("100")
+                    if percent > context.price_tolerance_percent:
+                        source_note = " (tỷ giá tĩnh)" if context.fx_source == "static" else ""
+                        findings.append(
+                            Finding(
+                                code="PRICE_MISMATCH",
+                                severity="warning",
+                                sku=item.sku,
+                                message=(
+                                    f"SKU {item.sku}: PO price {item.unit_price:,.2f} {order_curr} "
+                                    f"(~{converted_price:,.0f} VND), target price {expected_price:,.0f} VND "
+                                    f"({percent:.2f}% difference at FX rate {fx_rate:,.2f}{source_note})."
+                                ),
+                            )
+                        )
             else:
                 difference = abs(item.unit_price - expected_price)
                 percent = (difference / expected_price) * Decimal("100")
-                if percent > price_tolerance_percent:
+                if percent > context.price_tolerance_percent:
                     findings.append(
                         Finding(
                             code="PRICE_MISMATCH",
@@ -245,7 +314,6 @@ def analyze_order(
                     )
 
     if any(f.severity == "error" for f in findings):
-
         status = "blocked"
     elif findings:
         status = "review_required"
@@ -255,7 +323,7 @@ def analyze_order(
 
 
 class DecisionValidationError(Exception):
-    """Raised when an approval/rejection decision violates SOX 404/governance constraints."""
+    """Raised when an approval/rejection decision violates financial control & governance constraints."""
 
     def __init__(self, message: str, status_code: int = 400):
         super().__init__(message)
@@ -302,4 +370,3 @@ def validate_order_decision(
                 f"A justification note of at least 10 characters is required to {normalized_decision.replace('_', ' ')}.",
                 status_code=422,
             )
-

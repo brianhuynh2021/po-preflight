@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from decimal import Decimal
 from typing import Any
@@ -27,26 +28,37 @@ class DynamicFXEngine:
     }
 
     def __init__(self, cache_ttl_seconds: int = 43200) -> None:  # 12 hours
+
         self.cache_ttl = cache_ttl_seconds
         self._cache: dict[str, tuple[float, float]] = {}  # key -> (rate, timestamp)
 
-    def get_rate(self, base_currency: str = "USD", target_currency: str = "VND") -> float:
+    @property
+    def is_live_enabled(self) -> bool:
+        return os.getenv("PREFLIGHT_FX_LIVE", "false").strip().lower() in ("true", "1", "yes")
+
+    def get_rate_info(self, base_currency: str = "USD", target_currency: str = "VND") -> tuple[Decimal, str]:
+        """Returns (rate, source) where source is 'live' | 'static' | 'fallback'."""
         base = base_currency.strip().upper()
         target = target_currency.strip().upper()
 
         if base == target:
-            return 1.0
+            return Decimal("1.0"), "static"
 
         key = f"{base}_{target}"
+
+        # If live FX is not enabled, use static fallback
+        if not self.is_live_enabled:
+            rate = self.FALLBACK_RATES.get(key, 25400.0 if base == "USD" and target == "VND" else 1.0)
+            return Decimal(str(rate)), "static"
 
         # 1. Check TTL Cache
         now = time.time()
         if key in self._cache:
             rate, cached_at = self._cache[key]
             if now - cached_at < self.cache_ttl:
-                return rate
+                return Decimal(str(rate)), "live"
 
-        # 2. Attempt Dynamic Online Fetch (open API with 2s timeout)
+        # 2. Attempt Dynamic Online Fetch
         try:
             url = f"https://open.er-api.com/v6/latest/{base}"
             req = urllib.request.Request(url, headers={"User-Agent": "PO-Preflight/1.0"})
@@ -57,16 +69,19 @@ class DynamicFXEngine:
                     if target in rates:
                         live_rate = float(rates[target])
                         self._cache[key] = (live_rate, now)
-                        # Cache reverse rate
                         if live_rate > 0:
                             self._cache[f"{target}_{base}"] = (1.0 / live_rate, now)
-                        return live_rate
+                        return Decimal(str(live_rate)), "live"
         except Exception:
-            # Fall through to baseline fallback rate on offline/network errors
             pass
 
-        # 3. Offline Baseline Fallback
-        return self.FALLBACK_RATES.get(key, 25400.0 if base == "USD" and target == "VND" else 1.0)
+        # 3. Fallback on network error
+        rate = self.FALLBACK_RATES.get(key, 25400.0 if base == "USD" and target == "VND" else 1.0)
+        return Decimal(str(rate)), "static"
+
+    def get_rate(self, base_currency: str = "USD", target_currency: str = "VND") -> float:
+        rate, _ = self.get_rate_info(base_currency, target_currency)
+        return float(rate)
 
     def convert(
         self,
@@ -81,3 +96,4 @@ class DynamicFXEngine:
 
 # Global engine instance
 fx_engine = DynamicFXEngine()
+

@@ -47,9 +47,11 @@ def _order_from_mapping(data: dict[str, Any]) -> Order:
             sku=str(item.get("sku", "")).strip().upper(),
             quantity=_quantity(item.get("quantity")),
             unit_price=_decimal(item.get("unit_price"), "unit_price"),
+            uom=str(item.get("uom", "PCS") or "PCS").strip().upper(),
         )
         for item in raw_items
     )
+
     if any(not item.sku for item in items):
         raise OrderParseError("An item is missing its SKU")
     return Order(

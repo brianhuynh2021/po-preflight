@@ -26,7 +26,9 @@ from preflight.api.schemas import (
 from preflight.models import Analysis, LineItem, Order, Product
 from preflight.parsers import parse_order
 from preflight.rules import DecisionValidationError, analyze_order, validate_order_decision
+from preflight.rules_context import build_rule_context
 from preflight.security.rbac import Role, UserPrincipal, require_role
+
 from preflight.store import AuditStore
 
 router = APIRouter(prefix="/api/v1/orders", tags=["Purchase Orders & Preflight Operations"])
@@ -232,8 +234,10 @@ async def upload_order(
             # Stage in extraction_review state without rules evaluation
             analysis = Analysis(order=order, findings=[], status="extraction_review")
         else:
-            # Run preflight rules immediately
-            analysis = analyze_order(order, catalog, duplicate=duplicate)
+            # Run preflight rules immediately with comprehensive RuleContext
+            ctx = build_rule_context(store, catalog, order, duplicate=duplicate)
+            analysis = analyze_order(order, ctx)
+
 
         # Persist to database
         analysis_id = store.record_analysis(analysis, str(file.filename))
@@ -296,8 +300,10 @@ def confirm_extraction(
         currency=payload.currency,
     )
 
-    # Run deterministic preflight rules on confirmed order
-    analysis = analyze_order(updated_order, catalog, duplicate=False)
+    # Run deterministic preflight rules on confirmed order with RuleContext
+    ctx = build_rule_context(store, catalog, updated_order, duplicate=False)
+    analysis = analyze_order(updated_order, ctx)
+
 
     # Active Learning Feedback Loop: Persist customer nickname/alias mappings when human corrects SKUs
     try:

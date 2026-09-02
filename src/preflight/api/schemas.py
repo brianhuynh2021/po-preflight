@@ -56,12 +56,13 @@ class HealthResponse(BaseModel):
 # Line Item & Finding Schemas
 # ---------------------------------------------------------
 class FindingResponse(BaseModel):
-    code: Literal["PRICE_MISMATCH", "INSUFFICIENT_STOCK", "UNKNOWN_SKU", "INACTIVE_SKU", "DUPLICATE_PO"] = Field(
-        ..., description="Deterministic validation code"
+    code: str = Field(
+        ..., description="Deterministic validation code (e.g., PRICE_MISMATCH, INSUFFICIENT_STOCK, CUSTOMER_BLOCKED, etc.)"
     )
     severity: Literal["error", "warning", "info"] = Field(..., description="Severity level")
     message: str = Field(..., description="Human-readable explanation")
     sku: str | None = Field(None, description="Affected SKU if applicable")
+
     evidence: str | None = Field(None, description="Grounding evidence citation")
 
     model_config = {

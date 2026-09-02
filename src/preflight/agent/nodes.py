@@ -10,7 +10,9 @@ from preflight.agent.state import PreflightAgentState
 from preflight.models import Analysis, Finding, LineItem, Order, Product
 from preflight.rag.matcher import HybridSKUMatcher
 from preflight.rules import analyze_order
+from preflight.rules_context import build_rule_context
 from preflight.store import AuditStore
+
 
 try:
     from preflight.bot.telegram import TelegramBotService
@@ -119,9 +121,11 @@ def audit_rules_node(state: PreflightAgentState, catalog: dict[str, Product], st
     ]
     order = Order(po_number=po_num, customer=cust, items=order_items)
 
-    # Check duplicate in store
+    # Check duplicate in store and build comprehensive RuleContext
     duplicate = store.has_po(po_num)
-    analysis: Analysis = analyze_order(order, catalog, duplicate=duplicate)
+    ctx = build_rule_context(store, catalog, order, duplicate=duplicate)
+    analysis: Analysis = analyze_order(order, ctx)
+
 
     # Convert findings to dicts
     findings_dicts = [f.to_dict() for f in analysis.findings]

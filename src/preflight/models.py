@@ -156,3 +156,29 @@ class Analysis:
             "order": self.order.to_dict(),
             "findings": [finding.to_dict() for finding in self.findings],
         }
+
+
+@dataclass(frozen=True)
+class RulePolicy:
+    price_tolerance_percent: Decimal = Decimal("0")
+    stock_safety_margin: int = 0
+    allow_inactive_sku: bool = False
+    auto_approve_ready: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "price_tolerance_percent": str(self.price_tolerance_percent),
+            "stock_safety_margin": self.stock_safety_margin,
+            "allow_inactive_sku": self.allow_inactive_sku,
+            "auto_approve_ready": self.auto_approve_ready,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RulePolicy:
+        return cls(
+            price_tolerance_percent=Decimal(str(data.get("price_tolerance_percent", 0))),
+            stock_safety_margin=int(data.get("stock_safety_margin", 0)),
+            allow_inactive_sku=bool(data.get("allow_inactive_sku", False)),
+            auto_approve_ready=bool(data.get("auto_approve_ready", False)),
+        )
+
