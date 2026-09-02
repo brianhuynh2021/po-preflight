@@ -6,7 +6,7 @@ import os
 import sqlite3
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -232,6 +232,17 @@ CREATE TABLE IF NOT EXISTS erp_outbox (
 CREATE INDEX IF NOT EXISTS idx_erp_outbox_status ON erp_outbox(status);
 CREATE INDEX IF NOT EXISTS idx_erp_outbox_idemp ON erp_outbox(idempotency_key);
 CREATE INDEX IF NOT EXISTS idx_erp_outbox_po ON erp_outbox(po_number);
+
+CREATE TABLE IF NOT EXISTS request_errors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    status_code INTEGER NOT NULL,
+    error_message TEXT NOT NULL,
+    traceback TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_request_errors_created ON request_errors(created_at DESC);
 """
 
 
@@ -441,6 +452,17 @@ CREATE TABLE IF NOT EXISTS erp_outbox (
 CREATE INDEX IF NOT EXISTS idx_pg_erp_outbox_status ON erp_outbox(status);
 CREATE INDEX IF NOT EXISTS idx_pg_erp_outbox_idemp ON erp_outbox(idempotency_key);
 CREATE INDEX IF NOT EXISTS idx_pg_erp_outbox_po ON erp_outbox(po_number);
+
+CREATE TABLE IF NOT EXISTS request_errors (
+    id SERIAL PRIMARY KEY,
+    request_id VARCHAR(64) NOT NULL,
+    endpoint VARCHAR(255) NOT NULL,
+    status_code INTEGER NOT NULL,
+    error_message TEXT NOT NULL,
+    traceback TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pg_request_errors_created ON request_errors(created_at DESC);
 """
 
 
@@ -745,6 +767,21 @@ class BaseAuditStore(abc.ABC):
 
     @abc.abstractmethod
     def calculate_atp(self, sku: str, catalog_stock: Decimal | int = Decimal("0")) -> dict[str, Any]:
+        pass
+
+    @abc.abstractmethod
+    def record_request_error(
+        self,
+        request_id: str,
+        endpoint: str,
+        status_code: int,
+        error_message: str,
+        traceback_str: str = "",
+    ) -> None:
+        pass
+
+    @abc.abstractmethod
+    def get_recent_request_errors(self, limit: int = 10) -> list[dict[str, Any]]:
         pass
 
 
@@ -1202,6 +1239,12 @@ class AuditStore(BaseAuditStore):
     ) -> dict[str, Any]:
         with self._lock:
             t = timestamp if timestamp is not None else time.time()
+            from preflight.observability.context import get_request_id
+            req_id = get_request_id()
+            if req_id and isinstance(payload, dict) and "request_id" not in payload:
+                payload = dict(payload)
+                payload["request_id"] = req_id
+
             last_row = self.connection.execute(
                 "SELECT * FROM audit_blocks WHERE po_number = ? ORDER BY block_index DESC LIMIT 1",
                 (po_number,),
@@ -2174,6 +2217,41 @@ class AuditStore(BaseAuditStore):
             "is_stale": is_stale,
         }
 
+    def record_request_error(
+        self,
+        request_id: str,
+        endpoint: str,
+        status_code: int,
+        error_message: str,
+        traceback_str: str = "",
+    ) -> None:
+        with self._lock:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            self.connection.execute(
+                """
+                INSERT INTO request_errors (request_id, endpoint, status_code, error_message, traceback, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (request_id, endpoint, status_code, error_message, traceback_str, now_iso),
+            )
+            # Prune older than 7 days
+            seven_days_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+            self.connection.execute("DELETE FROM request_errors WHERE created_at < ?", (seven_days_ago,))
+            self.connection.commit()
+
+    def get_recent_request_errors(self, limit: int = 10) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self.connection.execute(
+                """
+                SELECT id, request_id, endpoint, status_code, error_message, traceback, created_at
+                FROM request_errors
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
 
 
 
@@ -2508,6 +2586,12 @@ class PostgresAuditStore(BaseAuditStore):
     ) -> dict[str, Any]:
         with self._pool.connection() as conn:
             t = timestamp if timestamp is not None else time.time()
+            from preflight.observability.context import get_request_id
+            req_id = get_request_id()
+            if req_id and isinstance(payload, dict) and "request_id" not in payload:
+                payload = dict(payload)
+                payload["request_id"] = req_id
+
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT block_index, block_hash FROM audit_blocks WHERE po_number = %s ORDER BY block_index DESC LIMIT 1",
@@ -3403,6 +3487,43 @@ class PostgresAuditStore(BaseAuditStore):
             "source": source,
             "is_stale": is_stale,
         }
+
+    def record_request_error(
+        self,
+        request_id: str,
+        endpoint: str,
+        status_code: int,
+        error_message: str,
+        traceback_str: str = "",
+    ) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO request_errors (request_id, endpoint, status_code, error_message, traceback)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (request_id, endpoint, status_code, error_message, traceback_str),
+            )
+            cur.execute(
+                """
+                DELETE FROM request_errors
+                WHERE created_at < NOW() - INTERVAL '7 days'
+                """
+            )
+
+    def get_recent_request_errors(self, limit: int = 10) -> list[dict[str, Any]]:
+        with self._cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, request_id, endpoint, status_code, error_message, traceback, created_at
+                FROM request_errors
+                ORDER BY id DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            rows = cur.fetchall()
+            return [dict(r) for r in rows]
 
 
 

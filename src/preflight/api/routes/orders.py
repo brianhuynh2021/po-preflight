@@ -378,6 +378,17 @@ async def upload_order(
             # Persist to database
             analysis_id = store.record_analysis(analysis, str(filename))
 
+            try:
+                from preflight.observability.metrics import metrics_registry
+                risk = _calculate_risk(
+                    analysis.status,
+                    sum(1 for f in analysis.findings if f.severity == "error"),
+                    sum(1 for f in analysis.findings if f.severity == "warning"),
+                )
+                metrics_registry.record_order_processed(analysis.status, risk)
+            except Exception:
+                pass
+
         # Store permanent file in structured hierarchy <analysis_id>/<safe_name>
         final_dir = upload_dir / str(analysis_id)
         final_dir.mkdir(parents=True, exist_ok=True)
@@ -477,6 +488,17 @@ def confirm_extraction(
 
     # Update database record
     store.update_analysis(int(row["id"]), analysis)
+
+    try:
+        from preflight.observability.metrics import metrics_registry
+        risk = _calculate_risk(
+            analysis.status,
+            sum(1 for f in analysis.findings if f.severity == "error"),
+            sum(1 for f in analysis.findings if f.severity == "warning"),
+        )
+        metrics_registry.record_order_processed(analysis.status, risk)
+    except Exception:
+        pass
 
     event_bus.publish(
         "order.confirmed",

@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import {
+  Activity,
   LayoutDashboard,
   FileText,
   ScanLine,
@@ -67,6 +68,7 @@ export function Sidebar() {
               { label: "Người dùng & Phân quyền", href: "/users", icon: UserCheck },
               { label: "Luật & Chính sách", href: "/rules", icon: ShieldCheck },
               { label: "Đồng bộ ERP Outbox", href: "/erp-sync", icon: RefreshCw },
+              { label: "Giám sát & Sức khỏe", href: "/admin/health", icon: Activity },
               { label: "Kiểm thử SKU (RAG)", href: "/rag-playground", icon: Zap },
               { label: "Sơ đồ LangGraph", href: "/agent-graph", icon: Workflow },
               { label: "Chứng thư Merkle", href: "/audit-certificate", icon: Lock },

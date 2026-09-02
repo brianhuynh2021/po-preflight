@@ -6,6 +6,8 @@ from preflight.rag.fuzzy import FuzzyLexicalMatcher
 from preflight.rag.llm_fallback import LLMContextResolver
 from preflight.rag.schemas import MatchResult
 from preflight.rag.vector import VectorSemanticMatcher
+from preflight.observability.tracing import trace_span
+from preflight.observability.metrics import metrics_registry
 
 
 class HybridSKUMatcher:
@@ -35,6 +37,16 @@ class HybridSKUMatcher:
             self.store.learn_alias(customer_id, raw_query, target_sku)
 
     def resolve(self, raw_query: str, customer_id: str | None = None) -> MatchResult:
+        with trace_span("sku_resolution", {"raw_query": raw_query, "customer_id": str(customer_id)}):
+            res = self._do_resolve(raw_query, customer_id)
+            try:
+                tier_val = str(res.tier_used.value if hasattr(res.tier_used, "value") else res.tier_used)
+                metrics_registry.record_sku_resolution(tier_val)
+            except Exception:
+                pass
+            return res
+
+    def _do_resolve(self, raw_query: str, customer_id: str | None = None) -> MatchResult:
         if not raw_query or not raw_query.strip():
             return self.tier4_llm.match("", customer_id=customer_id)
 
@@ -94,10 +106,8 @@ class HybridSKUMatcher:
         # -------------------------------------------------------------
         vector_res = self.tier3_vector.match(raw_query)
         if vector_res is not None and vector_res.confidence_score >= 0.35:
-            # If fuzzy also had a candidate, merge them into alternative candidates
             if fuzzy_res and fuzzy_res.candidates:
                 merged = vector_res.candidates + fuzzy_res.candidates
-                # Deduplicate by SKU
                 seen = set()
                 deduped = []
                 for c in merged:
@@ -107,7 +117,6 @@ class HybridSKUMatcher:
                 vector_res.candidates = deduped[:3]
             return vector_res
 
-        # If fuzzy had a partial match (e.g. 0.75-0.79) but vector didn't beat it, return fuzzy
         if fuzzy_res is not None:
             return fuzzy_res
 

@@ -687,6 +687,14 @@ def analyze_order(
     else:
         status = "ready_for_approval"
 
+    # Record metrics for findings
+    try:
+        from preflight.observability.metrics import metrics_registry
+        for f in findings:
+            metrics_registry.record_finding(f.code, f.severity)
+    except Exception:
+        pass
+
     now_iso = datetime.now(timezone.utc).isoformat()
     return Analysis(
         order=order,

@@ -12,6 +12,7 @@ from preflight.api.deps import get_catalog, get_db_path
 from preflight.api.logging_config import RequestLoggingMiddleware, logger
 from preflight.security.rate_limiter import RateLimitMiddleware
 from preflight.api.routes import (
+    admin_health,
     agent,
     audit,
     auth,
@@ -34,6 +35,7 @@ from preflight.api.routes import (
     users,
 )
 
+from preflight.observability.tracing import setup_opentelemetry
 from preflight.parsers import parse_order
 from preflight.rules import analyze_order
 from preflight.store import AuditStore
@@ -115,6 +117,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "SECURITY NOTICE: Running in OPEN DEVELOPMENT mode (PREFLIGHT_AUTH_REQUIRED=false). "
             "Anonymous requests will receive dev_admin privileges."
         )
+    # Initialize OpenTelemetry and Sentry if configured
+    setup_opentelemetry(app)
+    sentry_dsn = os.getenv("SENTRY_DSN", "").strip()
+    if sentry_dsn:
+        try:
+            import sentry_sdk
+            sentry_sdk.init(
+                dsn=sentry_dsn,
+                environment=os.getenv("PREFLIGHT_ENV", "development"),
+                traces_sample_rate=1.0,
+            )
+            logger.info("Sentry SDK initialized successfully.")
+        except Exception as exc:
+            logger.info(f"Sentry SDK initialization skipped: {exc}")
 
     seed_initial_data()
     logger.info("🚀 PO Preflight REST Gateway is ready! Swagger UI at http://localhost:8000/docs")
@@ -137,6 +153,7 @@ risk scoring, visual grounding evidence citations, and Human-in-the-loop approva
 
 ### 🔑 Key Capabilities:
 * **System Health:** `/health` - Real-time diagnostics & database health.
+* **Admin Health:** `/api/v1/admin/health` - Observability and monitoring.
 * **Order Queue:** `/api/v1/orders` - Filter, search, and inspect orders with violation findings.
 * **Intake & Preflight:** `POST /api/v1/orders/upload` - Multipart file upload (PDF/JSON/CSV/TXT).
 * **Human Decision:** `POST /api/v1/orders/{order_id}/decide` - Approve, reject, or request changes.
@@ -174,6 +191,7 @@ app.add_middleware(RateLimitMiddleware)
 
 # Mount Routers
 app.include_router(health.router)
+app.include_router(admin_health.router)
 app.include_router(metrics.router)
 app.include_router(orders.router)
 app.include_router(dashboard.router)

@@ -15,13 +15,16 @@ class PrometheusMetricsRegistry:
         self.http_requests_total: dict[tuple[str, str, int], int] = defaultdict(int)
         self.http_durations: dict[tuple[str, str], list[float]] = defaultdict(list)
         self.orders_total: dict[tuple[str, str], int] = defaultdict(int)
+        self.findings_total: dict[tuple[str, str], int] = defaultdict(int)
         self.sku_resolutions_total: dict[str, int] = defaultdict(int)
         self.erp_sync_total: dict[tuple[str, str], int] = defaultdict(int)
+        self.analysis_durations: list[float] = []
+        self.outbox_pending_count: int = 0
+        self.outbox_pending_max_age_seconds: float = 0.0
         self.start_time = time.time()
 
     def record_http_request(self, method: str, path: str, status_code: int, duration_sec: float) -> None:
         """Record incoming HTTP request latency and status."""
-        # Sanitize path to prevent cardinality explosion (e.g. /api/v1/orders/123 -> /api/v1/orders/{id})
         norm_path = path
         if norm_path.startswith("/api/v1/orders/") and norm_path.count("/") >= 4:
             parts = norm_path.split("/")
@@ -40,6 +43,16 @@ class PrometheusMetricsRegistry:
         with self._lock:
             self.orders_total[(status, risk_level)] += 1
 
+    def record_finding(self, code: str, severity: str = "warning") -> None:
+        with self._lock:
+            self.findings_total[(code, severity)] += 1
+
+    def record_analysis_duration(self, duration_sec: float) -> None:
+        with self._lock:
+            self.analysis_durations.append(duration_sec)
+            if len(self.analysis_durations) > 500:
+                self.analysis_durations.pop(0)
+
     def record_sku_resolution(self, tier: str) -> None:
         with self._lock:
             self.sku_resolutions_total[tier] += 1
@@ -48,6 +61,11 @@ class PrometheusMetricsRegistry:
         with self._lock:
             st = "success" if success else "failure"
             self.erp_sync_total[(adapter, st)] += 1
+
+    def record_outbox_pending(self, count: int, max_age_seconds: float) -> None:
+        with self._lock:
+            self.outbox_pending_count = count
+            self.outbox_pending_max_age_seconds = max_age_seconds
 
     def generate_prometheus_text(self) -> str:
         """Render metrics in standard Prometheus text format (v0.0.4)."""
@@ -107,6 +125,36 @@ class PrometheusMetricsRegistry:
                 lines.append(
                     f'po_preflight_orders_processed_total{{status="{status}",risk_level="{risk}"}} {count}'
                 )
+
+        # Findings Total
+        lines.append("# HELP po_preflight_findings_total Total findings discovered by code and severity")
+        lines.append("# TYPE po_preflight_findings_total counter")
+        with self._lock:
+            for (code, sev), count in self.findings_total.items():
+                lines.append(f'po_preflight_findings_total{{code="{code}",severity="{sev}"}} {count}')
+
+        # Analysis Latency Summary
+        lines.append("# HELP po_preflight_analysis_duration_seconds Rule and analysis duration quantiles")
+        lines.append("# TYPE po_preflight_analysis_duration_seconds summary")
+        with self._lock:
+            if self.analysis_durations:
+                sorted_a = sorted(self.analysis_durations)
+                na = len(sorted_a)
+                p50_a = sorted_a[int(na * 0.50)]
+                p90_a = sorted_a[min(int(na * 0.90), na - 1)]
+                p99_a = sorted_a[min(int(na * 0.99), na - 1)]
+                lines.append(f'po_preflight_analysis_duration_seconds{{quantile="0.5"}} {p50_a:.4f}')
+                lines.append(f'po_preflight_analysis_duration_seconds{{quantile="0.9"}} {p90_a:.4f}')
+                lines.append(f'po_preflight_analysis_duration_seconds{{quantile="0.99"}} {p99_a:.4f}')
+
+        # Outbox pending gauges
+        lines.append("# HELP po_preflight_outbox_pending_count Current pending outbox events")
+        lines.append("# TYPE po_preflight_outbox_pending_count gauge")
+        lines.append(f"po_preflight_outbox_pending_count {self.outbox_pending_count}")
+
+        lines.append("# HELP po_preflight_outbox_pending_max_age_seconds Oldest pending outbox event age in seconds")
+        lines.append("# TYPE po_preflight_outbox_pending_max_age_seconds gauge")
+        lines.append(f"po_preflight_outbox_pending_max_age_seconds {self.outbox_pending_max_age_seconds:.2f}")
 
         # SKU resolutions by tier
         lines.append("# HELP po_preflight_sku_resolutions_total Total SKU resolutions by RAG tier")

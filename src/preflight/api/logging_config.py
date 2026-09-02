@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import time
+import traceback
 import uuid
 from typing import Callable
 
@@ -10,87 +12,76 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-# ANSI Color Codes
-RESET = "\033[0m"
-BOLD = "\033[1m"
-DIM = "\033[2m"
-
-# Foreground Colors
-CYAN = "\033[36m"
-GREEN = "\033[32m"
-YELLOW = "\033[33m"
-RED = "\033[31m"
-MAGENTA = "\033[35m"
-BLUE = "\033[34m"
-WHITE = "\033[37m"
+from preflight.observability.context import (
+    request_id_var,
+    user_id_var,
+    order_id_var,
+    set_request_id,
+    set_user_id,
+    set_order_id,
+)
+from preflight.observability.logging import (
+    JsonLogFormatter,
+    ColoredLogFormatter,
+    configure_logging,
+    BOLD,
+    CYAN,
+    DIM,
+    GREEN,
+    MAGENTA,
+    RED,
+    RESET,
+    WHITE,
+    YELLOW,
+)
 
 # Method Colors
 METHOD_COLORS = {
-    "GET": BLUE,
-    "POST": GREEN,
-    "PUT": YELLOW,
-    "DELETE": RED,
-    "PATCH": MAGENTA,
-    "OPTIONS": CYAN,
+    "GET": "\033[34m",
+    "POST": "\033[32m",
+    "PUT": "\033[33m",
+    "DELETE": "\033[31m",
+    "PATCH": "\033[35m",
+    "OPTIONS": "\033[36m",
 }
 
-
-class ColoredFormatter(logging.Formatter):
-    """Custom ANSI formatter for beautiful terminal logs."""
-
-    def format(self, record: logging.LogRecord) -> str:
-        # Time string
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(record.created))
-        time_str = f"{DIM}[{timestamp}]{RESET}"
-
-        # Level coloring
-        level = record.levelname
-        if level == "INFO":
-            level_str = f"{GREEN}{BOLD}INFO{RESET}"
-        elif level == "WARNING":
-            level_str = f"{YELLOW}{BOLD}WARN{RESET}"
-        elif level == "ERROR":
-            level_str = f"{RED}{BOLD}ERROR{RESET}"
-        elif level == "DEBUG":
-            level_str = f"{CYAN}{BOLD}DEBUG{RESET}"
-        else:
-            level_str = f"{WHITE}{BOLD}{level}{RESET}"
-
-        tag_str = f"{MAGENTA}[PreflightAPI]{RESET}"
-        msg = record.getMessage()
-
-        return f"{time_str} {level_str} {tag_str} {msg}"
-
-
-def setup_logger(name: str = "preflight.api") -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-
-    if not logger.handlers:
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(ColoredFormatter())
-        logger.addHandler(handler)
-
-    logger.propagate = False
-    return logger
-
-
-logger = setup_logger()
+# Ensure global logging is configured
+formatter = configure_logging()
+logger = logging.getLogger("preflight.api")
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware that logs incoming requests and responses with latency and colored status."""
+    """Middleware that correlates request_id, user_id, logs responses, tracks Prometheus metrics and persists 5xx errors."""
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         start_time = time.perf_counter()
         request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:8]
         request.state.request_id = request_id
 
+        # Set ContextVars
+        token_req = set_request_id(request_id)
+
+        # Extract user if available in cookie/auth
+        user_id = ""
+        cookie_sess = request.cookies.get("pf_session")
+        if cookie_sess:
+            try:
+                from preflight.security.session import verify_session_token
+                principal = verify_session_token(cookie_sess)
+                user_id = principal.username
+            except Exception:
+                pass
+        token_user = set_user_id(user_id) if user_id else None
+
         method = request.method
         method_color = METHOD_COLORS.get(method, WHITE)
         path = request.url.path
 
-        # Process the request
+        # Check if JSON logging is active
+        is_json = os.getenv("PREFLIGHT_LOG_FORMAT", "").lower() == "json" or (
+            os.getenv("PREFLIGHT_ENV", "").lower() == "production" and os.getenv("PREFLIGHT_LOG_FORMAT", "").lower() != "text"
+        )
+
         try:
             response = await call_next(request)
             duration_ms = (time.perf_counter() - start_time) * 1000
@@ -108,12 +99,17 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             response.headers["X-Request-ID"] = request_id
             response.headers["X-Response-Time"] = f"{duration_ms:.2f}ms"
 
-            # Avoid spamming logs with frequent healthcheck polls if desired, but format nicely
-            logger.info(
-                f"{method_color}{BOLD}{method:<6}{RESET} {path:<28} "
-                f"-> {status_color}{BOLD}{status_code}{RESET} "
-                f"({duration_ms:.2f}ms) {DIM}[req_id={request_id}]{RESET}"
-            )
+            if is_json:
+                logger.info(
+                    f"{method} {path} -> {status_code} ({duration_ms:.2f}ms)",
+                    extra={"method": method, "path": path, "status_code": status_code, "duration_ms": duration_ms},
+                )
+            else:
+                logger.info(
+                    f"{method_color}{BOLD}{method:<6}{RESET} {path:<28} "
+                    f"-> {status_color}{BOLD}{status_code}{RESET} "
+                    f"({duration_ms:.2f}ms)"
+                )
 
             # Record Prometheus OpenMetrics
             try:
@@ -123,12 +119,51 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             except Exception:
                 pass
 
+            # Record 5xx errors into store
+            if status_code >= 500:
+                try:
+                    from preflight.api.deps import get_db_path
+                    from preflight.store import create_audit_store
+                    with create_audit_store(get_db_path()) as store:
+                        store.record_request_error(
+                            request_id=request_id,
+                            endpoint=f"{method} {path}",
+                            status_code=status_code,
+                            error_message=f"HTTP {status_code}",
+                            traceback_str="",
+                        )
+                except Exception:
+                    pass
+
             return response
         except Exception as exc:
             duration_ms = (time.perf_counter() - start_time) * 1000
-            logger.error(
-                f"{method_color}{BOLD}{method:<6}{RESET} {path:<28} "
-                f"-> {RED}{BOLD}500 ERROR{RESET} ({duration_ms:.2f}ms) "
-                f"[req_id={request_id}] - Exception: {exc}"
-            )
+            tb_str = traceback.format_exc()
+            if is_json:
+                logger.error(
+                    f"{method} {path} -> 500 ERROR ({duration_ms:.2f}ms): {exc}",
+                    extra={"method": method, "path": path, "status_code": 500, "duration_ms": duration_ms, "exception": str(exc)},
+                )
+            else:
+                logger.error(
+                    f"{method_color}{BOLD}{method:<6}{RESET} {path:<28} "
+                    f"-> {RED}{BOLD}500 ERROR{RESET} ({duration_ms:.2f}ms) "
+                    f"- Exception: {exc}"
+                )
+
+            # Record 5xx exception into store
+            try:
+                from preflight.api.deps import get_db_path
+                from preflight.store import create_audit_store
+                with create_audit_store(get_db_path()) as store:
+                    store.record_request_error(
+                        request_id=request_id,
+                        endpoint=f"{method} {path}",
+                        status_code=500,
+                        error_message=str(exc),
+                        traceback_str=tb_str,
+                    )
+            except Exception:
+                pass
+
             raise

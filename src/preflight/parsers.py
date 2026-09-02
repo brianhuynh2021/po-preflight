@@ -270,24 +270,26 @@ def parse_pdf(path: Path) -> Order:
 
 
 def parse_order(path: str | Path) -> Order:
-    source = Path(path)
-    if not source.is_file():
-        raise OrderParseError(f"File not found: {source}")
-    suffix = source.suffix.lower()
-    if suffix == ".json":
-        return parse_json(source)
-    if suffix == ".csv":
-        return parse_csv(source)
-    if suffix in {".xlsx", ".xlsm", ".xls"}:
-        from preflight.ingestion.excel_parser import ExcelExtractor
-        extractor = ExcelExtractor()
-        _, domain_order = extractor.extract(source.read_bytes(), source.name)
-        return domain_order
-    if suffix in {".txt", ".md"}:
-        return parse_text(source.read_text(encoding="utf-8"))
-    if suffix == ".pdf":
-        return parse_pdf(source)
-    raise OrderParseError(f"Unsupported file format: {suffix or '(no extension)'}")
+    from preflight.observability.tracing import trace_span
+    with trace_span("parse_order", {"path": str(path)}):
+        source = Path(path)
+        if not source.is_file():
+            raise OrderParseError(f"File not found: {source}")
+        suffix = source.suffix.lower()
+        if suffix == ".json":
+            return parse_json(source)
+        if suffix == ".csv":
+            return parse_csv(source)
+        if suffix in {".xlsx", ".xlsm", ".xls"}:
+            from preflight.ingestion.excel_parser import ExcelExtractor
+            extractor = ExcelExtractor()
+            _, domain_order = extractor.extract(source.read_bytes(), source.name)
+            return domain_order
+        if suffix in {".txt", ".md"}:
+            return parse_text(source.read_text(encoding="utf-8"))
+        if suffix == ".pdf":
+            return parse_pdf(source)
+        raise OrderParseError(f"Unsupported file format: {suffix or '(no extension)'}")
 
 
 def parse_order_content(content: str, suffix: str = ".json") -> Order:

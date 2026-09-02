@@ -1,7 +1,7 @@
 import os
 import time
 from pathlib import Path
-from typing import Generator
+from typing import Any, Generator
 
 from preflight.catalog import load_catalog
 from preflight.config import get_settings
@@ -55,3 +55,14 @@ def get_audit_store() -> Generator[BaseAuditStore, None, None]:
 
 
 get_store = get_audit_store
+
+
+def get_outbox_store() -> Generator[Any, None, None]:
+    from preflight.erp.outbox import create_outbox_store
+    db_target = get_db_path()
+    outbox = create_outbox_store(db_target)
+    try:
+        yield outbox
+    finally:
+        outbox.close()
+

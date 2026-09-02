@@ -73,23 +73,25 @@ class GeminiVisionOCREngine:
 
     def extract(self, file_bytes: bytes, filename: str, doc_type: DocumentType) -> ExtractedOrder:
         """Extract structured PO data from image or scanned document bytes."""
-        if not self.is_live:
-            raise UpstreamUnavailable(
-                "OCR chưa được cấu hình. Vui lòng cấu hình GEMINI_API_KEY hoặc tải lên tệp Excel/CSV/JSON."
-            )
+        from preflight.observability.tracing import trace_span
+        with trace_span("ocr_extraction", {"filename": filename, "doc_type": str(doc_type)}):
+            if not self.is_live:
+                raise UpstreamUnavailable(
+                    "OCR chưa được cấu hình. Vui lòng cấu hình GEMINI_API_KEY hoặc tải lên tệp Excel/CSV/JSON."
+                )
 
-        try:
-            return vision_ai_circuit_breaker.call(
-                self._call_gemini_api, file_bytes, filename, doc_type
-            )
-        except CircuitBreakerOpenException as exc:
-            logger.error(f"Vision OCR Circuit Breaker is OPEN: {exc}")
-            raise UpstreamUnavailable(
-                f"Dịch vụ AI Vision tạm thời bị ngắt kết nối bảo vệ do lỗi quá nhiều lần. Vui lòng thử lại sau {exc.retry_after_sec:.0f} giây."
-            ) from exc
-        except Exception as exc:
-            logger.error(f"Live Gemini Vision API call failed: {exc}")
-            raise UpstreamUnavailable(f"Gọi Gemini Vision OCR thất bại: {exc}") from exc
+            try:
+                return vision_ai_circuit_breaker.call(
+                    self._call_gemini_api, file_bytes, filename, doc_type
+                )
+            except CircuitBreakerOpenException as exc:
+                logger.error(f"Vision OCR Circuit Breaker is OPEN: {exc}")
+                raise UpstreamUnavailable(
+                    f"Dịch vụ AI Vision tạm thời bị ngắt kết nối bảo vệ do lỗi quá nhiều lần. Vui lòng thử lại sau {exc.retry_after_sec:.0f} giây."
+                ) from exc
+            except Exception as exc:
+                logger.error(f"Live Gemini Vision API call failed: {exc}")
+                raise UpstreamUnavailable(f"Gọi Gemini Vision OCR thất bại: {exc}") from exc
 
     def _call_gemini_api(self, file_bytes: bytes, filename: str, doc_type: DocumentType) -> ExtractedOrder:
         mime_type = "application/pdf" if doc_type in [DocumentType.DIGITAL_PDF, DocumentType.SCANNED_PDF] else "image/png"
