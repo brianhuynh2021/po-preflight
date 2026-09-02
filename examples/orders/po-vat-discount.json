@@ -1,0 +1,43 @@
+{
+  "po_number": "PO-2026-VAT-01",
+  "customer": "Northstar Retail Vietnam",
+  "currency": "VND",
+  "header_discount_amount": 0,
+  "shipping_fee": 0,
+  "declared_subtotal": 40750000,
+  "declared_tax": 4075000,
+  "declared_total": 44825000,
+  "items": [
+    {
+      "sku": "LAPTOP-A14",
+      "quantity": 2,
+      "unit_price": 18500000,
+      "uom": "PCS",
+      "discount_percent": 5,
+      "discount_amount": 0,
+      "tax_rate": 10,
+      "is_promo": false
+    },
+    {
+      "sku": "DOCK-USBC",
+      "quantity": 2,
+      "unit_price": 2800000,
+      "uom": "PCS",
+      "discount_percent": 0,
+      "discount_amount": 0,
+      "tax_rate": 10,
+      "is_promo": false
+    },
+    {
+      "sku": "CAB-CAT6-3M",
+      "quantity": 5,
+      "unit_price": 0,
+      "uom": "PCS",
+      "discount_percent": 0,
+      "discount_amount": 0,
+      "tax_rate": 0,
+      "is_promo": true,
+      "description": "Hàng tặng kèm khuyến mãi"
+    }
+  ]
+}

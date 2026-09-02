@@ -16,6 +16,14 @@ from preflight.rag.matcher import HybridSKUMatcher
 from preflight.rules_context import RuleContext
 
 
+def format_money(amount: Decimal | int | float, currency: str = "VND") -> str:
+    """Format monetary amounts cleanly based on currency."""
+    curr = (currency or "VND").upper().strip()
+    if curr == "VND":
+        return f"{amount:,.0f} VND"
+    return f"{amount:,.2f} {curr}"
+
+
 def analyze_order(
     order: Order,
     ctx: RuleContext | dict[str, Product],
@@ -32,17 +40,22 @@ def analyze_order(
     - Customer credit status & exposure limits
     - Duplicate PO detection
     - Item quantity & price sanity
+    - VAT tax rate legality (0%, 5%, 8%, 10%)
+    - Discount policy thresholds
+    - Promo item recognition & price mismatch skipping
     - Hybrid SKU recognition & active catalog status
     - Unit of Measure (UOM) conversions & MOQ/packaging validation
     - Warehouse stock availability with safety margin thresholds
     - Tiered volume customer contract pricing
     - Multi-currency FX conversion and tolerance thresholding
+    - Declared total mathematical discrepancy verification
     """
+    order_currency = (order.currency or "VND").strip().upper()
+
     if isinstance(ctx, dict):
         # Gracefully wrap legacy catalog dict into RuleContext
         fx_rates: dict[str, Decimal] = {}
         fx_source = "static"
-        order_currency = (order.currency or "VND").strip().upper()
         if order_currency != "VND":
             from preflight.currency import fx_engine
             rate_val, fx_source = fx_engine.get_rate_info(order_currency, "VND")
@@ -60,7 +73,6 @@ def analyze_order(
         )
     else:
         context = ctx
-
 
     findings: list[Finding] = []
     catalog = context.catalog
@@ -94,7 +106,7 @@ def analyze_order(
                     code="OVERDUE_DEBT_BLOCKED",
                     severity="error",
                     message=(
-                        f"Customer '{order.customer}' has overdue debt of {customer_credit.overdue_balance:,.0f} VND "
+                        f"Customer '{order.customer}' has overdue debt of {format_money(customer_credit.overdue_balance, order_currency)} "
                         f"aged {customer_credit.oldest_overdue_days} days (exceeds 30-day grace limit)."
                     ),
                 )
@@ -109,8 +121,8 @@ def analyze_order(
                     code="CREDIT_LIMIT_EXCEEDED",
                     severity="error" if customer_credit.credit_limit == 0 or (deficit / customer_credit.credit_limit) > Decimal("0.2") else "warning",
                     message=(
-                        f"Order total {order.total:,.0f} VND pushes customer credit exposure to {total_exposure:,.0f} VND, "
-                        f"exceeding approved credit limit of {customer_credit.credit_limit:,.0f} VND by {deficit:,.0f} VND."
+                        f"Order total {format_money(order.total, order_currency)} pushes customer credit exposure to {format_money(total_exposure, order_currency)}, "
+                        f"exceeding approved credit limit of {format_money(customer_credit.credit_limit, order_currency)} by {format_money(deficit, order_currency)}."
                     ),
                 )
             )
@@ -124,11 +136,12 @@ def analyze_order(
         if norm_key:
             agreements_map[(norm_key, pa.sku.strip().upper())] = pa
 
-
     # Fast lookup for UOM conversions by (sku, uom_code)
     uom_map: dict[tuple[str, str], Decimal] = {}
     for u in context.uom_conversions:
         uom_map[(u.sku.strip().upper(), u.uom_code.strip().upper())] = u.conversion_factor
+
+    VALID_TAX_RATES = {Decimal("0"), Decimal("5"), Decimal("8"), Decimal("10")}
 
     # -------------------------------------------------------------
     # 2. Line Item Rules & Validations
@@ -150,6 +163,29 @@ def analyze_order(
                     severity="error",
                     sku=item.sku,
                     message=f"SKU {item.sku}: unit price cannot be negative (received {item.unit_price}).",
+                )
+            )
+
+        # Tax Rate Validation (VAT in Vietnam)
+        if item.tax_rate not in VALID_TAX_RATES:
+            findings.append(
+                Finding(
+                    code="TAX_RATE_INVALID",
+                    severity="error",
+                    sku=item.sku,
+                    message=f"SKU {item.sku}: Thuế suất VAT {item.tax_rate:g}% không hợp lệ theo quy định Việt Nam (chỉ chấp nhận 0%, 5%, 8%, 10%).",
+                )
+            )
+
+        # Discount Policy Validation
+        max_disc = getattr(context, "max_discount_percent", Decimal("15"))
+        if item.discount_percent > max_disc:
+            findings.append(
+                Finding(
+                    code="DISCOUNT_EXCEEDS_POLICY",
+                    severity="warning",
+                    sku=item.sku,
+                    message=f"SKU {item.sku}: Mức chiết khấu {item.discount_percent:g}% vượt quá chính sách tối đa {max_disc:g}%.",
                 )
             )
 
@@ -263,6 +299,20 @@ def analyze_order(
             )
 
         # -------------------------------------------------------------
+        # Promo Line Check vs Price Mismatch
+        # -------------------------------------------------------------
+        if getattr(item, "is_promo", False):
+            findings.append(
+                Finding(
+                    code="PROMO_LINE",
+                    severity="info",
+                    sku=item.sku,
+                    message=f"SKU {item.sku}: Dòng hàng khuyến mãi / tặng kèm (đơn giá {format_money(item.unit_price, order_currency)}).",
+                )
+            )
+            continue
+
+        # -------------------------------------------------------------
         # Contract Pricing & Multi-Currency FX Tolerance
         # -------------------------------------------------------------
         from preflight.rules_context import normalize_customer_key
@@ -277,11 +327,9 @@ def analyze_order(
         if declared_uom != base_uom and conversion_factor > Decimal("0"):
             expected_price = expected_price * conversion_factor
 
-
         if expected_price > 0:
-            order_curr = (order.currency or "VND").strip().upper()
-            if order_curr != "VND":
-                fx_key = f"{order_curr}_VND"
+            if order_currency != "VND":
+                fx_key = f"{order_currency}_VND"
                 fx_rate = context.fx_rates.get(fx_key)
                 if fx_rate is None or fx_rate <= Decimal("0"):
                     findings.append(
@@ -289,7 +337,7 @@ def analyze_order(
                             code="FX_RATE_UNAVAILABLE",
                             severity="error",
                             sku=item.sku,
-                            message=f"Tỷ giá cho cặp tiền {order_curr}/VND không khả dụng.",
+                            message=f"Tỷ giá cho cặp tiền {order_currency}/VND không khả dụng.",
                         )
                     )
                 else:
@@ -304,8 +352,8 @@ def analyze_order(
                                 severity="warning",
                                 sku=item.sku,
                                 message=(
-                                    f"SKU {item.sku}: PO price {item.unit_price:,.2f} {order_curr} "
-                                    f"(~{converted_price:,.0f} VND), target price {expected_price:,.0f} VND "
+                                    f"SKU {item.sku}: PO price {format_money(item.unit_price, order_currency)} "
+                                    f"(~{format_money(converted_price, 'VND')}), target price {format_money(expected_price, 'VND')} "
                                     f"({percent:.2f}% difference at FX rate {fx_rate:,.2f}{source_note})."
                                 ),
                             )
@@ -320,16 +368,44 @@ def analyze_order(
                             severity="warning",
                             sku=item.sku,
                             message=(
-                                f"SKU {item.sku}: PO price {item.unit_price:,.0f} VND, "
-                                f"target price {expected_price:,.0f} VND ({percent:.2f}% difference)."
+                                f"SKU {item.sku}: PO price {format_money(item.unit_price, 'VND')}, "
+                                f"target price {format_money(expected_price, 'VND')} ({percent:.2f}% difference)."
                             ),
                         )
                     )
 
+    # -------------------------------------------------------------
+    # 3. Declared Total Verification vs Computed Total
+    # -------------------------------------------------------------
+    if order.declared_total is not None:
+        diff = abs(order.declared_total - order.grand_total)
+        min_abs_tol = Decimal("1000") if order_currency == "VND" else Decimal("0.05")
+        rel_tol = order.grand_total * Decimal("0.005")
+        tolerance = max(min_abs_tol, rel_tol)
+
+        # Check rounding differences
+        rounded_sum = sum((round(it.line_total) for it in order.items), start=Decimal("0"))
+        is_rounding = (abs(rounded_sum - order.declared_total) <= min_abs_tol) and (diff <= order.grand_total * Decimal("0.01"))
+
+        if diff > tolerance and not is_rounding:
+            findings.append(
+                Finding(
+                    code="TOTAL_MISMATCH",
+                    severity="warning",
+                    message=(
+                        f"Tổng tiền khai báo ({format_money(order.declared_total, order_currency)}) "
+                        f"lệch so với tổng tiền tính toán ({format_money(order.grand_total, order_currency)}) "
+                        f"chênh lệch {format_money(diff, order_currency)}."
+                    ),
+                )
+            )
+
     if any(f.severity == "error" for f in findings):
         status = "blocked"
-    elif findings:
+    elif any(f.severity == "warning" for f in findings):
         status = "review_required"
+    elif any(f.severity == "info" for f in findings):
+        status = "ready_for_approval"
     else:
         status = "ready_for_approval"
     return Analysis(order=order, findings=findings, status=status)

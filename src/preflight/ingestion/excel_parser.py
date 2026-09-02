@@ -17,12 +17,13 @@ from preflight.ingestion.schemas import (
 )
 from preflight.ingestion.verifier import SelfReflectionVerifier
 from preflight.models import LineItem, Order
+from preflight.parsers import _decimal
 
 
 class ExcelExtractor:
     """Enterprise Multi-Sheet Excel (.xlsx / .xlsm / .xls) PO Extractor.
-    Features dynamic header recognition, flat-table vs form layout detection,
-    currency normalization & math verification.
+    Features dynamic Vietnamese header recognition, VAT/Discount/Promo detection,
+    declared totals extraction & self-reflection math verification.
     """
 
     PO_ALIASES = [
@@ -58,12 +59,34 @@ class ExcelExtractor:
         "đơn giá", "đơn giá trước thuế", "price", "unit price", "unit_price", "don gia",
         "giá", "gia", "đơn giá bán", "don gia ban",
     ]
+    DISCOUNT_PCT_ALIASES = [
+        "chiết khấu", "% chiết khấu", "ck", "% ck", "%ck", "giảm giá", "% giảm", "chiet khau",
+        "% chiet khau", "discount %", "discount_percent", "disc %", "discount",
+    ]
+    DISCOUNT_AMT_ALIASES = [
+        "tiền ck", "tiền chiết khấu", "tiền giảm", "tien chiet khau", "discount amount", "discount_amt",
+    ]
+    TAX_RATE_ALIASES = [
+        "thuế", "vat", "thuế suất", "% thuế", "% vat", "%vat", "thue", "thue vat", "% thue",
+        "tax rate", "tax %", "tax_rate",
+    ]
+    TAX_AMT_ALIASES = [
+        "tiền thuế", "tiền vat", "tien thue", "tien vat", "tax amount", "vat amount",
+    ]
+    PROMO_ALIASES = [
+        "khuyến mãi", "km", "tặng", "hàng tặng", "khuyen mai", "hang tang", "promo", "gift", "hàng km",
+    ]
     AMOUNT_ALIASES = [
-        "thành tiền", "tổng tiền", "amount", "total", "thanh tien", "tổng cộng", "tong cong",
-        "line_total", "line total", "total_amount",
+        "thành tiền", "tổng tiền", "amount", "total", "thanh tien", "line_total", "line total", "total_amount",
     ]
     UOM_ALIASES = [
         "đơn vị tính", "đvt", "dvt", "uom", "unit", "đơn vị", "don vi tinh", "don vi",
+    ]
+
+    TOTAL_KEYWORDS = [
+        "tổng cộng", "tong cong", "tổng trước thuế", "tong truoc thue", "cộng tiền hàng",
+        "cong tien hang", "tổng sau thuế", "tong sau thue", "tổng thanh toán", "tong thanh toan",
+        "grand total", "subtotal", "total amount",
     ]
 
     KNOWN_HEADER_KEYWORDS = {
@@ -72,14 +95,15 @@ class ExcelExtractor:
         "sl", "qty", "quantity", "đơn giá", "unit price", "price", "giá", "thành tiền",
         "amount", "total", "tổng cộng", "đvt", "dvt", "uom", "unit", "đơn vị", "ghi chú",
         "note", "notes", "khách hàng", "customer", "buyer", "po", "số po", "po number",
-        "po_number", "order date", "ngày đặt", "tiền tệ", "currency",
+        "po_number", "order date", "ngày đặt", "tiền tệ", "currency", "chiết khấu", "ck",
+        "thuế", "vat", "khuyến mãi", "km", "tặng",
     }
 
     def __init__(self):
         self.verifier = SelfReflectionVerifier()
 
     def extract(self, file_bytes: bytes, filename: str = "order.xlsx") -> tuple[ExtractedOrder, Order]:
-        """Extract structured PO metadata and line items from Excel binary stream."""
+        """Extract structured PO metadata, line items (with VAT/discount/promo) from Excel."""
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
         sheet = self._select_primary_sheet(wb)
 
@@ -91,6 +115,12 @@ class ExcelExtractor:
         items: list[ExtractedLineItem] = []
         domain_items: list[LineItem] = []
 
+        declared_subtotal: Decimal | None = None
+        declared_tax: Decimal | None = None
+        declared_total: Decimal | None = None
+        header_discount_amount = Decimal("0")
+        shipping_fee = Decimal("0")
+
         if header_row_idx is not None:
             max_r = sheet.max_row
             for r_idx in range(header_row_idx + 1, max_r + 1):
@@ -100,23 +130,66 @@ class ExcelExtractor:
 
                 sku_val = self._get_cell_str(sheet, r_idx, col_map.get("sku"))
                 desc_val = self._get_cell_str(sheet, r_idx, col_map.get("desc")) or sku_val
-                qty_val = self._parse_numeric(self._get_cell_raw(sheet, r_idx, col_map.get("qty")))
-                price_val = self._parse_numeric(self._get_cell_raw(sheet, r_idx, col_map.get("price")))
+                qty_raw = self._get_cell_raw(sheet, r_idx, col_map.get("qty"))
+                price_raw = self._get_cell_raw(sheet, r_idx, col_map.get("price"))
                 uom_val = self._get_cell_str(sheet, r_idx, col_map.get("uom")) or "PCS"
 
-                # Check if this row is a total/subtotal summary row
-                combined_text = f"{sku_val} {desc_val}".lower()
-                if any(k in combined_text for k in ["tổng cộng", "tong cong", "subtotal", "grand total", "thuế vat", "tax"]):
+                disc_pct_raw = self._get_cell_raw(sheet, r_idx, col_map.get("discount_pct"))
+                disc_amt_raw = self._get_cell_raw(sheet, r_idx, col_map.get("discount_amt"))
+                tax_rate_raw = self._get_cell_raw(sheet, r_idx, col_map.get("tax_rate"))
+                promo_raw = self._get_cell_raw(sheet, r_idx, col_map.get("promo"))
+
+                # Check if this row is a total/summary/footer row
+                combined_text = f"{sku_val or ''} {desc_val or ''}".lower()
+                if any(k in combined_text for k in self.TOTAL_KEYWORDS):
+                    amt_cell = self._get_cell_raw(sheet, r_idx, col_map.get("amount") or col_map.get("price"))
+                    parsed_amt = self._parse_numeric(amt_cell)
+                    if parsed_amt > 0:
+                        if "trước thuế" in combined_text or "cộng tiền hàng" in combined_text or "subtotal" in combined_text:
+                            declared_subtotal = parsed_amt
+                        elif "thuế" in combined_text or "vat" in combined_text:
+                            declared_tax = parsed_amt
+                        else:
+                            declared_total = parsed_amt
                     continue
 
                 if not sku_val and not desc_val:
                     continue
-                if qty_val <= 0 and price_val <= 0:
+
+                qty_val = self._parse_numeric(qty_raw)
+                price_val = self._parse_numeric(price_raw)
+                disc_pct_val = self._parse_numeric(disc_pct_raw)
+                disc_amt_val = self._parse_numeric(disc_amt_raw)
+                tax_rate_val = self._parse_numeric(tax_rate_raw)
+
+                # Promo item detection
+                is_promo = False
+                if promo_raw is not None:
+                    is_promo = str(promo_raw).strip().lower() in {"true", "1", "yes", "km", "tặng", "hàng tặng", "promo"}
+                if not is_promo:
+                    combined_check = f"{sku_val or ''} {desc_val or ''}".upper()
+                    if price_val == Decimal("0") or any(k in combined_check for k in ["KM", "TẶNG", "KHUYẾN MÃI", "KHUYEN MAI", "HANG TANG"]):
+                        is_promo = True
+
+                if qty_val <= 0 and price_val <= 0 and not is_promo:
                     continue
 
                 final_sku = sku_val if sku_val else desc_val
                 qty_int = int(qty_val) if qty_val > 0 else 1
-                amount = Decimal(str(qty_int)) * price_val
+                
+                # Line item domain calculation
+                item_obj = LineItem(
+                    sku=final_sku,
+                    raw_sku=final_sku,
+                    description=desc_val or final_sku,
+                    quantity=qty_int,
+                    unit_price=price_val,
+                    uom=uom_val.upper(),
+                    discount_percent=disc_pct_val,
+                    discount_amount=disc_amt_val,
+                    tax_rate=tax_rate_val,
+                    is_promo=is_promo,
+                )
 
                 items.append(
                     ExtractedLineItem(
@@ -124,18 +197,11 @@ class ExcelExtractor:
                         description=desc_val or final_sku,
                         quantity=qty_int,
                         unit_price=price_val,
-                        amount=amount,
+                        amount=item_obj.line_total,
                         uom=uom_val.upper(),
                     )
                 )
-                domain_items.append(
-                    LineItem(
-                        sku=final_sku,
-                        quantity=qty_int,
-                        unit_price=price_val,
-                        uom=uom_val.upper(),
-                    )
-                )
+                domain_items.append(item_obj)
 
         # Fallback if no table items extracted
         if not items:
@@ -150,15 +216,18 @@ class ExcelExtractor:
             )
             domain_items.append(LineItem(sku="UNKNOWN-EXCEL", quantity=1, unit_price=Decimal("0")))
 
-        subtotal = sum((it.amount for it in items), start=Decimal("0"))
+        subtotal = sum((it.line_net for it in domain_items), start=Decimal("0"))
+        tax_amount = sum((it.line_tax for it in domain_items), start=Decimal("0"))
+        grand_total = subtotal + tax_amount + shipping_fee
+
         header = ExtractedOrderHeader(
             po_number=po_number,
             customer=customer,
             order_date=order_date,
             currency=currency,
             subtotal=subtotal,
-            tax_amount=Decimal("0"),
-            grand_total=subtotal,
+            tax_amount=tax_amount,
+            grand_total=grand_total,
             notes=f"Parsed from Excel workbook '{filename}' (Sheet: {sheet.title})",
         )
 
@@ -178,6 +247,11 @@ class ExcelExtractor:
             customer=customer,
             items=tuple(domain_items),
             currency=currency,
+            header_discount_amount=header_discount_amount,
+            shipping_fee=shipping_fee,
+            declared_subtotal=declared_subtotal,
+            declared_tax=declared_tax,
+            declared_total=declared_total,
         )
         return extracted, domain_order
 
@@ -235,7 +309,7 @@ class ExcelExtractor:
                     elif "VND" in curr_upper or "VNĐ" in curr_upper:
                         currency = "VND"
 
-        # 2. If po_number or customer wasn't resolved from flat columns, scan form rows above table header
+        # 2. Scan form rows above table header
         form_search_row = min(15, (header_row_idx - 1) if (header_row_idx and header_row_idx > 1) else (sheet.max_row or 1))
         max_search_col = min(10, sheet.max_column or 1)
 
@@ -279,11 +353,11 @@ class ExcelExtractor:
         clean = text.lower().strip()
         if clean in self.KNOWN_HEADER_KEYWORDS:
             return True
-        # Check against list aliases
         all_aliases = (
             self.PO_ALIASES + self.CUSTOMER_ALIASES + self.DATE_ALIASES +
             self.CURRENCY_ALIASES + self.SKU_ALIASES + self.DESC_ALIASES +
-            self.QTY_ALIASES + self.PRICE_ALIASES + self.AMOUNT_ALIASES + self.UOM_ALIASES
+            self.QTY_ALIASES + self.PRICE_ALIASES + self.AMOUNT_ALIASES + self.UOM_ALIASES +
+            self.DISCOUNT_PCT_ALIASES + self.TAX_RATE_ALIASES + self.PROMO_ALIASES
         )
         return clean in all_aliases
 
@@ -295,7 +369,6 @@ class ExcelExtractor:
                 candidate = parts[1].strip()
                 if not self._is_header_keyword(candidate):
                     return candidate
-        # Look in next column
         next_val = sheet.cell(row=row, column=col + 1).value
         if next_val:
             candidate = str(next_val).strip()
@@ -304,7 +377,7 @@ class ExcelExtractor:
         return None
 
     def _detect_table_headers(self, sheet: Any) -> tuple[int | None, dict[str, int]]:
-        """Identify header row and map column indices for SKU, description, quantity, price, amount, etc."""
+        """Identify header row and map column indices for SKU, description, quantity, price, discount, tax, promo, etc."""
         max_search_row = min(25, sheet.max_row or 1)
         for r_idx in range(1, max_search_row + 1):
             col_map: dict[str, int] = {}
@@ -329,19 +402,27 @@ class ExcelExtractor:
                     col_map["qty"] = c_idx
                 elif not col_map.get("price") and any(k == raw or k in raw for k in self.PRICE_ALIASES):
                     col_map["price"] = c_idx
+                elif not col_map.get("discount_pct") and any(k == raw or k in raw for k in self.DISCOUNT_PCT_ALIASES):
+                    col_map["discount_pct"] = c_idx
+                elif not col_map.get("discount_amt") and any(k == raw or k in raw for k in self.DISCOUNT_AMT_ALIASES):
+                    col_map["discount_amt"] = c_idx
+                elif not col_map.get("tax_rate") and any(k == raw or k in raw for k in self.TAX_RATE_ALIASES):
+                    col_map["tax_rate"] = c_idx
+                elif not col_map.get("tax_amt") and any(k == raw or k in raw for k in self.TAX_AMT_ALIASES):
+                    col_map["tax_amt"] = c_idx
+                elif not col_map.get("promo") and any(k == raw or k in raw for k in self.PROMO_ALIASES):
+                    col_map["promo"] = c_idx
                 elif not col_map.get("amount") and any(k == raw or k in raw for k in self.AMOUNT_ALIASES):
                     col_map["amount"] = c_idx
                 elif not col_map.get("uom") and any(k == raw or k in raw for k in self.UOM_ALIASES):
                     col_map["uom"] = c_idx
 
-            # If we matched at least 2 key columns (e.g. SKU/desc and price/qty, or po_number/customer and items), we found table header!
             key_cols = {"sku", "desc", "qty", "price", "amount", "po_number", "customer"}
             matched_keys = set(col_map.keys()) & key_cols
             if len(matched_keys) >= 2 and ("qty" in col_map or "price" in col_map or "sku" in col_map or "desc" in col_map):
                 return r_idx, col_map
 
         return None, {}
-
 
     def _get_cell_raw(self, sheet: Any, row: int, col: int | None) -> Any:
         if not col:
@@ -356,39 +437,5 @@ class ExcelExtractor:
         return s if s else None
 
     def _parse_numeric(self, val: Any) -> Decimal:
-        """Sanitize formatted currency/quantity values (e.g. '18.500.000 đ', '1,250.00')."""
-        if val is None:
-            return Decimal("0")
-        if isinstance(val, (int, float, Decimal)):
-            return Decimal(str(val))
-        
-        s = str(val).strip()
-        # Remove currency symbols and non-numeric characters except digits, commas, dots, hyphens
-        s_clean = re.sub(r"[^\d,\.\-]", "", s)
-        if not s_clean:
-            return Decimal("0")
-
-        # Vietnamese/European format: 18.500.000 or 18.500.000,00
-        if "." in s_clean and "," in s_clean:
-            if s_clean.rfind(",") > s_clean.rfind("."):
-                # 1.234,56 -> 1234.56
-                s_clean = s_clean.replace(".", "").replace(",", ".")
-            else:
-                # 1,234.56 -> 1234.56
-                s_clean = s_clean.replace(",", "")
-        elif "." in s_clean and not "," in s_clean:
-            # Check if dot is thousands separator (e.g. 18.500.000)
-            parts = s_clean.split(".")
-            if len(parts) > 2 or (len(parts) == 2 and len(parts[1]) == 3 and int(parts[0]) > 0):
-                s_clean = s_clean.replace(".", "")
-        elif "," in s_clean and not "." in s_clean:
-            parts = s_clean.split(",")
-            if len(parts) > 2 or (len(parts) == 2 and len(parts[1]) == 3 and int(parts[0]) > 0):
-                s_clean = s_clean.replace(",", "")
-            else:
-                s_clean = s_clean.replace(",", ".")
-
-        try:
-            return Decimal(s_clean)
-        except Exception:
-            return Decimal("0")
+        """Sanitize formatted currency/quantity values (e.g. '18.500.000 đ', '1,250.00', '1.250.000,50')."""
+        return _decimal(val)

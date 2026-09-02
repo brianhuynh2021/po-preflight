@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  Info,
   FileText,
   User,
   RotateCw,
@@ -500,12 +501,14 @@ function OrderDetail({
           <div className="findings">
             {order.findings.map((finding) => (
               <article
-                className={`finding finding-${finding.severity === "Error" ? "blocked" : "review"}`}
+                className={`finding finding-${finding.severity === "Error" ? "blocked" : finding.severity === "Info" ? "info" : "review"}`}
                 key={`${finding.code}-${finding.sku ?? ""}`}
               >
                 <div className="finding-symbol" aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {finding.severity === "Error" ? (
                     <XCircle size={16} strokeWidth={2.2} />
+                  ) : finding.severity === "Info" ? (
+                    <Info size={15} strokeWidth={2.2} />
                   ) : (
                     <AlertTriangle size={15} strokeWidth={2.2} />
                   )}
@@ -513,7 +516,7 @@ function OrderDetail({
                 <div>
                   <div className="finding-top">
                     <strong>{finding.title}</strong>
-                    <span>{finding.severity === "Error" ? "Lỗi chặn" : "Cảnh báo"}</span>
+                    <span>{finding.severity === "Error" ? "Lỗi chặn" : finding.severity === "Info" ? "Thông tin" : "Cảnh báo"}</span>
                   </div>
                   <p>{finding.detail}</p>
                   <code>{finding.evidence}</code>
@@ -550,6 +553,8 @@ function OrderDetail({
                 <th style={{ textAlign: "right" }}>Số lượng</th>
                 <th style={{ textAlign: "right" }}>Tồn kho</th>
                 <th style={{ textAlign: "right" }}>Đơn giá PO</th>
+                <th style={{ textAlign: "right" }}>Chiết khấu</th>
+                <th style={{ textAlign: "right" }}>VAT</th>
                 <th style={{ textAlign: "right" }}>Giá Catalog</th>
               </tr>
             </thead>
@@ -561,7 +566,7 @@ function OrderDetail({
                     <small>{line.product}</small>
                   </td>
                   <td className="tabular-nums" style={{ textAlign: "right" }}>
-                    {line.quantity}
+                    {line.quantity} {line.uom || ""}
                   </td>
                   <td
                     className={`tabular-nums ${line.available < line.quantity ? "cell-warning" : ""}`}
@@ -570,10 +575,16 @@ function OrderDetail({
                     {line.available}
                   </td>
                   <td
-                    className={`tabular-nums ${line.catalogPrice > 0 && line.unitPrice !== line.catalogPrice ? "cell-warning" : ""}`}
+                    className={`tabular-nums ${line.catalogPrice > 0 && line.unitPrice !== line.catalogPrice && !line.isPromo ? "cell-warning" : ""}`}
                     style={{ textAlign: "right" }}
                   >
-                    {money(line.unitPrice, order.currency)}
+                    {line.isPromo ? "0 (Tặng/KM)" : money(line.unitPrice, order.currency)}
+                  </td>
+                  <td className="tabular-nums" style={{ textAlign: "right" }}>
+                    {line.discountPercent ? `${line.discountPercent}%` : line.discountAmount ? money(line.discountAmount, order.currency) : "—"}
+                  </td>
+                  <td className="tabular-nums" style={{ textAlign: "right" }}>
+                    {line.taxRate !== undefined && line.taxRate > 0 ? `${line.taxRate}%` : "—"}
                   </td>
                   <td className="tabular-nums" style={{ textAlign: "right" }}>
                     {line.catalogPrice ? money(line.catalogPrice, order.currency) : "—"}

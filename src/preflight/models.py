@@ -11,13 +11,43 @@ class LineItem:
     quantity: int
     unit_price: Decimal
     uom: str = "PCS"
+    raw_sku: str | None = None
+    description: str | None = None
+    discount_percent: Decimal = Decimal("0")
+    discount_amount: Decimal = Decimal("0")
+    tax_rate: Decimal = Decimal("0")
+    is_promo: bool = False
+
+    @property
+    def line_net(self) -> Decimal:
+        base = self.unit_price * self.quantity
+        pct_disc = (base * self.discount_percent) / Decimal("100")
+        net = base - self.discount_amount - pct_disc
+        return max(Decimal("0"), net)
+
+    @property
+    def line_tax(self) -> Decimal:
+        return (self.line_net * self.tax_rate) / Decimal("100")
+
+    @property
+    def line_total(self) -> Decimal:
+        return self.line_net + self.line_tax
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "sku": self.sku,
+            "raw_sku": self.raw_sku or self.sku,
+            "description": self.description,
             "quantity": self.quantity,
             "unit_price": str(self.unit_price),
             "uom": self.uom,
+            "discount_percent": str(self.discount_percent),
+            "discount_amount": str(self.discount_amount),
+            "tax_rate": str(self.tax_rate),
+            "is_promo": self.is_promo,
+            "line_net": str(self.line_net),
+            "line_tax": str(self.line_tax),
+            "line_total": str(self.line_total),
         }
 
 
@@ -27,25 +57,44 @@ class Order:
     customer: str
     items: tuple[LineItem, ...]
     currency: str = "VND"
-
-    @property
-    def total(self) -> Decimal:
-        return sum(
-            (item.unit_price * item.quantity for item in self.items),
-            start=Decimal("0"),
-        )
+    header_discount_amount: Decimal = Decimal("0")
+    shipping_fee: Decimal = Decimal("0")
+    declared_subtotal: Decimal | None = None
+    declared_tax: Decimal | None = None
+    declared_total: Decimal | None = None
 
     @property
     def subtotal(self) -> Decimal:
-        return self.total
+        raw_sum = sum((item.line_net for item in self.items), start=Decimal("0"))
+        return max(Decimal("0"), raw_sum - self.header_discount_amount)
+
+    @property
+    def tax_amount(self) -> Decimal:
+        return sum((item.line_tax for item in self.items), start=Decimal("0"))
+
+    @property
+    def grand_total(self) -> Decimal:
+        return self.subtotal + self.tax_amount + self.shipping_fee
+
+    @property
+    def total(self) -> Decimal:
+        return self.grand_total
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "po_number": self.po_number,
             "customer": self.customer,
             "currency": self.currency,
+            "header_discount_amount": str(self.header_discount_amount),
+            "shipping_fee": str(self.shipping_fee),
+            "declared_subtotal": str(self.declared_subtotal) if self.declared_subtotal is not None else None,
+            "declared_tax": str(self.declared_tax) if self.declared_tax is not None else None,
+            "declared_total": str(self.declared_total) if self.declared_total is not None else None,
             "items": [item.to_dict() for item in self.items],
+            "subtotal": str(self.subtotal),
+            "tax_amount": str(self.tax_amount),
             "total": str(self.total),
+            "grand_total": str(self.grand_total),
         }
 
 
@@ -119,10 +168,10 @@ class UOMConversion:
 class CustomerCreditProfile:
     customer_id: str
     credit_limit: Decimal
-    outstanding_balance: Decimal
-    overdue_balance: Decimal
+    outstanding_balance: Decimal = Decimal("0")
+    overdue_balance: Decimal = Decimal("0")
     oldest_overdue_days: int = 0
-    status: str = "ACTIVE"  # ACTIVE, ON_HOLD, BLOCKED
+    status: str = "ACTIVE"
 
     @property
     def available_credit(self) -> Decimal:
@@ -143,7 +192,7 @@ class CustomerCreditProfile:
 @dataclass(frozen=True)
 class Finding:
     code: str
-    severity: str
+    severity: str  # "info", "warning", "error"
     message: str
     sku: str | None = None
     evidence: dict[str, Any] | None = None
@@ -170,12 +219,17 @@ class Analysis:
     def warning_count(self) -> int:
         return sum(f.severity == "warning" for f in self.findings)
 
+    @property
+    def info_count(self) -> int:
+        return sum(f.severity == "info" for f in self.findings)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "analysis_id": self.analysis_id,
             "status": self.status,
             "error_count": self.error_count,
             "warning_count": self.warning_count,
+            "info_count": self.info_count,
             "order": self.order.to_dict(),
             "findings": [finding.to_dict() for finding in self.findings],
         }
@@ -190,6 +244,17 @@ class RulePolicy:
     stock_safety_margin: int = 0
     allow_inactive_sku: bool = False
     auto_approve_ready: bool = False
+    max_discount_percent: Decimal = Decimal("15")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RulePolicy:
+        return cls(
+            price_tolerance_percent=Decimal(str(data.get("price_tolerance_percent", "0"))),
+            stock_safety_margin=int(data.get("stock_safety_margin", 0)),
+            allow_inactive_sku=bool(data.get("allow_inactive_sku", False)),
+            auto_approve_ready=bool(data.get("auto_approve_ready", False)),
+            max_discount_percent=Decimal(str(data.get("max_discount_percent", "15"))),
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -197,13 +262,5 @@ class RulePolicy:
             "stock_safety_margin": self.stock_safety_margin,
             "allow_inactive_sku": self.allow_inactive_sku,
             "auto_approve_ready": self.auto_approve_ready,
+            "max_discount_percent": str(self.max_discount_percent),
         }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> RulePolicy:
-        return cls(
-            price_tolerance_percent=Decimal(str(data.get("price_tolerance_percent", 0))),
-            stock_safety_margin=int(data.get("stock_safety_margin", 0)),
-            allow_inactive_sku=bool(data.get("allow_inactive_sku", False)),
-            auto_approve_ready=bool(data.get("auto_approve_ready", False)),
-        )

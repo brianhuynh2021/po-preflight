@@ -970,6 +970,10 @@ html.dark .topbar {
   background: var(--red-soft);
   border-color: var(--red);
 }
+.finding-info {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: #64748b;
+}
 .finding-symbol,
 .attention-icon,
 .rule-symbol {
@@ -992,6 +996,10 @@ html.dark .topbar {
   background: var(--red-soft);
   color: var(--red);
 }
+.finding-info .finding-symbol {
+  background: rgba(148, 163, 184, 0.2);
+  color: #64748b;
+}
 .finding-top {
   display: flex;
   justify-content: space-between;
@@ -1007,6 +1015,9 @@ html.dark .topbar {
 }
 .finding-blocked .finding-top span {
   color: var(--red);
+}
+.finding-info .finding-top span {
+  color: #64748b;
 }
 .finding p {
   color: var(--muted);

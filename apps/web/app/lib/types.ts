@@ -43,9 +43,13 @@ export type FindingCode =
   | "UNKNOWN_SKU"
   | "INACTIVE_SKU"
   | "DUPLICATE_PO"
-  | "UOM_CONVERSION_MISSING";
+  | "UOM_CONVERSION_MISSING"
+  | "PROMO_LINE"
+  | "DISCOUNT_EXCEEDS_POLICY"
+  | "TAX_RATE_INVALID"
+  | "TOTAL_MISMATCH";
 
-export type FindingSeverity = "Warning" | "Error";
+export type FindingSeverity = "Info" | "Warning" | "Error";
 
 /** Severity is fixed by code, not a free field. Seed data violating this is a bug. */
 export const SEVERITY_BY_CODE: Record<FindingCode, FindingSeverity> = {
@@ -55,6 +59,10 @@ export const SEVERITY_BY_CODE: Record<FindingCode, FindingSeverity> = {
   INACTIVE_SKU: "Error",
   DUPLICATE_PO: "Error",
   UOM_CONVERSION_MISSING: "Warning",
+  PROMO_LINE: "Info",
+  DISCOUNT_EXCEEDS_POLICY: "Warning",
+  TAX_RATE_INVALID: "Error",
+  TOTAL_MISMATCH: "Warning",
 };
 
 export const FINDING_TITLE: Record<FindingCode, string> = {
@@ -64,6 +72,10 @@ export const FINDING_TITLE: Record<FindingCode, string> = {
   INACTIVE_SKU: "Sản phẩm đã ngừng kinh doanh",
   DUPLICATE_PO: "Trùng lặp mã đơn hàng",
   UOM_CONVERSION_MISSING: "Thiếu cấu hình quy đổi đơn vị (UOM)",
+  PROMO_LINE: "Dòng hàng khuyến mãi / tặng kèm",
+  DISCOUNT_EXCEEDS_POLICY: "Chiết khấu vượt chính sách quy định",
+  TAX_RATE_INVALID: "Thuế suất VAT không hợp lệ",
+  TOTAL_MISMATCH: "Lệch tổng tiền khai báo và tính toán",
 };
 
 export interface Finding {
@@ -88,6 +100,12 @@ export interface LineItem {
   unitPrice: number;
   /** Company catalog price. 0 when the SKU is unknown. */
   catalogPrice: number;
+  discountPercent?: number;
+  discountAmount?: number;
+  taxRate?: number;
+  isPromo?: boolean;
+  description?: string | null;
+  uom?: string;
 }
 // Note: LineItem has no `currency` of its own — it inherits the parent order's.
 // A single PO cannot mix currencies. Always format with money(value, order.currency).
@@ -122,6 +140,12 @@ export interface PurchaseOrder {
   owner: string;
   /** Newest first. Empty until someone decides. */
   decisions: Decision[];
+  subtotal?: number;
+  taxAmount?: number;
+  grandTotal?: number;
+  shippingFee?: number;
+  headerDiscountAmount?: number;
+  declaredTotal?: number | null;
 }
 
 // ---------------------------------------------------------------- catalog
@@ -173,4 +197,3 @@ export interface AuditEntry {
   detail: string;
   type: ActivityEventType;
 }
-

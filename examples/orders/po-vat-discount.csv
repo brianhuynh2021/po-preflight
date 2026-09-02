@@ -1,0 +1,4 @@
+po_number,customer,currency,sku,quantity,unit_price,uom,discount_percent,tax_rate,is_promo,description
+PO-2026-VAT-02,Northstar Retail Vietnam,VND,LAPTOP-A14,2,18500000,PCS,5,10,false,A14 Business Laptop
+PO-2026-VAT-02,Northstar Retail Vietnam,VND,DOCK-USBC,2,2800000,PCS,0,10,false,USB-C Dock
+PO-2026-VAT-02,Northstar Retail Vietnam,VND,CAB-CAT6-3M,5,0,PCS,0,0,true,Hàng tặng khuyến mãi

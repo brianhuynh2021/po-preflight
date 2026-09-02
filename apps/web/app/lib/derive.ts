@@ -16,10 +16,10 @@ import {
 
 // ------------------------------------------------------- derived status
 
-/** Mirrors rules.py:74-79. Never assign these three statuses by hand. */
+/** Mirrors rules.py. Never assign these three statuses by hand. */
 export function deriveStatus(findings: { severity: string }[]): OrderStatus {
-  if (findings.some((f) => f.severity === "Error")) return "Blocked";
-  if (findings.length > 0) return "Review required";
+  if (findings.some((f) => f.severity.toLowerCase() === "error")) return "Blocked";
+  if (findings.some((f) => f.severity.toLowerCase() === "warning")) return "Review required";
   return "Ready";
 }
 
@@ -34,10 +34,26 @@ export const isDecided = (s: OrderStatus) => DECIDED_STATUSES.includes(s);
 
 // -------------------------------------------------------- derived money
 
-export const lineTotal = (l: LineItem) => l.quantity * l.unitPrice;
+export const lineNet = (l: LineItem): number => {
+  const base = l.quantity * l.unitPrice;
+  const discAmt = l.discountAmount ?? 0;
+  const discPct = l.discountPercent ?? 0;
+  const pctAmt = (base * discPct) / 100;
+  return Math.max(0, base - discAmt - pctAmt);
+};
 
-export const orderValue = (o: Pick<PurchaseOrder, "lines">) =>
-  o.lines.reduce((sum, l) => sum + lineTotal(l), 0);
+export const lineTax = (l: LineItem): number => {
+  const net = lineNet(l);
+  const rate = l.taxRate ?? 0;
+  return (net * rate) / 100;
+};
+
+export const lineTotal = (l: LineItem): number => lineNet(l) + lineTax(l);
+
+export const orderValue = (o: Pick<PurchaseOrder, "lines"> & { grandTotal?: number }) => {
+  if (o.grandTotal !== undefined && o.grandTotal > 0) return o.grandTotal;
+  return o.lines.reduce((sum, l) => sum + lineTotal(l), 0);
+};
 
 /**
  * Signed price delta as a percentage of the catalog price.
@@ -50,10 +66,10 @@ export function priceDeltaPercent(poPrice: number, catalogPrice: number): number
 }
 
 export const money = (value: number, currency: string = "VND") => {
-  const isZeroDecimal = currency.toUpperCase() === "VND";
+  const isZeroDecimal = (currency || "VND").toUpperCase() === "VND";
   return new Intl.NumberFormat(isZeroDecimal ? "vi-VN" : "en-US", {
     style: "currency",
-    currency: currency.toUpperCase(),
+    currency: (currency || "VND").toUpperCase(),
     minimumFractionDigits: isZeroDecimal ? 0 : 2,
     maximumFractionDigits: isZeroDecimal ? 0 : 2,
   }).format(value);
@@ -61,7 +77,7 @@ export const money = (value: number, currency: string = "VND") => {
 
 // ------------------------------------------------------------ line flags
 
-export type CellFlag = "none" | "warn" | "error";
+export type CellFlag = "none" | "warn" | "error" | "info";
 
 /** Which cells to highlight in the line-item table — contract §3.1. */
 export function lineFlags(l: LineItem): {
@@ -69,6 +85,9 @@ export function lineFlags(l: LineItem): {
   unitPrice: CellFlag;
   quantity: CellFlag;
 } {
+  if (l.isPromo) {
+    return { row: "info", unitPrice: "none", quantity: "none" };
+  }
   if (l.catalogPrice === 0) {
     return { row: "error", unitPrice: "error", quantity: "error" };
   }
@@ -213,8 +232,16 @@ export function findingsByCode(
     INACTIVE_SKU: 0,
     DUPLICATE_PO: 0,
     UOM_CONVERSION_MISSING: 0,
+    PROMO_LINE: 0,
+    DISCOUNT_EXCEEDS_POLICY: 0,
+    TAX_RATE_INVALID: 0,
+    TOTAL_MISMATCH: 0,
   };
-  for (const o of orders) for (const f of o.findings) acc[f.code]++;
+  for (const o of orders) {
+    for (const f of o.findings) {
+      if (acc[f.code] !== undefined) acc[f.code]++;
+    }
+  }
   return acc;
 }
 
@@ -263,7 +290,10 @@ export function searchOrders(
 }
 
 export const errorCount = (o: PurchaseOrder) =>
-  o.findings.filter((f) => f.severity === "Error").length;
+  o.findings.filter((f) => f.severity.toLowerCase() === "error").length;
 
 export const warningCount = (o: PurchaseOrder) =>
-  o.findings.filter((f) => f.severity === "Warning").length;
+  o.findings.filter((f) => f.severity.toLowerCase() === "warning").length;
+
+export const infoCount = (o: PurchaseOrder) =>
+  o.findings.filter((f) => f.severity.toLowerCase() === "info").length;

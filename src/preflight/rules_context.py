@@ -70,6 +70,7 @@ class RuleContext:
     price_tolerance_percent: Decimal = Decimal("0")
     stock_safety_margin: int = 0
     allow_inactive_sku: bool = False
+    max_discount_percent: Decimal = Decimal("15")
     duplicate: bool = False
     fx_rates: Mapping[str, Decimal] = field(default_factory=dict)  # "USD_VND" -> rate
     fx_source: str = "static"  # "static" | "live" | "none"
@@ -138,6 +139,7 @@ def build_rule_context(
         price_tolerance_percent=policy.price_tolerance_percent,
         stock_safety_margin=policy.stock_safety_margin,
         allow_inactive_sku=policy.allow_inactive_sku,
+        max_discount_percent=getattr(policy, "max_discount_percent", Decimal("15")),
         duplicate=is_duplicate,
         fx_rates=fx_rates,
         fx_source=fx_source,
