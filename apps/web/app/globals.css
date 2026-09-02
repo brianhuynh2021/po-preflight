@@ -512,7 +512,7 @@ html.dark .topbar {
 }
 .topbar-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .icon-button,
 .more-button {
@@ -520,7 +520,7 @@ html.dark .topbar {
   background: var(--paper);
   width: 33px;
   height: 33px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--muted);
 }
@@ -533,41 +533,42 @@ html.dark .topbar {
   height: 6px;
   border-radius: 50%;
   background: var(--amber);
-  right: 6px;
-  top: 6px;
+  right: var(--space-2);
+  top: var(--space-2);
 }
 .mobile-brand {
   display: none;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin-right: auto;
 }
 
 .page {
-  padding: 12px 12px 0 12px;
+  padding: var(--space-3) var(--space-3) 0 var(--space-3);
 }
 .page-heading {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  gap: 24px;
-  margin-bottom: 24px;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
 }
 .page-heading h1 {
-  font-size: 29px;
+  font-size: var(--text-2xl);
   line-height: 1.1;
   letter-spacing: -1px;
-  margin: 3px 0 7px;
+  margin: var(--space-1) 0 var(--space-2);
 }
 .page-heading p:not(.eyebrow) {
   margin: 0;
   color: var(--muted);
+  font-size: var(--text-base);
 }
 .eyebrow,
 .review-label,
 .overview-label {
   color: var(--green);
-  font-size: 10px;
+  font-size: var(--text-xs);
   letter-spacing: 1.6px;
   font-weight: 700;
   margin: 0;
@@ -576,8 +577,9 @@ html.dark .topbar {
 .approve-button,
 .secondary-button,
 .light-button {
-  border-radius: 8px;
-  padding: 10px 15px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
   font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
@@ -587,18 +589,20 @@ html.dark .topbar {
 .approve-button {
   background: var(--nav);
   color: white;
-  box-shadow: 0 5px 12px rgba(16, 40, 32, 0.12);
+  box-shadow: var(--elev-1);
 }
 .primary-button:hover,
 .approve-button:hover {
   background: #1c4538;
+  box-shadow: var(--elev-2);
 }
 .primary-button span {
-  margin-right: 4px;
+  margin-right: var(--space-1);
 }
 .secondary-button {
   background: var(--paper);
   border-color: var(--line-strong);
+  box-shadow: var(--elev-1);
 }
 .secondary-button:hover {
   background: var(--canvas);
@@ -614,40 +618,42 @@ html.dark .topbar {
   background: transparent;
   color: var(--green);
   font-weight: 600;
+  font-size: var(--text-sm);
   cursor: pointer;
-  padding: 5px;
+  padding: var(--space-1);
 }
 
 .metrics-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 .metric {
   min-height: 118px;
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 11px;
-  padding: 16px 17px;
-  box-shadow: 0 2px 5px rgba(20, 35, 31, 0.02);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  box-shadow: var(--elev-1);
 }
 .metric > span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
   display: block;
 }
 .metric > strong {
   display: block;
-  font-size: 29px;
+  font-size: var(--text-2xl);
   letter-spacing: -1px;
-  margin: 8px 0 9px;
+  margin: var(--space-2) 0;
   font-variant-numeric: tabular-nums;
 }
 .metric small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
+
 .metric-dot {
   display: inline-block;
   width: 6px;
@@ -691,7 +697,7 @@ html.dark .topbar {
   grid-template-columns: minmax(360px, 0.74fr) minmax(570px, 1.26fr);
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow);
   min-height: 690px;
@@ -701,20 +707,20 @@ html.dark .topbar {
   min-width: 0;
 }
 .panel-toolbar {
-  padding: 14px;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--line);
   display: flex;
-  gap: 9px;
+  gap: var(--space-2);
   align-items: center;
 }
 .search {
   border: 1px solid var(--line-strong);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--canvas);
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 0 10px;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
   flex: 1;
   min-width: 0;
   color: var(--faint);
@@ -724,27 +730,27 @@ html.dark .topbar {
   outline: 0;
   background: transparent;
   width: 100%;
-  padding: 9px 0;
+  padding: var(--space-2) 0;
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .panel-toolbar select,
 .audit-card select {
   border: 1px solid var(--line-strong);
   background: var(--paper);
-  border-radius: 7px;
-  padding: 9px 28px 9px 10px;
-  font-size: 12px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-6) var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 .queue-header {
   display: grid;
   grid-template-columns: 1fr 115px 78px;
-  gap: 10px;
-  padding: 9px 15px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
   background: var(--canvas);
   color: var(--faint);
-  font-size: 9px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 1px;
   font-weight: 700;
@@ -762,9 +768,9 @@ html.dark .topbar {
   background: var(--paper);
   display: grid;
   grid-template-columns: 1fr 115px 78px;
-  gap: 10px;
+  gap: var(--space-2);
   align-items: center;
-  padding: 16px 15px;
+  padding: var(--space-4) var(--space-4);
   text-align: left;
   cursor: pointer;
   position: relative;
@@ -791,30 +797,29 @@ html.dark .topbar {
   display: block;
 }
 .order-identity strong {
-  font-size: 13px;
-  margin-bottom: 3px;
+  font-size: var(--text-sm);
 }
 .order-identity small {
-  font-size: 11px;
   color: var(--muted);
-  margin-bottom: 5px;
+  font-size: var(--text-xs);
+  margin-top: var(--space-1);
 }
 .order-identity em {
-  font-size: 9px;
   font-style: normal;
   color: var(--faint);
+  font-size: var(--text-xs);
+  margin-top: var(--space-1);
 }
 .order-value {
   text-align: right;
 }
 .order-value strong {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
 }
 .order-value small {
   color: var(--faint);
-  font-size: 9px;
-  margin-top: 3px;
+  font-size: var(--text-xs);
+  margin-top: var(--space-1);
 }
 .status {
   display: inline-flex;
