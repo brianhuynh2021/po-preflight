@@ -83,7 +83,7 @@ export function CatalogView() {
             void syncCatalog();
           }}
           disabled={isSyncing}
-          style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
         >
           <RefreshCw size={15} strokeWidth={2} className={isSyncing ? "animate-spin" : ""} />
           <span>{isSyncing ? "Đang đồng bộ..." : "Sync catalog"}</span>

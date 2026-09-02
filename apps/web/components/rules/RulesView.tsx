@@ -18,7 +18,7 @@ export function RulesView() {
         <button
           className="primary-button interactive"
           onClick={createRipple}
-          style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
         >
           <Plus size={16} strokeWidth={2.2} />
           <span>Add rule</span>

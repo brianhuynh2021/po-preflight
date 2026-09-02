@@ -27,7 +27,7 @@ export function OverviewView() {
           className="primary-button interactive"
           href="/orders"
           onClick={createRipple}
-          style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
         >
           <Plus size={16} strokeWidth={2.2} />
           <span>Upload purchase order</span>
@@ -46,7 +46,7 @@ export function OverviewView() {
             className="light-button interactive"
             href="/orders"
             onClick={createRipple}
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+            style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
           >
             <span>Review priority orders</span>
             <ArrowRight size={14} strokeWidth={2} />

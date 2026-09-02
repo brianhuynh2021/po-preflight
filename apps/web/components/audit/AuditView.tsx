@@ -50,7 +50,7 @@ export function AuditView() {
         <button
           className="secondary-button interactive"
           onClick={createRipple}
-          style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
         >
           <Download size={15} strokeWidth={2} />
           <span>Export CSV</span>

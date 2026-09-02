@@ -31,41 +31,41 @@ export function SideBySideViewer({ order, onClose }: SideBySideViewerProps) {
           </button>
         </div>
 
-        <div style={{ display: "flex", gap: "8px", margin: "16px 0", borderBottom: "1px solid var(--line)", paddingBottom: "12px" }}>
+        <div style={{ display: "flex", gap: "var(--space-2)", margin: "var(--space-4) 0", borderBottom: "1px solid var(--line)", paddingBottom: "var(--space-3)" }}>
           <button
             className={activeTab === "visual" ? "primary-button" : "secondary-button"}
-            style={{ fontSize: "12px", padding: "6px 12px" }}
+            style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-3)" }}
             onClick={() => setActiveTab("visual")}
           >
             📄 Split View (Raw vs Normalized)
           </button>
           <button
             className={activeTab === "json" ? "primary-button" : "secondary-button"}
-            style={{ fontSize: "12px", padding: "6px 12px" }}
+            style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-3)" }}
             onClick={() => setActiveTab("json")}
           >
             {`{ }`} Ingested State JSON
           </button>
         </div>
 
-        <div style={{ maxHeight: "65vh", overflowY: "auto", padding: "4px 0" }}>
+        <div style={{ maxHeight: "65vh", overflowY: "auto", padding: "var(--space-1) 0" }}>
           {activeTab === "visual" ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-5)" }}>
               {/* Left Pane: Simulated Document Source */}
               <div className="clean-card" style={{ background: "var(--canvas)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid var(--line)", paddingBottom: "8px" }}>
-                  <strong style={{ color: "var(--ink)", fontSize: "13px" }}>Source Document (Uploaded)</strong>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)", borderBottom: "1px solid var(--line)", paddingBottom: "var(--space-2)" }}>
+                  <strong style={{ color: "var(--ink)", fontSize: "var(--text-sm)" }}>Source Document (Uploaded)</strong>
                   <span className="badge-clean badge-clean-info">MULTIMODAL_INSPECTION</span>
                 </div>
 
                 <div
                   style={{
                     fontFamily: "ui-monospace, monospace",
-                    fontSize: "12px",
+                    fontSize: "var(--text-xs)",
                     lineHeight: "1.6",
                     background: "var(--paper)",
-                    padding: "14px",
-                    borderRadius: "8px",
+                    padding: "var(--space-3)",
+                    borderRadius: "var(--radius-sm)",
                     border: "1px solid var(--line)",
                     color: "var(--ink)",
                   }}
@@ -74,10 +74,10 @@ export function SideBySideViewer({ order, onClose }: SideBySideViewerProps) {
                   <div>CUSTOMER: {order.customer}</div>
                   <div>CURRENCY: {order.currency}</div>
                   <div>SUBMITTED AT: {order.submittedAt}</div>
-                  <hr style={{ borderColor: "var(--line)", margin: "10px 0" }} />
+                  <hr style={{ borderColor: "var(--line)", margin: "var(--space-2) 0" }} />
                   <div style={{ fontWeight: 700, color: "var(--muted)" }}>EXTRACTED LINE ITEMS:</div>
                   {lines.map((item, idx) => (
-                    <div key={idx} style={{ padding: "6px 0", borderBottom: "1px dashed var(--line)" }}>
+                    <div key={idx} style={{ padding: "var(--space-1) 0", borderBottom: "1px dashed var(--line)" }}>
                       <div>
                         #{idx + 1} SKU: <strong>{item.sku}</strong> ({item.product})
                       </div>
@@ -86,7 +86,7 @@ export function SideBySideViewer({ order, onClose }: SideBySideViewerProps) {
                       </div>
                     </div>
                   ))}
-                  <div style={{ marginTop: "12px", color: "var(--green)", fontWeight: 700, fontSize: "13px" }}>
+                  <div style={{ marginTop: "var(--space-3)", color: "var(--green)", fontWeight: 700, fontSize: "var(--text-sm)" }}>
                     TOTAL: {money(totalValue, order.currency)}
                   </div>
                 </div>
@@ -94,8 +94,8 @@ export function SideBySideViewer({ order, onClose }: SideBySideViewerProps) {
 
               {/* Right Pane: Preflight Findings & Grounding */}
               <div className="clean-card">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid var(--line)", paddingBottom: "8px" }}>
-                  <strong style={{ color: "var(--ink)", fontSize: "13px" }}>Validation & Policy Checks</strong>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)", borderBottom: "1px solid var(--line)", paddingBottom: "var(--space-2)" }}>
+                  <strong style={{ color: "var(--ink)", fontSize: "var(--text-sm)" }}>Validation & Policy Checks</strong>
                   <span
                     className={`badge-clean ${
                       order.status === "Ready" || order.status === "Approved"
@@ -109,16 +109,16 @@ export function SideBySideViewer({ order, onClose }: SideBySideViewerProps) {
                   </span>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
                   {order.findings.length === 0 ? (
                     <div
                       style={{
-                        padding: "24px",
+                        padding: "var(--space-6)",
                         textAlign: "center",
                         background: "var(--green-soft)",
-                        borderRadius: "8px",
+                        borderRadius: "var(--radius-sm)",
                         color: "var(--green)",
-                        fontSize: "13px",
+                        fontSize: "var(--text-sm)",
                         fontWeight: 600,
                         border: "1px solid rgba(25, 112, 76, 0.2)",
                       }}
@@ -132,15 +132,15 @@ export function SideBySideViewer({ order, onClose }: SideBySideViewerProps) {
                         style={{
                           background: f.severity === "Error" ? "var(--red-soft)" : "var(--amber-soft)",
                           borderLeft: `4px solid ${f.severity === "Error" ? "var(--red)" : "var(--amber)"}`,
-                          padding: "12px",
-                          borderRadius: "0 8px 8px 0",
+                          padding: "var(--space-3)",
+                          borderRadius: "0 var(--radius-sm) var(--radius-sm) 0",
                         }}
                       >
-                        <div style={{ fontWeight: 700, fontSize: "13px", color: f.severity === "Error" ? "var(--red)" : "var(--amber)" }}>
+                        <div style={{ fontWeight: 700, fontSize: "var(--text-sm)", color: f.severity === "Error" ? "var(--red)" : "var(--amber)" }}>
                           [{f.code}] {f.title}
                         </div>
-                        <div style={{ fontSize: "12.5px", color: "var(--ink)", margin: "4px 0" }}>{f.detail}</div>
-                        <code style={{ fontSize: "11px", color: "var(--muted)", background: "rgba(0,0,0,0.04)", padding: "2px 4px", borderRadius: "3px" }}>
+                        <div style={{ fontSize: "var(--text-xs)", color: "var(--ink)", margin: "var(--space-1) 0" }}>{f.detail}</div>
+                        <code style={{ fontSize: "var(--text-xs)", color: "var(--muted)", background: "rgba(0,0,0,0.04)", padding: "2px 4px", borderRadius: "var(--radius-sm)" }}>
                           {f.evidence}
                         </code>
                       </div>
@@ -153,10 +153,10 @@ export function SideBySideViewer({ order, onClose }: SideBySideViewerProps) {
             <pre
               style={{
                 background: "var(--canvas)",
-                padding: "16px",
-                borderRadius: "8px",
+                padding: "var(--space-4)",
+                borderRadius: "var(--radius-sm)",
                 border: "1px solid var(--line)",
-                fontSize: "12px",
+                fontSize: "var(--text-xs)",
                 fontFamily: "ui-monospace, monospace",
                 overflowX: "auto",
                 color: "var(--ink)",
@@ -168,11 +168,12 @@ export function SideBySideViewer({ order, onClose }: SideBySideViewerProps) {
           )}
         </div>
 
-        <div className="modal-actions" style={{ marginTop: "16px", borderTop: "1px solid var(--line)", paddingTop: "14px" }}>
+        <div className="modal-actions" style={{ marginTop: "var(--space-4)", borderTop: "1px solid var(--line)", paddingTop: "var(--space-3)" }}>
           <button className="secondary-button" onClick={onClose}>
             Close Inspector
           </button>
         </div>
+
       </div>
     </div>
   );

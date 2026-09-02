@@ -123,7 +123,7 @@ export function OrdersView() {
             createRipple(e);
             setUploadOpen(true);
           }}
-          style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
         >
           <Plus size={16} strokeWidth={2.2} aria-hidden="true" />
           <span>Upload purchase order</span>
@@ -329,7 +329,7 @@ function OrderQueue({
         ))}
         {orders.length === 0 ? (
           <div className="empty-state">
-            <FileText size={28} strokeWidth={1.5} style={{ opacity: 0.4, marginBottom: "8px" }} />
+            <FileText size={28} strokeWidth={1.5} style={{ opacity: 0.4, marginBottom: "var(--space-2)" }} />
             <p>No orders match this view.</p>
           </div>
         ) : null}
@@ -365,14 +365,14 @@ function OrderDetail({
             {order.customer} · Submitted <SubmittedAt iso={order.submittedAt} />
           </p>
         </div>
-        <div style={{ display: "flex", gap: "8px" }}>
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
           <button
             className="secondary-button interactive"
             onClick={(e) => {
               createRipple(e);
               onOpenSideBySide();
             }}
-            style={{ fontSize: "12px", padding: "6px 10px", display: "inline-flex", alignItems: "center", gap: "6px" }}
+            style={{ fontSize: "var(--text-xs)", padding: "6px 10px", display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
           >
             <Split size={14} strokeWidth={2} />
             <span>Side-by-Side</span>

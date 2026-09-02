@@ -90,7 +90,7 @@ export function Sidebar() {
 
       <nav aria-label="Primary navigation" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
         {NAV_GROUPS.map((group) => (
-          <div key={group.name} style={{ marginBottom: "6px" }}>
+          <div key={group.name} style={{ marginBottom: "var(--space-1)" }}>
             <div className="nav-section-label">{group.name}</div>
             {group.items.map((item) => {
               const isActive =
@@ -131,16 +131,16 @@ export function Sidebar() {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "8px",
-          padding: "8px 12px",
+          gap: "var(--space-2)",
+          padding: "var(--space-2) var(--space-3)",
           background: "var(--canvas)",
           border: "1px solid var(--line)",
-          borderRadius: "6px",
-          fontSize: "12px",
+          borderRadius: "var(--radius-sm)",
+          fontSize: "var(--text-xs)",
           fontWeight: 600,
           color: "var(--green)",
           textDecoration: "none",
-          marginBottom: "10px",
+          marginBottom: "var(--space-2)",
         }}
       >
         <Globe size={15} strokeWidth={1.75} />

@@ -122,7 +122,7 @@ export function RAGPlaygroundView() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "var(--space-5)" }}>
         {/* Left: Input Sandbox */}
         <div className="clean-card">
           <div className="card-header-clean">
@@ -130,16 +130,16 @@ export function RAGPlaygroundView() {
             <span className="badge-clean badge-clean-info">Live Waterfall</span>
           </div>
 
-          <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", fontSize: "11px", color: "var(--muted)", fontWeight: 600, marginBottom: "8px" }}>
+          <div style={{ marginBottom: "var(--space-4)" }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--muted)", fontWeight: 600, marginBottom: "var(--space-2)" }}>
               QUICK TEST PRESETS
             </label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-1)" }}>
               {testPresets.map((preset, idx) => (
                 <button
                   key={idx}
                   className="secondary-button"
-                  style={{ fontSize: "12px", padding: "4px 10px" }}
+                  style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-2)" }}
                   onClick={() => setQuery(preset.text)}
                 >
                   {preset.label}: <strong>&quot;{preset.text}&quot;</strong>
@@ -148,8 +148,8 @@ export function RAGPlaygroundView() {
             </div>
           </div>
 
-          <div style={{ marginBottom: "14px" }}>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "6px" }}>
+          <div style={{ marginBottom: "var(--space-3)" }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--ink)", marginBottom: "var(--space-1)" }}>
               Raw Order Line Text / Nickname
             </label>
             <input
@@ -161,8 +161,8 @@ export function RAGPlaygroundView() {
             />
           </div>
 
-          <div style={{ marginBottom: "20px" }}>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "6px" }}>
+          <div style={{ marginBottom: "var(--space-5)" }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--ink)", marginBottom: "var(--space-1)" }}>
               Customer Context (Active Learning Memory)
             </label>
             <input
@@ -200,17 +200,17 @@ export function RAGPlaygroundView() {
               <div
                 style={{
                   background: "var(--canvas)",
-                  padding: "16px",
-                  borderRadius: "8px",
+                  padding: "var(--space-4)",
+                  borderRadius: "var(--radius-sm)",
                   border: "1px solid var(--line)",
-                  marginBottom: "16px",
+                  marginBottom: "var(--space-4)",
                 }}
               >
-                <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>MATCHED TARGET SKU</span>
-                <div style={{ fontSize: "20px", fontWeight: 700, color: "var(--green)", marginTop: "2px" }}>
+                <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", fontWeight: 600 }}>MATCHED TARGET SKU</span>
+                <div style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--green)", marginTop: "2px" }}>
                   {result.matchedSku}
                 </div>
-                <p style={{ fontSize: "12.5px", color: "var(--muted)", margin: "6px 0 12px", lineHeight: 1.4 }}>
+                <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", margin: "6px 0 12px", lineHeight: 1.4 }}>
                   {result.tierReason}
                 </p>
 
@@ -218,10 +218,10 @@ export function RAGPlaygroundView() {
                   style={{
                     display: "grid",
                     gridTemplateColumns: "repeat(3, 1fr)",
-                    gap: "10px",
+                    gap: "var(--space-2)",
                     borderTop: "1px solid var(--line)",
                     paddingTop: "10px",
-                    fontSize: "12px",
+                    fontSize: "var(--text-xs)",
                   }}
                 >
                   <div>
@@ -239,11 +239,11 @@ export function RAGPlaygroundView() {
                 </div>
               </div>
 
-              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted)", marginBottom: "8px", textTransform: "uppercase" }}>
+              <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--muted)", marginBottom: "var(--space-2)", textTransform: "uppercase" }}>
                 Top Match Candidates
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
                 {result.candidates.map((cand, i) => (
                   <div
                     key={i}
@@ -251,16 +251,16 @@ export function RAGPlaygroundView() {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      padding: "8px 12px",
+                      padding: "var(--space-2) var(--space-3)",
                       background: "var(--canvas)",
                       border: "1px solid var(--line)",
-                      borderRadius: "6px",
-                      fontSize: "12.5px",
+                      borderRadius: "var(--radius-sm)",
+                      fontSize: "var(--text-sm)",
                     }}
                   >
                     <div>
                       <strong style={{ color: "var(--ink)" }}>{cand.sku}</strong>
-                      <div style={{ fontSize: "11px", color: "var(--muted)" }}>{cand.name}</div>
+                      <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>{cand.name}</div>
                     </div>
                     <span className="badge-clean badge-clean-info">
                       {(cand.score * 100).toFixed(0)}%

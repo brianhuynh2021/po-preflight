@@ -75,20 +75,20 @@ export function AuditCertificateModal({ poNumber = "PO-10428" }: CertificateProp
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: "var(--space-5)" }}>
         {/* Certificate Card */}
         <div className="clean-card">
           <div className="card-header-clean">
             <div>
-              <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 700 }}>OFFICIAL VERIFICATION CERTIFICATE</span>
-              <h2 style={{ fontSize: "18px", margin: "2px 0 0", color: "var(--ink)" }}>Order: {sampleCert.po_number}</h2>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", fontWeight: 700 }}>OFFICIAL VERIFICATION CERTIFICATE</span>
+              <h2 style={{ fontSize: "var(--text-lg)", margin: "var(--space-1) 0 0", color: "var(--ink)" }}>Order: {sampleCert.po_number}</h2>
             </div>
             <span className="badge-clean badge-clean-success">
               ✔ MERKLE CHAIN VALID
             </span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "12.5px", marginBottom: "16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", fontSize: "var(--text-sm)", marginBottom: "var(--space-4)" }}>
             <div>
               <span style={{ color: "var(--muted)", display: "block" }}>Compliance Standard:</span>
               <strong style={{ color: "var(--ink)" }}>{sampleCert.standard}</strong>
@@ -102,46 +102,46 @@ export function AuditCertificateModal({ poNumber = "PO-10428" }: CertificateProp
           <div
             style={{
               background: "var(--canvas)",
-              padding: "12px",
-              borderRadius: "8px",
+              padding: "var(--space-3)",
+              borderRadius: "var(--radius-sm)",
               border: "1px solid var(--line)",
-              marginBottom: "18px",
+              marginBottom: "var(--space-4)",
             }}
           >
-            <div style={{ fontSize: "10.5px", color: "var(--muted)", fontWeight: 700, marginBottom: "4px" }}>
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", fontWeight: 700, marginBottom: "var(--space-1)" }}>
               MERKLE ROOT HASH (SHA-256)
             </div>
-            <code style={{ fontSize: "12px", color: "var(--green)", wordBreak: "break-all", fontFamily: "ui-monospace, monospace" }}>
+            <code style={{ fontSize: "var(--text-xs)", color: "var(--green)", wordBreak: "break-all", fontFamily: "ui-monospace, monospace" }}>
               {sampleCert.merkle_root_sha256}
             </code>
           </div>
 
-          <h3 style={{ fontSize: "13px", fontWeight: 700, color: "var(--ink)", marginBottom: "10px", textTransform: "uppercase" }}>
+          <h3 style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--ink)", marginBottom: "var(--space-2)", textTransform: "uppercase" }}>
             Cryptographic Ledger Chain
           </h3>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
             {sampleCert.blocks.map((block) => (
               <div
                 key={block.index}
                 style={{
-                  padding: "10px 14px",
+                  padding: "var(--space-2) var(--space-3)",
                   background: "var(--canvas)",
-                  borderRadius: "8px",
+                  borderRadius: "var(--radius-sm)",
                   border: "1px solid var(--line)",
-                  fontSize: "12.5px",
+                  fontSize: "var(--text-xs)",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--space-1)" }}>
                   <strong style={{ color: "var(--ink)" }}>
                     #{block.index}: {block.event}
                   </strong>
-                  <span style={{ color: "var(--muted)", fontSize: "11px" }}>{block.timestamp}</span>
+                  <span style={{ color: "var(--muted)", fontSize: "var(--text-xs)" }}>{block.timestamp}</span>
                 </div>
-                <div style={{ color: "var(--muted)", fontSize: "12px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "var(--text-xs)" }}>
                   Actor: <span style={{ color: "var(--ink)", fontWeight: 500 }}>{block.actor}</span>
                 </div>
-                <div style={{ color: "var(--faint)", fontFamily: "ui-monospace, monospace", fontSize: "11px", marginTop: "2px" }}>
+                <div style={{ color: "var(--faint)", fontFamily: "ui-monospace, monospace", fontSize: "var(--text-xs)", marginTop: "var(--space-1)" }}>
                   Hash: {block.block_hash}
                 </div>
               </div>
@@ -155,44 +155,45 @@ export function AuditCertificateModal({ poNumber = "PO-10428" }: CertificateProp
             <h3>Non-Repudiation Guarantee</h3>
           </div>
 
-          <p style={{ fontSize: "13px", color: "var(--muted)", lineHeight: 1.5, marginBottom: "16px" }}>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", lineHeight: 1.5, marginBottom: "var(--space-4)" }}>
             Every document parsing, deterministic rule finding, human approval override, and ERP dispatch event is cryptographically linked in a tamper-evident SHA-256 hash chain.
           </p>
 
           <div
             style={{
-              padding: "14px",
+              padding: "var(--space-3)",
               background: "var(--green-soft)",
               border: "1px solid rgba(25, 112, 76, 0.2)",
-              borderRadius: "8px",
-              marginBottom: "14px",
+              borderRadius: "var(--radius-sm)",
+              marginBottom: "var(--space-3)",
             }}
           >
-            <h4 style={{ fontSize: "13px", color: "var(--green)", margin: "0 0 4px", fontWeight: 700 }}>
+            <h4 style={{ fontSize: "var(--text-sm)", color: "var(--green)", margin: "0 0 var(--space-1)", fontWeight: 700 }}>
               SOX 404 Audit Readiness
             </h4>
-            <p style={{ fontSize: "12px", color: "var(--ink)", margin: 0, lineHeight: 1.4 }}>
+            <p style={{ fontSize: "var(--text-xs)", color: "var(--ink)", margin: 0, lineHeight: 1.4 }}>
               External auditors can mathematically verify that no figures or order items were altered post-approval without needing live database access.
             </p>
           </div>
 
           <div
             style={{
-              padding: "14px",
+              padding: "var(--space-3)",
               background: "var(--blue-soft)",
               border: "1px solid rgba(56, 107, 142, 0.2)",
-              borderRadius: "8px",
+              borderRadius: "var(--radius-sm)",
             }}
           >
-            <h4 style={{ fontSize: "13px", color: "var(--blue)", margin: "0 0 4px", fontWeight: 700 }}>
+            <h4 style={{ fontSize: "var(--text-sm)", color: "var(--blue)", margin: "0 0 var(--space-1)", fontWeight: 700 }}>
               Cryptographic Nonce & Timestamp
             </h4>
-            <p style={{ fontSize: "12px", color: "var(--ink)", margin: 0, lineHeight: 1.4 }}>
+            <p style={{ fontSize: "var(--text-xs)", color: "var(--ink)", margin: 0, lineHeight: 1.4 }}>
               Timestamps are anchored to UTC ISO-8601 with microsecond precision, preventing backdated order authorization attacks.
             </p>
           </div>
         </div>
       </div>
+
     </div>
   );
 }

@@ -56,11 +56,11 @@ export function SettingsView() {
       {saved && (
         <div
           style={{
-            padding: "12px 16px",
+            padding: "var(--space-3) var(--space-4)",
             background: "var(--green-soft)",
             color: "var(--green)",
-            borderRadius: "8px",
-            marginBottom: "16px",
+            borderRadius: "var(--radius-sm)",
+            marginBottom: "var(--space-4)",
             fontWeight: 600,
             border: "1px solid rgba(25, 112, 76, 0.2)",
           }}
@@ -69,12 +69,12 @@ export function SettingsView() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-5)" }}>
         {/* Telegram Configuration Card */}
         <div className="clean-card">
           <div className="card-header-clean">
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "18px" }}>✈️</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+              <span style={{ fontSize: "var(--text-lg)" }}>✈️</span>
               <h3>Telegram Bot &amp; Phê duyệt Di động</h3>
             </div>
             <span className={`badge-clean ${botStatus?.telegram_enabled ? "badge-clean-success" : "badge-clean-info"}`}>
@@ -82,8 +82,8 @@ export function SettingsView() {
             </span>
           </div>
 
-          <div style={{ marginBottom: "14px" }}>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
+          <div style={{ marginBottom: "var(--space-3)" }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--ink)", marginBottom: "var(--space-1)" }}>
               Mã Bot API Token
             </label>
             <input
@@ -94,8 +94,8 @@ export function SettingsView() {
             />
           </div>
 
-          <div style={{ marginBottom: "14px" }}>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
+          <div style={{ marginBottom: "var(--space-3)" }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--ink)", marginBottom: "var(--space-1)" }}>
               ID Nhóm / Kênh Quản lý (Chat/Group ID)
             </label>
             <input
@@ -106,8 +106,8 @@ export function SettingsView() {
             />
           </div>
 
-          <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
+          <div style={{ marginBottom: "var(--space-4)" }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--ink)", marginBottom: "var(--space-1)" }}>
               Mã bí mật Webhook (Chống giả mạo - Issue #43)
             </label>
             <input
@@ -117,7 +117,7 @@ export function SettingsView() {
               onChange={(e) => setTelegramSecret(e.target.value)}
               style={{ fontFamily: "ui-monospace, monospace" }}
             />
-            <small style={{ color: "var(--muted)", display: "block", marginTop: "4px" }}>
+            <small style={{ color: "var(--muted)", display: "block", marginTop: "var(--space-1)" }}>
               Xác thực an toàn qua tiêu đề <code>X-Telegram-Bot-Api-Secret-Token</code>.
             </small>
           </div>
@@ -126,8 +126,8 @@ export function SettingsView() {
         {/* Zalo OA & Dispatch Policy Card */}
         <div className="clean-card">
           <div className="card-header-clean">
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "18px" }}>💬</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+              <span style={{ fontSize: "var(--text-lg)" }}>💬</span>
               <h3>Zalo Official Account (Zalo OA)</h3>
             </div>
             <span className={`badge-clean ${botStatus?.zalo_enabled ? "badge-clean-success" : "badge-clean-info"}`}>
@@ -136,8 +136,8 @@ export function SettingsView() {
           </div>
 
 
-          <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
+          <div style={{ marginBottom: "var(--space-4)" }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--ink)", marginBottom: "var(--space-1)" }}>
               Mã truy cập Zalo OA (Access Token)
             </label>
             <input
@@ -148,7 +148,7 @@ export function SettingsView() {
             />
           </div>
 
-          <div className="card-header-clean" style={{ marginTop: "24px" }}>
+          <div className="card-header-clean" style={{ marginTop: "var(--space-6)" }}>
             <h3>Chính sách Tự động Đẩy đơn (Dispatch Policy)</h3>
           </div>
 
@@ -156,10 +156,10 @@ export function SettingsView() {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "10px",
+              gap: "var(--space-2)",
               cursor: "pointer",
               padding: "8px 0",
-              fontSize: "13px",
+              fontSize: "var(--text-sm)",
               color: "var(--ink)",
             }}
           >
@@ -174,7 +174,7 @@ export function SettingsView() {
             </span>
           </label>
 
-          <div style={{ marginTop: "20px" }}>
+          <div style={{ marginTop: "var(--space-5)" }}>
             <button className="primary-button" style={{ width: "100%", justifyContent: "center" }} onClick={handleSave}>
               💾 Lưu Cấu hình Đa kênh
             </button>

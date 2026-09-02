@@ -97,7 +97,7 @@ export function AgentGraphVisualizer() {
             Real-time inspection of cyclical agent StateGraph execution, checkpoint persistence, and Human-in-the-Loop interruptions.
           </p>
         </div>
-        <div style={{ display: "flex", gap: "10px" }}>
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
           {!isResumed && (
             <button className="primary-button" onClick={handleSimulateResume}>
               ▶ Resume StateGraph Execution
@@ -111,7 +111,7 @@ export function AgentGraphVisualizer() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "var(--space-5)" }}>
         {/* Left: DAG Pipeline Canvas */}
         <div className="clean-card">
           <div className="card-header-clean">
@@ -128,7 +128,7 @@ export function AgentGraphVisualizer() {
             </span>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "14px", padding: "10px 0" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", padding: "10px 0" }}>
             {nodes.map((node, index) => {
               const isSelected = activeStep === node.id;
               const isCurrentPause = node.id === "human_approval" && !isResumed;
@@ -144,7 +144,7 @@ export function AgentGraphVisualizer() {
                   onClick={() => setActiveStep(node.id)}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
                       <span
                         style={{
                           display: "inline-flex",
@@ -155,16 +155,16 @@ export function AgentGraphVisualizer() {
                           borderRadius: "50%",
                           background: node.status === "COMPLETED" ? "var(--green-soft)" : isCurrentPause ? "var(--amber-soft)" : "var(--canvas)",
                           color: node.status === "COMPLETED" ? "var(--green)" : isCurrentPause ? "var(--amber)" : "var(--muted)",
-                          fontSize: "11px",
+                          fontSize: "var(--text-xs)",
                           fontWeight: 700,
                         }}
                       >
                         {index + 1}
                       </span>
-                      <strong style={{ fontSize: "14px", color: "var(--ink)" }}>{node.name}</strong>
+                      <strong style={{ fontSize: "var(--text-base)", color: "var(--ink)" }}>{node.name}</strong>
                     </div>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
                       <span className="code-snippet">{node.latencyMs}ms</span>
                       <span
                         className={`badge-clean ${
@@ -179,7 +179,7 @@ export function AgentGraphVisualizer() {
                       </span>
                     </div>
                   </div>
-                  <p style={{ margin: "8px 0 0", fontSize: "12.5px", color: "var(--muted)" }}>
+                  <p style={{ margin: "8px 0 0", fontSize: "var(--text-sm)", color: "var(--muted)" }}>
                     {node.description}
                   </p>
                 </div>
@@ -195,26 +195,26 @@ export function AgentGraphVisualizer() {
             <span className="code-snippet">{selectedNode.category}</span>
           </div>
 
-          <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", fontSize: "11px", color: "var(--muted)", fontWeight: 600, marginBottom: "4px" }}>
+          <div style={{ marginBottom: "var(--space-4)" }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--muted)", fontWeight: 600, marginBottom: "var(--space-1)" }}>
               STEP SUMMARY
             </label>
-            <p style={{ fontSize: "13px", color: "var(--ink)", margin: 0, lineHeight: 1.5 }}>
+            <p style={{ fontSize: "var(--text-sm)", color: "var(--ink)", margin: 0, lineHeight: 1.5 }}>
               {selectedNode.description}
             </p>
           </div>
 
-          <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", fontSize: "11px", color: "var(--muted)", fontWeight: 600, marginBottom: "6px" }}>
+          <div style={{ marginBottom: "var(--space-4)" }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--muted)", fontWeight: 600, marginBottom: "var(--space-1)" }}>
               STATE PAYLOAD (JSON)
             </label>
             <pre
               style={{
                 background: "var(--canvas)",
-                padding: "12px",
-                borderRadius: "8px",
+                padding: "var(--space-3)",
+                borderRadius: "var(--radius-sm)",
                 border: "1px solid var(--line)",
-                fontSize: "12px",
+                fontSize: "var(--text-xs)",
                 fontFamily: "ui-monospace, monospace",
                 overflowX: "auto",
                 margin: 0,
@@ -225,12 +225,12 @@ export function AgentGraphVisualizer() {
             </pre>
           </div>
 
-          <div style={{ borderTop: "1px solid var(--line)", paddingTop: "14px", marginTop: "14px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--muted)" }}>
+          <div style={{ borderTop: "1px solid var(--line)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", color: "var(--muted)" }}>
               <span>Execution Engine:</span>
               <strong style={{ color: "var(--ink)" }}>LangGraph Core v0.2</strong>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--muted)", marginTop: "6px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", color: "var(--muted)", marginTop: "var(--space-1)" }}>
               <span>State Reducer:</span>
               <strong style={{ color: "var(--ink)" }}>Immutable Append</strong>
             </div>

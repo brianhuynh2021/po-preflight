@@ -129,14 +129,14 @@ export function ERPSyncView() {
 
       {/* Outbox Table Card */}
       <div className="clean-card" style={{ padding: "0", overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--line)" }}>
-          <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 600 }}>Transactional Outbox Messages</h3>
-          <div style={{ display: "flex", gap: "6px" }}>
+        <div style={{ padding: "var(--space-4) var(--space-5)", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--line)" }}>
+          <h3 style={{ margin: 0, fontSize: "var(--text-base)", fontWeight: 600 }}>Transactional Outbox Messages</h3>
+          <div style={{ display: "flex", gap: "var(--space-1)" }}>
             {(["ALL", "DELIVERED", "PENDING", "DEAD_LETTER"] as const).map((s) => (
               <button
                 key={s}
                 className={filter === s ? "primary-button" : "secondary-button"}
-                style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px" }}
+                style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-2)", borderRadius: "var(--radius-sm)" }}
                 onClick={() => setFilter(s)}
               >
                 {s}
@@ -146,26 +146,26 @@ export function ERPSyncView() {
         </div>
 
         <div className="table-wrap">
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
             <thead>
               <tr style={{ background: "var(--canvas)", borderBottom: "1px solid var(--line)", textAlign: "left" }}>
-                <th style={{ padding: "10px 16px" }}>PO NUMBER</th>
-                <th style={{ padding: "10px 16px" }}>CUSTOMER</th>
-                <th style={{ padding: "10px 16px" }}>TARGET ERP ADAPTER</th>
-                <th style={{ padding: "10px 16px" }}>AMOUNT</th>
-                <th style={{ padding: "10px 16px" }}>STATUS</th>
-                <th style={{ padding: "10px 16px" }}>ERP REF #</th>
-                <th style={{ padding: "10px 16px", textAlign: "right" }}>ACTION</th>
+                <th style={{ padding: "var(--space-2) var(--space-4)" }}>PO NUMBER</th>
+                <th style={{ padding: "var(--space-2) var(--space-4)" }}>CUSTOMER</th>
+                <th style={{ padding: "var(--space-2) var(--space-4)" }}>TARGET ERP ADAPTER</th>
+                <th style={{ padding: "var(--space-2) var(--space-4)" }}>AMOUNT</th>
+                <th style={{ padding: "var(--space-2) var(--space-4)" }}>STATUS</th>
+                <th style={{ padding: "var(--space-2) var(--space-4)" }}>ERP REF #</th>
+                <th style={{ padding: "var(--space-2) var(--space-4)", textAlign: "right" }}>ACTION</th>
               </tr>
             </thead>
             <tbody>
               {filteredItems.map((item) => (
                 <tr key={item.id} style={{ borderBottom: "1px solid var(--line)" }}>
-                  <td style={{ padding: "12px 16px", fontWeight: 600, color: "var(--green)" }}>{item.poNumber}</td>
-                  <td style={{ padding: "12px 16px", fontWeight: 500 }}>{item.customer}</td>
-                  <td style={{ padding: "12px 16px", color: "var(--muted)", fontSize: "12px" }}>{item.adapter}</td>
-                  <td style={{ padding: "12px 16px", fontWeight: 600 }}>{money(item.amount, item.currency)}</td>
-                  <td style={{ padding: "12px 16px" }}>
+                  <td style={{ padding: "var(--space-3) var(--space-4)", fontWeight: 600, color: "var(--green)" }}>{item.poNumber}</td>
+                  <td style={{ padding: "var(--space-3) var(--space-4)", fontWeight: 500 }}>{item.customer}</td>
+                  <td style={{ padding: "var(--space-3) var(--space-4)", color: "var(--muted)", fontSize: "var(--text-xs)" }}>{item.adapter}</td>
+                  <td style={{ padding: "var(--space-3) var(--space-4)", fontWeight: 600 }}>{money(item.amount, item.currency)}</td>
+                  <td style={{ padding: "var(--space-3) var(--space-4)" }}>
                     <span
                       className={`badge-clean ${
                         item.status === "DELIVERED"
@@ -176,20 +176,20 @@ export function ERPSyncView() {
                       {item.status}
                     </span>
                   </td>
-                  <td style={{ padding: "12px 16px" }}>
+                  <td style={{ padding: "var(--space-3) var(--space-4)" }}>
                     <span className="code-snippet">{item.erpReference || "—"}</span>
                   </td>
-                  <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                  <td style={{ padding: "var(--space-3) var(--space-4)", textAlign: "right" }}>
                     {item.status === "PENDING" ? (
                       <button
                         className="primary-button"
-                        style={{ fontSize: "11px", padding: "4px 8px" }}
+                        style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-2)" }}
                         onClick={() => triggerRetry(item.id)}
                       >
                         ⚡ Sync
                       </button>
                     ) : (
-                      <span style={{ fontSize: "12px", color: "var(--muted)" }}>Synced</span>
+                      <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Synced</span>
                     )}
                   </td>
                 </tr>
@@ -198,6 +198,7 @@ export function ERPSyncView() {
           </table>
         </div>
       </div>
+
     </div>
   );
 }

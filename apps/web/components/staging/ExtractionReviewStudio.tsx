@@ -48,20 +48,22 @@ export function ExtractionReviewStudio() {
       {statusMessage && (
         <div
           style={{
-            padding: "12px 16px",
+            padding: "var(--space-3) var(--space-4)",
             background: "var(--green-soft)",
             color: "var(--green)",
-            borderRadius: "8px",
-            marginBottom: "16px",
+            borderRadius: "var(--radius-sm)",
+            marginBottom: "var(--space-4)",
             fontWeight: 600,
+            fontSize: "var(--text-sm)",
             border: "1px solid rgba(25, 112, 76, 0.2)",
+            boxShadow: "var(--elev-1)",
           }}
         >
           {statusMessage}
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: "var(--space-5)" }}>
         {/* Left Card: Document Properties */}
         <div className="clean-card">
           <div className="card-header-clean">
@@ -69,8 +71,8 @@ export function ExtractionReviewStudio() {
             <span className="badge-clean badge-clean-info">Extraction Staged</span>
           </div>
 
-          <div style={{ marginBottom: "14px" }}>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
+          <div style={{ marginBottom: "var(--space-3)" }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--ink)", marginBottom: "var(--space-1)" }}>
               PO NUMBER
             </label>
             <input
@@ -81,8 +83,8 @@ export function ExtractionReviewStudio() {
             />
           </div>
 
-          <div style={{ marginBottom: "14px" }}>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
+          <div style={{ marginBottom: "var(--space-3)" }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--ink)", marginBottom: "var(--space-1)" }}>
               CUSTOMER ENTITY
             </label>
             <input
@@ -93,8 +95,8 @@ export function ExtractionReviewStudio() {
             />
           </div>
 
-          <div style={{ marginBottom: "18px" }}>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--ink)", marginBottom: "4px" }}>
+          <div style={{ marginBottom: "var(--space-4)" }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--ink)", marginBottom: "var(--space-1)" }}>
               CURRENCY
             </label>
             <select
@@ -110,14 +112,14 @@ export function ExtractionReviewStudio() {
 
           <div
             style={{
-              padding: "14px",
+              padding: "var(--space-3)",
               background: "var(--canvas)",
-              borderRadius: "8px",
+              borderRadius: "var(--radius-sm)",
               border: "1px solid var(--line)",
-              fontSize: "12px",
+              fontSize: "var(--text-xs)",
               display: "flex",
               flexDirection: "column",
-              gap: "6px",
+              gap: "var(--space-2)",
             }}
           >
             <div>
@@ -130,7 +132,7 @@ export function ExtractionReviewStudio() {
             </div>
             <div>
               <span style={{ color: "var(--muted)" }}>Confidence Score:</span>{" "}
-              <span className="badge-clean badge-clean-success" style={{ marginLeft: "4px" }}>
+              <span className="badge-clean badge-clean-success" style={{ marginLeft: "var(--space-1)" }}>
                 96.5% Overall
               </span>
             </div>
@@ -141,62 +143,62 @@ export function ExtractionReviewStudio() {
         <div className="clean-card">
           <div className="card-header-clean">
             <h3>Extracted Line Items (Editable)</h3>
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--green)" }}>
+            <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--green)" }}>
               Total: {money(totalValue, currency)}
             </span>
           </div>
 
           <div className="table-wrap">
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
               <thead>
                 <tr style={{ background: "var(--canvas)", borderBottom: "1px solid var(--line)", textAlign: "left" }}>
-                  <th style={{ padding: "8px 12px" }}>SKU</th>
-                  <th style={{ padding: "8px 12px" }}>DESCRIPTION</th>
-                  <th style={{ padding: "8px 12px" }}>QTY</th>
-                  <th style={{ padding: "8px 12px" }}>UNIT PRICE</th>
-                  <th style={{ padding: "8px 12px" }}>OCR CONF.</th>
+                  <th style={{ padding: "var(--space-2) var(--space-3)" }}>SKU</th>
+                  <th style={{ padding: "var(--space-2) var(--space-3)" }}>DESCRIPTION</th>
+                  <th style={{ padding: "var(--space-2) var(--space-3)" }}>QTY</th>
+                  <th style={{ padding: "var(--space-2) var(--space-3)" }}>UNIT PRICE</th>
+                  <th style={{ padding: "var(--space-2) var(--space-3)" }}>OCR CONF.</th>
                 </tr>
               </thead>
               <tbody>
                 {lineItems.map((item, idx) => (
                   <tr key={idx} style={{ borderBottom: "1px solid var(--line)" }}>
-                    <td style={{ padding: "8px 12px" }}>
+                    <td style={{ padding: "var(--space-2) var(--space-3)" }}>
                       <input
                         type="text"
                         className="input-clean"
-                        style={{ padding: "4px 8px", fontSize: "12px", fontWeight: 600 }}
+                        style={{ padding: "var(--space-1) var(--space-2)", fontSize: "var(--text-xs)", fontWeight: 600 }}
                         value={item.sku}
                         onChange={(e) => updateItem(idx, "sku", e.target.value)}
                       />
                     </td>
-                    <td style={{ padding: "8px 12px" }}>
+                    <td style={{ padding: "var(--space-2) var(--space-3)" }}>
                       <input
                         type="text"
                         className="input-clean"
-                        style={{ padding: "4px 8px", fontSize: "12px" }}
+                        style={{ padding: "var(--space-1) var(--space-2)", fontSize: "var(--text-xs)" }}
                         value={item.product}
                         onChange={(e) => updateItem(idx, "product", e.target.value)}
                       />
                     </td>
-                    <td style={{ padding: "8px 12px", width: "70px" }}>
+                    <td style={{ padding: "var(--space-2) var(--space-3)", width: "70px" }}>
                       <input
                         type="number"
                         className="input-clean"
-                        style={{ padding: "4px 8px", fontSize: "12px" }}
+                        style={{ padding: "var(--space-1) var(--space-2)", fontSize: "var(--text-xs)" }}
                         value={item.quantity}
                         onChange={(e) => updateItem(idx, "quantity", Number(e.target.value))}
                       />
                     </td>
-                    <td style={{ padding: "8px 12px", width: "120px" }}>
+                    <td style={{ padding: "var(--space-2) var(--space-3)", width: "120px" }}>
                       <input
                         type="number"
                         className="input-clean"
-                        style={{ padding: "4px 8px", fontSize: "12px" }}
+                        style={{ padding: "var(--space-1) var(--space-2)", fontSize: "var(--text-xs)" }}
                         value={item.unitPrice}
                         onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))}
                       />
                     </td>
-                    <td style={{ padding: "8px 12px" }}>
+                    <td style={{ padding: "var(--space-2) var(--space-3)" }}>
                       <span
                         className={`badge-clean ${
                           item.ocrConfidence >= 0.9 ? "badge-clean-success" : "badge-clean-warning"
@@ -215,3 +217,4 @@ export function ExtractionReviewStudio() {
     </div>
   );
 }
+
