@@ -12,6 +12,7 @@ import {
   type LineItem,
   type OrderStatus,
   type PurchaseOrder,
+  FINDING_TITLE,
 } from "./types";
 
 // ------------------------------------------------------- derived status
@@ -225,21 +226,15 @@ export function avgDecisionTimeMinutes(orders: PurchaseOrder[]): number | null {
 export function findingsByCode(
   orders: PurchaseOrder[],
 ): Record<FindingCode, number> {
-  const acc: Record<FindingCode, number> = {
-    PRICE_MISMATCH: 0,
-    INSUFFICIENT_STOCK: 0,
-    UNKNOWN_SKU: 0,
-    INACTIVE_SKU: 0,
-    DUPLICATE_PO: 0,
-    UOM_CONVERSION_MISSING: 0,
-    PROMO_LINE: 0,
-    DISCOUNT_EXCEEDS_POLICY: 0,
-    TAX_RATE_INVALID: 0,
-    TOTAL_MISMATCH: 0,
-  };
+  const acc = {} as Record<FindingCode, number>;
+  for (const code of Object.keys(FINDING_TITLE) as FindingCode[]) {
+    acc[code] = 0;
+  }
   for (const o of orders) {
     for (const f of o.findings) {
-      if (acc[f.code] !== undefined) acc[f.code]++;
+      if (acc[f.code] !== undefined) {
+        acc[f.code]++;
+      }
     }
   }
   return acc;

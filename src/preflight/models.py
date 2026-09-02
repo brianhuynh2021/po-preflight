@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -57,6 +58,7 @@ class Order:
     customer: str
     items: tuple[LineItem, ...]
     currency: str = "VND"
+    order_date: str | None = None
     header_discount_amount: Decimal = Decimal("0")
     shipping_fee: Decimal = Decimal("0")
     declared_subtotal: Decimal | None = None
@@ -85,6 +87,7 @@ class Order:
             "po_number": self.po_number,
             "customer": self.customer,
             "currency": self.currency,
+            "order_date": self.order_date,
             "header_discount_amount": str(self.header_discount_amount),
             "shipping_fee": str(self.shipping_fee),
             "declared_subtotal": str(self.declared_subtotal) if self.declared_subtotal is not None else None,
@@ -210,6 +213,8 @@ class Analysis:
     findings: list[Finding] = field(default_factory=list)
     status: str = "review_required"
     analysis_id: int | None = None
+    policy_version: str = "2.0"
+    catalog_snapshot_at: str | None = None
 
     @property
     def error_count(self) -> int:
@@ -230,6 +235,8 @@ class Analysis:
             "error_count": self.error_count,
             "warning_count": self.warning_count,
             "info_count": self.info_count,
+            "policy_version": self.policy_version,
+            "catalog_snapshot_at": self.catalog_snapshot_at,
             "order": self.order.to_dict(),
             "findings": [finding.to_dict() for finding in self.findings],
         }
@@ -245,6 +252,10 @@ class RulePolicy:
     allow_inactive_sku: bool = False
     auto_approve_ready: bool = False
     max_discount_percent: Decimal = Decimal("15")
+    overdue_grace_days: int = 30
+    credit_limit_block_percent: Decimal = Decimal("20")
+    credit_hold_behaviour: str = "review"  # "block" | "review"
+    version: str = "2.0"
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> RulePolicy:
@@ -254,6 +265,10 @@ class RulePolicy:
             allow_inactive_sku=bool(data.get("allow_inactive_sku", False)),
             auto_approve_ready=bool(data.get("auto_approve_ready", False)),
             max_discount_percent=Decimal(str(data.get("max_discount_percent", "15"))),
+            overdue_grace_days=int(data.get("overdue_grace_days", 30)),
+            credit_limit_block_percent=Decimal(str(data.get("credit_limit_block_percent", "20"))),
+            credit_hold_behaviour=str(data.get("credit_hold_behaviour", "review")).strip().lower(),
+            version=str(data.get("version", "2.0")),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -263,4 +278,8 @@ class RulePolicy:
             "allow_inactive_sku": self.allow_inactive_sku,
             "auto_approve_ready": self.auto_approve_ready,
             "max_discount_percent": str(self.max_discount_percent),
+            "overdue_grace_days": self.overdue_grace_days,
+            "credit_limit_block_percent": str(self.credit_limit_block_percent),
+            "credit_hold_behaviour": self.credit_hold_behaviour,
+            "version": self.version,
         }

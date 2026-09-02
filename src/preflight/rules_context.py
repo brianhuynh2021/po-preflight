@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 
@@ -23,16 +24,13 @@ def normalize_customer_key(name: str) -> str:
     """Normalize customer name to a standard key for master data lookup.
     
     Strips accents, corporate prefixes/suffixes, and punctuation.
-    TODO(B5): Replace with canonical customer_id from CustomerMaster.
     """
     if not name:
         return ""
-    # Normalize unicode NFKD and remove diacritics
     nfkd = unicodedata.normalize("NFKD", name.strip())
     without_accents = "".join(c for c in nfkd if not unicodedata.combining(c))
     cleaned = without_accents.upper()
 
-    # Remove corporate entity prefixes and suffixes in Vietnamese & English
     patterns = [
         r"\bCONG TY CO PHAN\b",
         r"\bCONG TY TNHH MTV\b",
@@ -54,9 +52,7 @@ def normalize_customer_key(name: str) -> str:
     for p in patterns:
         cleaned = re.sub(p, " ", cleaned)
 
-    # Remove non-alphanumeric punctuation
     cleaned = re.sub(r"[^\w\s]", " ", cleaned)
-    # Collapse multiple whitespaces
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned
 
@@ -71,9 +67,18 @@ class RuleContext:
     stock_safety_margin: int = 0
     allow_inactive_sku: bool = False
     max_discount_percent: Decimal = Decimal("15")
+    overdue_grace_days: int = 30
+    credit_limit_block_percent: Decimal = Decimal("20")
+    credit_hold_behaviour: str = "review"  # "block" | "review"
+    policy_version: str = "2.0"
+    order_date: str | None = None
     duplicate: bool = False
     fx_rates: Mapping[str, Decimal] = field(default_factory=dict)  # "USD_VND" -> rate
     fx_source: str = "static"  # "static" | "live" | "none"
+
+    def available_stock(self, product: Product) -> int:
+        """Calculate effective available stock factoring in inventory safety margins."""
+        return max(0, product.stock - self.stock_safety_margin)
 
 
 def build_rule_context(
@@ -85,18 +90,13 @@ def build_rule_context(
     fx_provider: Callable[[str, str], tuple[Decimal, str]] | None = None,
     duplicate: bool | None = None,
 ) -> RuleContext:
-    """Central factory for building immutable RuleContext from store, master data, and policies.
-    
-    This is the ONLY designated location for pulling customer pricing, UOM conversions,
-    credit profiles, PO duplication checks, and currency exchange rates before pure rule evaluation.
-    """
+    """Central factory for building immutable RuleContext from store, master data, and policies."""
     if policy is None:
         try:
             policy = store.get_policy()
         except Exception:
             policy = RulePolicy()
 
-    # Determine customer lookup keys (both raw and normalized)
     raw_customer = order.customer.strip()
     norm_customer = normalize_customer_key(raw_customer)
 
@@ -131,6 +131,8 @@ def build_rule_context(
             fx_rates[f"{order_currency}_VND"] = rate_val
             fx_source = source
 
+    order_date = order.order_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
     return RuleContext(
         catalog=catalog,
         pricing_agreements=tuple(pricing_list),
@@ -140,6 +142,11 @@ def build_rule_context(
         stock_safety_margin=policy.stock_safety_margin,
         allow_inactive_sku=policy.allow_inactive_sku,
         max_discount_percent=getattr(policy, "max_discount_percent", Decimal("15")),
+        overdue_grace_days=getattr(policy, "overdue_grace_days", 30),
+        credit_limit_block_percent=getattr(policy, "credit_limit_block_percent", Decimal("20")),
+        credit_hold_behaviour=getattr(policy, "credit_hold_behaviour", "review"),
+        policy_version=getattr(policy, "version", "2.0"),
+        order_date=order_date,
         duplicate=is_duplicate,
         fx_rates=fx_rates,
         fx_source=fx_source,

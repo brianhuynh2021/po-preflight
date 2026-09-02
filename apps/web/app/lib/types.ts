@@ -37,46 +37,24 @@ export const STATUS_LABEL_VI: Record<OrderStatus, string> = {
 
 // --------------------------------------------------------------- findings
 
-export type FindingCode =
-  | "PRICE_MISMATCH"
-  | "INSUFFICIENT_STOCK"
-  | "UNKNOWN_SKU"
-  | "INACTIVE_SKU"
-  | "DUPLICATE_PO"
-  | "UOM_CONVERSION_MISSING"
-  | "PROMO_LINE"
-  | "DISCOUNT_EXCEEDS_POLICY"
-  | "TAX_RATE_INVALID"
-  | "TOTAL_MISMATCH";
+import type {
+  FindingCode,
+  FindingSeverity,
+  FindingCategory,
+  FindingMetadata,
+} from "./findings.generated";
 
-export type FindingSeverity = "Info" | "Warning" | "Error";
-
-/** Severity is fixed by code, not a free field. Seed data violating this is a bug. */
-export const SEVERITY_BY_CODE: Record<FindingCode, FindingSeverity> = {
-  PRICE_MISMATCH: "Warning",
-  INSUFFICIENT_STOCK: "Warning",
-  UNKNOWN_SKU: "Error",
-  INACTIVE_SKU: "Error",
-  DUPLICATE_PO: "Error",
-  UOM_CONVERSION_MISSING: "Warning",
-  PROMO_LINE: "Info",
-  DISCOUNT_EXCEEDS_POLICY: "Warning",
-  TAX_RATE_INVALID: "Error",
-  TOTAL_MISMATCH: "Warning",
+export type {
+  FindingCode,
+  FindingSeverity,
+  FindingCategory,
+  FindingMetadata,
 };
-
-export const FINDING_TITLE: Record<FindingCode, string> = {
-  PRICE_MISMATCH: "Chênh lệch giá so với Catalog",
-  INSUFFICIENT_STOCK: "Không đủ tồn kho đáp ứng",
-  UNKNOWN_SKU: "Mã SKU không tồn tại",
-  INACTIVE_SKU: "Sản phẩm đã ngừng kinh doanh",
-  DUPLICATE_PO: "Trùng lặp mã đơn hàng",
-  UOM_CONVERSION_MISSING: "Thiếu cấu hình quy đổi đơn vị (UOM)",
-  PROMO_LINE: "Dòng hàng khuyến mãi / tặng kèm",
-  DISCOUNT_EXCEEDS_POLICY: "Chiết khấu vượt chính sách quy định",
-  TAX_RATE_INVALID: "Thuế suất VAT không hợp lệ",
-  TOTAL_MISMATCH: "Lệch tổng tiền khai báo và tính toán",
-};
+export {
+  FINDINGS_REGISTRY,
+  FINDING_TITLE,
+  SEVERITY_BY_CODE,
+} from "./findings.generated";
 
 export interface Finding {
   code: FindingCode;

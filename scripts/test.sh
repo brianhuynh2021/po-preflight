@@ -26,6 +26,9 @@ if grep -RInE --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.venv 
   exit 1
 fi
 
+echo "🔍 Checking findings code generator sync..."
+"${PYTHON_BIN}" "${repo_root}/scripts/gen_findings_ts.py" --check
+
 if command -v npm >/dev/null 2>&1 && [[ -d "${repo_root}/apps/web" ]]; then
   echo "🌐 Running frontend web tests & checks..."
   (cd "${repo_root}/apps/web" && npx tsc --noEmit && npm run lint && npm run test)
