@@ -514,6 +514,42 @@ export function createApiClient(config: ClientConfig = {}) {
       }),
   };
 
+  // =========================================================================
+  // 17. Email Intake API
+  // =========================================================================
+  const emailIntake = {
+    getStatus: () =>
+      request<{
+        enabled: boolean;
+        imap_configured: boolean;
+        imap_host: string | null;
+        imap_folder: string;
+        smtp_configured: boolean;
+        poll_interval_seconds: number;
+        last_polled_at: string | null;
+        recent_error_count: number;
+        total_recent_logs: number;
+      }>("/api/v1/intake/email/status"),
+    poll: () =>
+      request<{
+        status: string;
+        processed_count: number;
+        results: Array<{
+          message_id: string;
+          sender: string;
+          subject: string;
+          status: string;
+          orders_created: number;
+          analysis_ids: number[];
+          po_numbers: string[];
+          auto_reply_sent: boolean;
+          customer_resolved: string | null;
+          error_message: string | null;
+        }>;
+      }>("/api/v1/intake/email/poll", { method: "POST" }),
+    getLogs: (limit = 50) => request<Array<Record<string, unknown>>>(`/api/v1/intake/email/logs?limit=${limit}`),
+  };
+
   return {
     auth,
     orders,
@@ -533,6 +569,7 @@ export function createApiClient(config: ClientConfig = {}) {
     rules,
     system,
     health,
+    emailIntake,
     connectRealtimeStream,
   };
 }

@@ -753,3 +753,7 @@ def validate_order_decision(
                 f"A justification note of at least 10 characters is required to {normalized_decision.replace('_', ' ')}.",
                 status_code=422,
             )
+
+
+evaluate_order = analyze_order
+

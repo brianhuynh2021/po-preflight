@@ -149,6 +149,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                     catalogPrice: Number(it.catalog_unit_price ?? it.unit_price),
                   })),
                   owner: detail.decisions?.[0]?.actor || "Hệ thống Preflight",
+                  // Email-sourced orders are recorded with a "email://<sender>/<file>" source_file.
+                  sourceChannel: detail.source_file?.startsWith("email://") ? "email" : "web",
+                  senderEmail: detail.source_file?.startsWith("email://")
+                    ? detail.source_file.slice("email://".length).split("/")[0]
+                    : undefined,
                   timeline: (detail.decisions || []).map((d) => ({
                     title: d.decision === "approved" ? "Đã duyệt đơn" : d.decision === "rejected" ? "Đã từ chối đơn" : "Yêu cầu chỉnh sửa",
                     detail: d.note || `Quyết định: ${d.decision} bởi ${d.actor}`,

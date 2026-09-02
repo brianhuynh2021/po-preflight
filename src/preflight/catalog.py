@@ -143,3 +143,7 @@ def load_catalog(path: str | Path | None = None) -> dict[str, Product]:
         _CATALOG_CACHE[resolved_path] = (current_mtime, products)
 
     return products
+
+
+get_catalog = load_catalog
+

@@ -14,6 +14,7 @@ import {
   User,
   RotateCw,
   AlertCircle,
+  Mail,
 } from "lucide-react";
 
 import type { DecisionType, OrderStatus, PurchaseOrder } from "@/app/lib/types";
@@ -484,8 +485,14 @@ function OrderDetail({
           <strong>{order.owner}</strong>
         </div>
         <div>
-          <span>Tệp nguồn</span>
-          <strong className="source-name">{order.sourceFile}</strong>
+          <span>Nguồn tiếp nhận</span>
+          {order.sourceChannel === "email" || order.sourceFile.startsWith("email://") ? (
+            <strong className="source-name" style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: "var(--color-primary)" }}>
+              <Mail size={13} /> {order.senderEmail || order.sourceFile.replace("email://", "")}
+            </strong>
+          ) : (
+            <strong className="source-name">{order.sourceFile}</strong>
+          )}
         </div>
       </div>
 

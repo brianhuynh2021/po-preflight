@@ -377,6 +377,7 @@ class CustomerMaster:
     tax_code: str | None = None
     tier: str = "STANDARD"
     aliases: list[str] = field(default_factory=list)
+    contact_emails: list[str] = field(default_factory=list)
     id: int | None = None
     created_at: str | None = None
 
@@ -389,6 +390,7 @@ class CustomerMaster:
             "tax_code": self.tax_code,
             "tier": self.tier,
             "aliases": self.aliases,
+            "contact_emails": self.contact_emails,
             "created_at": self.created_at,
         }
 

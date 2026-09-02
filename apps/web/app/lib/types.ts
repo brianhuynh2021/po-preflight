@@ -128,6 +128,8 @@ export interface PurchaseOrder {
   shippingFee?: number;
   headerDiscountAmount?: number;
   declaredTotal?: number | null;
+  sourceChannel?: string;
+  senderEmail?: string;
 }
 
 // ---------------------------------------------------------------- catalog

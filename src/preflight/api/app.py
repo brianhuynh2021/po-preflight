@@ -21,6 +21,7 @@ from preflight.api.routes import (
     catalog,
     customers,
     dashboard,
+    email_intake,
     erp,
     events,
     health,
@@ -205,6 +206,7 @@ app.include_router(agent.router)
 
 app.include_router(bot.router)
 app.include_router(ingestion.router)
+app.include_router(email_intake.router)
 app.include_router(erp.router)
 app.include_router(events.router)
 app.include_router(auth.router)

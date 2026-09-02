@@ -76,6 +76,13 @@ def build_parser() -> argparse.ArgumentParser:
     inv_list = inv_sub.add_parser("list", help="List inventory snapshots and ATP")
     inv_list.add_argument("--sku", help="Filter by specific SKU")
 
+    # Intake Subcommands
+    intake_cmd = subparsers.add_parser("intake", help="Multi-channel PO ingestion (email, etc.)")
+    intake_sub = intake_cmd.add_subparsers(dest="intake_command", required=True)
+    email_cmd = intake_sub.add_parser("email", help="Email IMAP PO intake")
+    email_cmd.add_argument("--once", action="store_true", default=True, help="Poll once and exit")
+    email_cmd.add_argument("--loop", action="store_true", help="Continuously poll every interval")
+
     # Seed Demo Subcommand
     subparsers.add_parser("seed-demo", help="Seed demo organization, catalog, customers, and sample orders")
 
@@ -280,6 +287,35 @@ def main(argv: list[str] | None = None) -> int:
                         f"   • {s}: on_hand={atp['on_hand']}, reserved_erp={atp['reserved_erp']}, "
                         f"allocated_local={atp['allocated_local']}, ATP={atp['atp']}{stale_flag} (src: {atp['source']})"
                     )
+                return 0
+        finally:
+            store.close()
+
+    if args.command == "intake":
+        from datetime import datetime, UTC
+        from preflight.intake.email import EmailIntakeService
+        from preflight.store import create_audit_store
+        store = create_audit_store(args.db)
+        try:
+            service = EmailIntakeService(store=store)
+            if getattr(args, "loop", False):
+                import time
+                interval = service.config.poll_interval_seconds
+                print(f"📧 Starting continuous Email Intake polling (interval: {interval}s)...")
+                try:
+                    while True:
+                        results = service.poll_once(catalog_path=args.catalog)
+                        print(f"[{datetime.now(UTC).isoformat()}] Polled inbox: {len(results)} message(s) processed.")
+                        time.sleep(interval)
+                except KeyboardInterrupt:
+                    print("\n🛑 Stopped email polling.")
+                    return 0
+            else:
+                print("📧 Polling email intake mailbox once...")
+                results = service.poll_once(catalog_path=args.catalog)
+                print(f"✔ Completed email intake poll: {len(results)} message(s) processed.")
+                for r in results:
+                    print(f"   • [{r.status}] MsgID: {r.message_id} | Sender: {r.sender_email} | Subject: {r.subject} | Orders: {r.orders_created}")
                 return 0
         finally:
             store.close()

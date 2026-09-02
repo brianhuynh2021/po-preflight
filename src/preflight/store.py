@@ -156,6 +156,7 @@ CREATE TABLE IF NOT EXISTS customers (
     normalized_name TEXT NOT NULL,
     tax_code TEXT,
     tier TEXT NOT NULL DEFAULT 'STANDARD',
+    contact_emails TEXT DEFAULT '',
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_customers_code ON customers(code);
@@ -243,6 +244,20 @@ CREATE TABLE IF NOT EXISTS request_errors (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_request_errors_created ON request_errors(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS email_inbox_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id TEXT UNIQUE NOT NULL,
+    sender TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    received_at TEXT NOT NULL,
+    attachments_count INTEGER NOT NULL DEFAULT 0,
+    orders_created INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL,
+    error_message TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_email_inbox_msg_id ON email_inbox_logs(message_id);
 """
 
 
@@ -377,6 +392,7 @@ CREATE TABLE IF NOT EXISTS customers (
     normalized_name VARCHAR(255) NOT NULL,
     tax_code VARCHAR(64),
     tier VARCHAR(32) NOT NULL DEFAULT 'STANDARD',
+    contact_emails TEXT DEFAULT '',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_pg_customers_code ON customers(code);
@@ -463,6 +479,20 @@ CREATE TABLE IF NOT EXISTS request_errors (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_pg_request_errors_created ON request_errors(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS email_inbox_logs (
+    id SERIAL PRIMARY KEY,
+    message_id VARCHAR(255) UNIQUE NOT NULL,
+    sender VARCHAR(255) NOT NULL,
+    subject VARCHAR(512) NOT NULL,
+    received_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    attachments_count INTEGER NOT NULL DEFAULT 0,
+    orders_created INTEGER NOT NULL DEFAULT 0,
+    status VARCHAR(32) NOT NULL,
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pg_email_inbox_msg_id ON email_inbox_logs(message_id);
 """
 
 
@@ -782,6 +812,32 @@ class BaseAuditStore(abc.ABC):
 
     @abc.abstractmethod
     def get_recent_request_errors(self, limit: int = 10) -> list[dict[str, Any]]:
+        pass
+
+    @abc.abstractmethod
+    def get_customer_by_contact_email(self, email: str) -> CustomerMaster | None:
+        pass
+
+    @abc.abstractmethod
+    def record_email_inbox_log(
+        self,
+        message_id: str,
+        sender: str,
+        subject: str,
+        received_at: str,
+        attachments_count: int = 0,
+        orders_created: int = 0,
+        status: str = "PROCESSED",
+        error_message: str | None = None,
+    ) -> None:
+        pass
+
+    @abc.abstractmethod
+    def get_email_inbox_log(self, message_id: str) -> dict[str, Any] | None:
+        pass
+
+    @abc.abstractmethod
+    def list_email_inbox_logs(self, limit: int = 50) -> list[dict[str, Any]]:
         pass
 
 
@@ -1607,13 +1663,14 @@ class AuditStore(BaseAuditStore):
         with self._lock:
             norm_name = customer.normalized_name or normalize_vietnamese_name(customer.name)
             now = datetime.now(UTC).isoformat()
+            emails_str = ",".join(customer.contact_emails) if customer.contact_emails else ""
             cursor = self.connection.cursor()
             cursor.execute(
                 """
-                INSERT INTO customers (code, name, normalized_name, tax_code, tier, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO customers (code, name, normalized_name, tax_code, tier, contact_emails, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (customer.code.strip(), customer.name.strip(), norm_name, customer.tax_code, customer.tier, now),
+                (customer.code.strip(), customer.name.strip(), norm_name, customer.tax_code, customer.tier, emails_str, now),
             )
             cust_id = cursor.lastrowid
             self.connection.commit()
@@ -1631,6 +1688,7 @@ class AuditStore(BaseAuditStore):
                 tax_code=customer.tax_code,
                 tier=customer.tier,
                 aliases=list(customer.aliases),
+                contact_emails=list(customer.contact_emails),
                 created_at=now,
             )
 
@@ -1668,6 +1726,8 @@ class AuditStore(BaseAuditStore):
                     (row["code"],),
                 ).fetchall()
             ]
+            raw_emails = row["contact_emails"] if "contact_emails" in row.keys() and row["contact_emails"] else ""
+            email_list = [e.strip() for e in raw_emails.replace(";", ",").split(",") if e.strip()]
             return CustomerMaster(
                 id=row["id"],
                 code=row["code"],
@@ -1676,6 +1736,7 @@ class AuditStore(BaseAuditStore):
                 tax_code=row["tax_code"],
                 tier=row["tier"],
                 aliases=aliases,
+                contact_emails=email_list,
                 created_at=row["created_at"],
             )
 
@@ -1713,6 +1774,19 @@ class AuditStore(BaseAuditStore):
                 return self.get_customer(alias_row["customer_id"])
             return None
 
+    def get_customer_by_contact_email(self, email: str) -> CustomerMaster | None:
+        with self._lock:
+            clean = email.strip().lower()
+            if not clean:
+                return None
+            rows = self.connection.execute("SELECT * FROM customers").fetchall()
+            for r in rows:
+                raw_emails = r["contact_emails"] if "contact_emails" in r.keys() and r["contact_emails"] else ""
+                email_list = [e.strip().lower() for e in raw_emails.replace(";", ",").split(",") if e.strip()]
+                if clean in email_list:
+                    return self.get_customer(r["code"])
+            return None
+
     def list_customers(self, search: str | None = None, limit: int = 50, offset: int = 0) -> list[CustomerMaster]:
         with self._lock:
             if search:
@@ -1748,13 +1822,21 @@ class AuditStore(BaseAuditStore):
             new_norm = normalize_vietnamese_name(new_name)
             new_tax = data.get("tax_code", cust.tax_code)
             new_tier = data.get("tier", cust.tier)
+            if "contact_emails" in data:
+                emails_val = data["contact_emails"]
+                if isinstance(emails_val, list):
+                    emails_str = ",".join(emails_val)
+                else:
+                    emails_str = str(emails_val or "")
+            else:
+                emails_str = ",".join(cust.contact_emails)
 
             self.connection.execute(
                 """
-                UPDATE customers SET name = ?, normalized_name = ?, tax_code = ?, tier = ?
+                UPDATE customers SET name = ?, normalized_name = ?, tax_code = ?, tier = ?, contact_emails = ?
                 WHERE code = ?
                 """,
-                (new_name, new_norm, new_tax, new_tier, cust.code),
+                (new_name, new_norm, new_tax, new_tier, emails_str, cust.code),
             )
             self.connection.commit()
 
@@ -1789,6 +1871,48 @@ class AuditStore(BaseAuditStore):
                 ).fetchall()
             return [dict(r) for r in rows]
 
+    def record_email_inbox_log(
+        self,
+        message_id: str,
+        sender: str,
+        subject: str,
+        received_at: str,
+        attachments_count: int = 0,
+        orders_created: int = 0,
+        status: str = "PROCESSED",
+        error_message: str | None = None,
+    ) -> None:
+        with self._lock:
+            now = datetime.now(UTC).isoformat()
+            self.connection.execute(
+                """
+                INSERT INTO email_inbox_logs (message_id, sender, subject, received_at, attachments_count, orders_created, status, error_message, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(message_id) DO UPDATE SET
+                    status = excluded.status,
+                    orders_created = excluded.orders_created,
+                    error_message = excluded.error_message
+                """,
+                (message_id, sender, subject, received_at, attachments_count, orders_created, status, error_message, now),
+            )
+            self.connection.commit()
+
+    def get_email_inbox_log(self, message_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT * FROM email_inbox_logs WHERE message_id = ? LIMIT 1",
+                (message_id,),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def list_email_inbox_logs(self, limit: int = 50) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self.connection.execute(
+                "SELECT * FROM email_inbox_logs ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
     def seed_default_customers(self) -> None:
         with self._lock:
             count = self.connection.execute("SELECT COUNT(*) AS c FROM customers").fetchone()["c"]
@@ -1800,6 +1924,7 @@ class AuditStore(BaseAuditStore):
                         tax_code="0101245486",
                         tier="VIP",
                         aliases=["Vingroup", "Vingroup JSC", "CTY CP Vingroup"],
+                        contact_emails=["order@vingroup.net", "purchasing@vingroup.net"],
                     ),
                     CustomerMaster(
                         code="CUST-002",
@@ -1807,6 +1932,7 @@ class AuditStore(BaseAuditStore):
                         tax_code="0109876543",
                         tier="PLATINUM",
                         aliases=["Northstar", "Northstar Store", "Northstar Distribution"],
+                        contact_emails=["orders@northstar.vn", "purchasing@northstar.vn", "procurement@northstar.com"],
                     ),
                     CustomerMaster(
                         code="CUST-003",
@@ -1814,6 +1940,7 @@ class AuditStore(BaseAuditStore):
                         tax_code="0308765432",
                         tier="STANDARD",
                         aliases=["Acme", "Acme Vietnam", "Acme Corporation"],
+                        contact_emails=["sales@acme.vn", "orders@acme.com"],
                     ),
                     CustomerMaster(
                         code="CUST-004",
@@ -1821,6 +1948,7 @@ class AuditStore(BaseAuditStore):
                         tax_code="0312345678",
                         tier="STANDARD",
                         aliases=["Alpha Tech", "CTY TNHH Alpha", "Alpha Corp"],
+                        contact_emails=["it@alpha.vn", "procurement@alphatech.com"],
                     ),
                 ]
                 for d in defaults:
@@ -2945,13 +3073,14 @@ class PostgresAuditStore(BaseAuditStore):
         with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 norm_name = customer.normalized_name or normalize_vietnamese_name(customer.name)
+                emails_str = ",".join(customer.contact_emails) if customer.contact_emails else ""
                 cur.execute(
                     """
-                    INSERT INTO customers (code, name, normalized_name, tax_code, tier)
-                    VALUES (%s, %s, %s, %s, %s)
-                    RETURNING id, code, name, normalized_name, tax_code, tier, created_at
+                    INSERT INTO customers (code, name, normalized_name, tax_code, tier, contact_emails)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id, code, name, normalized_name, tax_code, tier, contact_emails, created_at
                     """,
-                    (customer.code.strip(), customer.name.strip(), norm_name, customer.tax_code, customer.tier),
+                    (customer.code.strip(), customer.name.strip(), norm_name, customer.tax_code, customer.tier, emails_str),
                 )
                 row = cur.fetchone()
                 conn.commit()
@@ -2969,6 +3098,7 @@ class PostgresAuditStore(BaseAuditStore):
                     tax_code=res.get("tax_code"),
                     tier=res["tier"],
                     aliases=list(customer.aliases),
+                    contact_emails=list(customer.contact_emails),
                     created_at=res["created_at"],
                 )
 
@@ -3002,6 +3132,8 @@ class PostgresAuditStore(BaseAuditStore):
                 alias_rows = cur.fetchall()
                 aliases = [r["alias"] for r in alias_rows]
                 created_at = row["created_at"].isoformat() if isinstance(row.get("created_at"), datetime) else str(row.get("created_at"))
+                raw_emails = row.get("contact_emails") or ""
+                email_list = [e.strip() for e in raw_emails.replace(";", ",").split(",") if e.strip()]
                 return CustomerMaster(
                     id=row["id"],
                     code=row["code"],
@@ -3010,6 +3142,7 @@ class PostgresAuditStore(BaseAuditStore):
                     tax_code=row.get("tax_code"),
                     tier=row["tier"],
                     aliases=aliases,
+                    contact_emails=email_list,
                     created_at=created_at,
                 )
 
@@ -3038,6 +3171,21 @@ class PostgresAuditStore(BaseAuditStore):
                 alias_row = cur.fetchone()
                 if alias_row:
                     return self.get_customer(alias_row["customer_id"])
+                return None
+
+    def get_customer_by_contact_email(self, email: str) -> CustomerMaster | None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                clean = email.strip().lower()
+                if not clean:
+                    return None
+                cur.execute("SELECT code, contact_emails FROM customers")
+                rows = cur.fetchall()
+                for r in rows:
+                    raw_emails = r.get("contact_emails") or ""
+                    email_list = [e.strip().lower() for e in raw_emails.replace(";", ",").split(",") if e.strip()]
+                    if clean in email_list:
+                        return self.get_customer(r["code"])
                 return None
 
     def list_customers(self, search: str | None = None, limit: int = 50, offset: int = 0) -> list[CustomerMaster]:
@@ -3074,13 +3222,21 @@ class PostgresAuditStore(BaseAuditStore):
                 new_norm = normalize_vietnamese_name(new_name)
                 new_tax = data.get("tax_code", cust.tax_code)
                 new_tier = data.get("tier", cust.tier)
+                if "contact_emails" in data:
+                    emails_val = data["contact_emails"]
+                    if isinstance(emails_val, list):
+                        emails_str = ",".join(emails_val)
+                    else:
+                        emails_str = str(emails_val or "")
+                else:
+                    emails_str = ",".join(cust.contact_emails)
 
                 cur.execute(
                     """
-                    UPDATE customers SET name = %s, normalized_name = %s, tax_code = %s, tier = %s
+                    UPDATE customers SET name = %s, normalized_name = %s, tax_code = %s, tier = %s, contact_emails = %s
                     WHERE code = %s
                     """,
-                    (new_name, new_norm, new_tax, new_tier, cust.code),
+                    (new_name, new_norm, new_tax, new_tier, emails_str, cust.code),
                 )
                 if "aliases" in data:
                     cur.execute("DELETE FROM customer_aliases WHERE customer_id = %s", (cust.code,))
@@ -3524,6 +3680,52 @@ class PostgresAuditStore(BaseAuditStore):
             )
             rows = cur.fetchall()
             return [dict(r) for r in rows]
+
+    def record_email_inbox_log(
+        self,
+        message_id: str,
+        sender: str,
+        subject: str,
+        received_at: str,
+        attachments_count: int = 0,
+        orders_created: int = 0,
+        status: str = "PROCESSED",
+        error_message: str | None = None,
+    ) -> None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO email_inbox_logs (message_id, sender, subject, received_at, attachments_count, orders_created, status, error_message, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT(message_id) DO UPDATE SET
+                        status = EXCLUDED.status,
+                        orders_created = EXCLUDED.orders_created,
+                        error_message = EXCLUDED.error_message
+                    """,
+                    (message_id, sender, subject, received_at, attachments_count, orders_created, status, error_message),
+                )
+            conn.commit()
+
+    def get_email_inbox_log(self, message_id: str) -> dict[str, Any] | None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM email_inbox_logs WHERE message_id = %s LIMIT 1",
+                    (message_id,),
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+
+    def list_email_inbox_logs(self, limit: int = 50) -> list[dict[str, Any]]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM email_inbox_logs ORDER BY id DESC LIMIT %s",
+                    (limit,),
+                )
+                rows = cur.fetchall()
+                return [dict(r) for r in rows]
 
 
 

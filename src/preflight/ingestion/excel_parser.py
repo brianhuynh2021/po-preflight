@@ -27,7 +27,7 @@ class ExcelExtractor:
     """
 
     PO_ALIASES = [
-        "số po", "so po", "po no", "po no.", "po number", "po_number", "ponumber",
+        "số po", "so po", "mã po", "ma po", "po no", "po no.", "po number", "po_number", "ponumber",
         "mã đơn", "số đơn", "số đơn hàng", "mã đơn hàng", "po #", "po#",
         "order number", "order_number", "order no", "so chung tu", "số chứng từ",
     ]
