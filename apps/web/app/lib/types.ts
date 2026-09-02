@@ -118,6 +118,10 @@ export interface PurchaseOrder {
   owner: string;
   /** Newest first. Empty until someone decides. */
   decisions: Decision[];
+  revision?: number;
+  supersedesOrderId?: string | number | null;
+  requestedChanges?: string | null;
+  revisions?: { id: string | number; revision: number; status: string; createdAt: string }[];
   subtotal?: number;
   taxAmount?: number;
   grandTotal?: number;

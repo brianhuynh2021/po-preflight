@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import uuid
+from contextlib import nullcontext
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from preflight.api.deps import get_audit_store, get_catalog
 from preflight.api.errors import (
     DecisionConflict,
+    DuplicatePendingError,
     Forbidden,
     NotFound,
     ParseError,
@@ -94,6 +96,9 @@ def list_orders(
                 findings_count=len(findings_data),
                 error_count=error_count,
                 warning_count=warning_count,
+                revision=row.get("revision", 1),
+                supersedes_order_id=row.get("supersedes_order_id"),
+                requested_changes=row.get("requested_changes"),
                 source_file=row["source_file"],
                 created_at=row["created_at"],
                 latest_decision=row.get("latest_decision"),
@@ -190,11 +195,15 @@ def get_order_detail(
         risk_level=risk_level,
         total=Decimal(row["total"]),
         currency=order_data.get("currency", "VND"),
+        revision=row.get("revision", 1),
+        supersedes_order_id=row.get("supersedes_order_id"),
+        requested_changes=row.get("requested_changes"),
         source_file=row["source_file"],
         created_at=row["created_at"],
         items=items,
         findings=findings,
         decisions=row.get("decisions", []),
+        revisions=row.get("revisions", []),
     )
 
 
@@ -256,6 +265,7 @@ def get_order_source_file(
 async def upload_order(
     file: UploadFile = File(..., description="Purchase order document file"),
     staged_review: bool = Query(False, description="Stage order in extraction_review state before running preflight rules"),
+    on_conflict: str = Query("reject", description="Conflict resolution: reject (409) or revise"),
     user: UserPrincipal = Depends(require_role(Role.VIEWER)),
     store: AuditStore = Depends(get_audit_store),
     catalog: dict[str, Product] = Depends(get_catalog),
@@ -296,18 +306,63 @@ async def upload_order(
                 "Không thể đọc hoặc phân tích nội dung tệp PO. Vui lòng kiểm tra định dạng dữ liệu."
             ) from None
 
-        duplicate = store.has_po(order.po_number)
+        with getattr(store, "_lock", nullcontext()):
+            existing = store.get_order_by_po(order.po_number, customer=order.customer)
+            duplicate = False
+            revision = 1
+            supersedes_order_id: int | None = None
+            revision_diff: dict[str, Any] | None = None
 
-        if staged_review:
-            # Stage in extraction_review state without rules evaluation
-            analysis = Analysis(order=order, findings=[], status="extraction_review")
-        else:
-            # Run preflight rules immediately with comprehensive RuleContext
-            ctx = build_rule_context(store, catalog, order, duplicate=duplicate)
-            analysis = analyze_order(order, ctx)
+            if existing:
+                old_status = existing.get("status")
+                old_decision = existing.get("latest_decision")
 
-        # Persist to database
-        analysis_id = store.record_analysis(analysis, str(filename))
+                if old_decision == "approved" or old_status in ("approved", "exported"):
+                    duplicate = True
+                elif (
+                    old_decision in ("rejected", "needs_changes")
+                    or old_status in ("rejected", "needs_changes", "extraction_review")
+                ):
+                    duplicate = False
+                    revision = int(existing.get("revision", 1)) + 1
+                    supersedes_order_id = int(existing["id"])
+                    from preflight.utils.order_diff import compute_order_diff
+                    old_ord_json = json.loads(existing["order_json"]) if existing.get("order_json") else {}
+                    revision_diff = compute_order_diff(old_ord_json, order)
+                    store.mark_superseded(int(existing["id"]))
+                else:
+                    if on_conflict.lower().strip() == "revise":
+                        duplicate = False
+                        revision = int(existing.get("revision", 1)) + 1
+                        supersedes_order_id = int(existing["id"])
+                        from preflight.utils.order_diff import compute_order_diff
+                        old_ord_json = json.loads(existing["order_json"]) if existing.get("order_json") else {}
+                        revision_diff = compute_order_diff(old_ord_json, order)
+                        store.mark_superseded(int(existing["id"]))
+                    else:
+                        raise DuplicatePendingError(
+                            existing_order_id=existing["id"],
+                            po_number=order.po_number,
+                        )
+
+            if staged_review:
+                # Stage in extraction_review state without rules evaluation
+                analysis = Analysis(
+                    order=order,
+                    findings=[],
+                    status="extraction_review",
+                    revision=revision,
+                    supersedes_order_id=supersedes_order_id,
+                )
+            else:
+                # Run preflight rules immediately with comprehensive RuleContext
+                ctx = build_rule_context(store, catalog, order, duplicate=duplicate, revision_diff=revision_diff)
+                analysis = analyze_order(order, ctx)
+                analysis.revision = revision
+                analysis.supersedes_order_id = supersedes_order_id
+
+            # Persist to database
+            analysis_id = store.record_analysis(analysis, str(filename))
 
         # Store permanent file in structured hierarchy <analysis_id>/<safe_name>
         final_dir = upload_dir / str(analysis_id)

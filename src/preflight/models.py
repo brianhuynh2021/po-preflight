@@ -215,6 +215,8 @@ class Analysis:
     analysis_id: int | None = None
     policy_version: str = "2.0"
     catalog_snapshot_at: str | None = None
+    revision: int = 1
+    supersedes_order_id: int | None = None
 
     @property
     def error_count(self) -> int:
@@ -232,6 +234,8 @@ class Analysis:
         return {
             "analysis_id": self.analysis_id,
             "status": self.status,
+            "revision": self.revision,
+            "supersedes_order_id": self.supersedes_order_id,
             "error_count": self.error_count,
             "warning_count": self.warning_count,
             "info_count": self.info_count,

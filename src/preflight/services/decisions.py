@@ -132,21 +132,22 @@ def decide_order(
     # 5. Broadcast SSE Real-Time Event
     if event_bus is not None:
         try:
-            event_bus.publish(
-                "order.decided",
-                {
-                    "order_id": str(row["id"]),
-                    "po_number": po_number,
-                    "decision": clean_decision,
-                    "actor": actor_str,
-                    "display_name": principal.display_name,
-                    "channel": principal.channel,
-                    "note": clean_note,
-                    "previous_status": current_status,
-                    "new_status": new_status,
-                    "created_at": created_at,
-                },
-            )
+            event_payload = {
+                "order_id": str(row["id"]),
+                "po_number": po_number,
+                "decision": clean_decision,
+                "actor": actor_str,
+                "display_name": principal.display_name,
+                "channel": principal.channel,
+                "note": clean_note,
+                "requested_changes": clean_note if clean_decision == "needs_changes" else None,
+                "previous_status": current_status,
+                "new_status": new_status,
+                "created_at": created_at,
+            }
+            event_bus.publish("order.decided", event_payload)
+            if clean_decision == "needs_changes":
+                event_bus.publish("order.needs_changes", event_payload)
         except Exception:
             pass
 

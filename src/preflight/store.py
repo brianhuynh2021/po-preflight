@@ -35,9 +35,13 @@ CREATE TABLE IF NOT EXISTS analyses (
     source_file TEXT NOT NULL,
     order_json TEXT NOT NULL,
     findings_json TEXT NOT NULL,
+    revision INTEGER DEFAULT 1,
+    supersedes_order_id INTEGER NULL,
+    requested_changes TEXT NULL,
     created_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS ux_analyses_po ON analyses(po_number);
+CREATE INDEX IF NOT EXISTS idx_analyses_po ON analyses(po_number);
+CREATE INDEX IF NOT EXISTS idx_analyses_cust_po ON analyses(customer, po_number);
 CREATE TABLE IF NOT EXISTS decisions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     po_number TEXT NOT NULL,
@@ -152,9 +156,13 @@ CREATE TABLE IF NOT EXISTS analyses (
     source_file VARCHAR(512) NOT NULL,
     order_json JSONB NOT NULL,
     findings_json JSONB NOT NULL,
+    revision INT DEFAULT 1,
+    supersedes_order_id INT NULL,
+    requested_changes TEXT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE UNIQUE INDEX IF NOT EXISTS ux_pg_analyses_po ON analyses(po_number);
+CREATE INDEX IF NOT EXISTS idx_pg_analyses_po ON analyses(po_number);
+CREATE INDEX IF NOT EXISTS idx_pg_analyses_cust_po ON analyses(customer, po_number);
 
 
 CREATE TABLE IF NOT EXISTS decisions (
@@ -279,7 +287,23 @@ class BaseAuditStore(abc.ABC):
         self.close()
 
     @abc.abstractmethod
-    def has_po(self, po_number: str) -> bool:
+    def has_po(self, po_number: str, customer: str | None = None) -> bool:
+        pass
+
+    @abc.abstractmethod
+    def get_order_by_po(self, po_number: str, customer: str | None = None) -> dict[str, Any] | None:
+        pass
+
+    @abc.abstractmethod
+    def get_order_revisions(self, po_number: str, customer: str | None = None) -> list[dict[str, Any]]:
+        pass
+
+    @abc.abstractmethod
+    def get_recent_customer_orders(self, customer: str, days: int = 14) -> list[dict[str, Any]]:
+        pass
+
+    @abc.abstractmethod
+    def mark_superseded(self, order_id: int) -> None:
         pass
 
     @abc.abstractmethod
@@ -329,6 +353,7 @@ class BaseAuditStore(abc.ABC):
         search: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        include_superseded: bool = False,
     ) -> list[dict[str, Any]]:
         pass
 
@@ -457,14 +482,33 @@ class AuditStore(BaseAuditStore):
                 # Enable WAL mode for high concurrency
                 self.connection.execute("PRAGMA journal_mode=WAL;")
                 self.connection.execute("PRAGMA busy_timeout=30000;")
-                # Deduplicate legacy rows before applying unique constraint index
-                self.connection.execute(
-                    "DELETE FROM analyses WHERE id NOT IN (SELECT MAX(id) FROM analyses GROUP BY po_number)"
-                )
-                self.connection.commit()
             except Exception:
                 pass
             self.connection.executescript(SQLITE_SCHEMA)
+            try:
+                self.connection.execute("ALTER TABLE analyses ADD COLUMN revision INTEGER DEFAULT 1;")
+            except Exception:
+                pass
+            try:
+                self.connection.execute("ALTER TABLE analyses ADD COLUMN supersedes_order_id INTEGER NULL;")
+            except Exception:
+                pass
+            try:
+                self.connection.execute("ALTER TABLE analyses ADD COLUMN requested_changes TEXT NULL;")
+            except Exception:
+                pass
+            try:
+                self.connection.execute("DROP INDEX IF EXISTS ux_analyses_po;")
+            except Exception:
+                pass
+            try:
+                self.connection.execute("CREATE INDEX IF NOT EXISTS idx_analyses_po ON analyses(po_number);")
+            except Exception:
+                pass
+            try:
+                self.connection.execute("CREATE INDEX IF NOT EXISTS idx_analyses_cust_po ON analyses(customer, po_number);")
+            except Exception:
+                pass
             try:
                 self.connection.execute("ALTER TABLE decisions ADD COLUMN display_name TEXT;")
             except Exception:
@@ -480,77 +524,104 @@ class AuditStore(BaseAuditStore):
         with self._lock:
             self.connection.close()
 
-    def has_po(self, po_number: str) -> bool:
+    def has_po(self, po_number: str, customer: str | None = None) -> bool:
         with self._lock:
-            row = self.connection.execute(
-                "SELECT 1 FROM analyses WHERE po_number = ? LIMIT 1", (po_number,)
-            ).fetchone()
+            if customer:
+                row = self.connection.execute(
+                    "SELECT 1 FROM analyses WHERE po_number = ? AND customer = ? AND status != 'superseded' LIMIT 1",
+                    (po_number, customer),
+                ).fetchone()
+            else:
+                row = self.connection.execute(
+                    "SELECT 1 FROM analyses WHERE po_number = ? AND status != 'superseded' LIMIT 1",
+                    (po_number,),
+                ).fetchone()
             return row is not None
+
+    def get_order_by_po(self, po_number: str, customer: str | None = None) -> dict[str, Any] | None:
+        with self._lock:
+            if customer:
+                row = self.connection.execute(
+                    "SELECT * FROM analyses WHERE po_number = ? AND customer = ? ORDER BY revision DESC, id DESC LIMIT 1",
+                    (po_number, customer),
+                ).fetchone()
+            else:
+                row = self.connection.execute(
+                    "SELECT * FROM analyses WHERE po_number = ? ORDER BY revision DESC, id DESC LIMIT 1",
+                    (po_number,),
+                ).fetchone()
+            if not row:
+                return None
+            return self._enrich_order_row(dict(row))
+
+    def get_order_revisions(self, po_number: str, customer: str | None = None) -> list[dict[str, Any]]:
+        with self._lock:
+            if customer:
+                rows = self.connection.execute(
+                    "SELECT * FROM analyses WHERE po_number = ? AND customer = ? ORDER BY revision ASC, id ASC",
+                    (po_number, customer),
+                ).fetchall()
+            else:
+                rows = self.connection.execute(
+                    "SELECT * FROM analyses WHERE po_number = ? ORDER BY revision ASC, id ASC",
+                    (po_number,),
+                ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_recent_customer_orders(self, customer: str, days: int = 14) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self.connection.execute(
+                "SELECT * FROM analyses WHERE customer = ? AND status != 'superseded' ORDER BY id DESC LIMIT 50",
+                (customer,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def mark_superseded(self, order_id: int) -> None:
+        with self._lock:
+            with self.connection:
+                self.connection.execute("UPDATE analyses SET status = 'superseded' WHERE id = ?", (order_id,))
 
     def record_analysis(self, analysis: Analysis, source_file: str) -> int:
         with self._lock:
-            try:
-                cursor = self.connection.cursor()
-                cursor.execute(
-                    """
-                    INSERT INTO analyses (
-                        po_number, customer, status, total, source_file,
-                        order_json, findings_json, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        analysis.order.po_number,
-                        analysis.order.customer,
-                        analysis.status,
-                        str(analysis.order.total),
-                        source_file,
-                        json.dumps(analysis.order.to_dict(), ensure_ascii=False),
-                        json.dumps(
-                            [finding.to_dict() for finding in analysis.findings],
-                            ensure_ascii=False,
-                        ),
-                        datetime.now(UTC).isoformat(),
-                    ),
-                )
-                self.connection.commit()
-                self.append_audit_block(
+            cursor = self.connection.cursor()
+            cursor.execute(
+                """
+                INSERT INTO analyses (
+                    po_number, customer, status, total, source_file,
+                    order_json, findings_json, revision, supersedes_order_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
                     analysis.order.po_number,
-                    "ORDER_INGESTED",
-                    "system:ingestion_pipeline",
-                    {"total": str(analysis.order.total), "status": analysis.status},
-                )
-                if cursor.lastrowid is not None:
-                    analysis.analysis_id = int(cursor.lastrowid)
-                    return analysis.analysis_id
-                existing = self.get_order(analysis.order.po_number)
-                if existing:
-                    analysis.analysis_id = int(existing["id"])
-                    return analysis.analysis_id
-                return 0
-            except (sqlite3.IntegrityError, sqlite3.OperationalError):
-                # Concurrent race condition: another thread/worker inserted the exact same PO number
-                existing = self.get_order(analysis.order.po_number)
-                if existing:
-                    dup_finding = {
-                        "code": "DUPLICATE_PO",
-                        "severity": "error",
-                        "message": f"PO {analysis.order.po_number} has already been processed.",
-                    }
-                    raw_findings = existing.get("findings_json") or "[]"
-                    findings_list = json.loads(raw_findings) if isinstance(raw_findings, str) else raw_findings
-                    if not any(isinstance(f, dict) and f.get("code") == "DUPLICATE_PO" for f in findings_list):
-                        findings_list.append(dup_finding)
-                    self.connection.execute(
-                        "UPDATE analyses SET status = 'blocked', findings_json = ? WHERE id = ?",
-                        (json.dumps(findings_list, ensure_ascii=False), existing["id"]),
-                    )
-                    self.connection.commit()
-                    analysis.analysis_id = int(existing["id"])
-                    analysis.status = "blocked"
-                    return analysis.analysis_id
-                raise
-
-
+                    analysis.order.customer,
+                    analysis.status,
+                    str(analysis.order.total),
+                    source_file,
+                    json.dumps(analysis.order.to_dict(), ensure_ascii=False),
+                    json.dumps(
+                        [finding.to_dict() for finding in analysis.findings],
+                        ensure_ascii=False,
+                    ),
+                    getattr(analysis, "revision", 1),
+                    getattr(analysis, "supersedes_order_id", None),
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+            self.connection.commit()
+            res_id = int(cursor.lastrowid or 0)
+            analysis.analysis_id = res_id
+            self.append_audit_block(
+                analysis.order.po_number,
+                "ORDER_INGESTED",
+                "system:ingestion_pipeline",
+                {
+                    "total": str(analysis.order.total),
+                    "status": analysis.status,
+                    "revision": getattr(analysis, "revision", 1),
+                    "supersedes_order_id": getattr(analysis, "supersedes_order_id", None),
+                },
+            )
+            return res_id
 
     def update_analysis(self, order_id: int, analysis: Analysis) -> None:
         """Update an existing analysis with confirmed order details and preflight findings."""
@@ -560,7 +631,7 @@ class AuditStore(BaseAuditStore):
                     """
                     UPDATE analyses
                     SET po_number = ?, customer = ?, status = ?, total = ?,
-                        order_json = ?, findings_json = ?
+                        order_json = ?, findings_json = ?, revision = ?, supersedes_order_id = ?
                     WHERE id = ?
                     """,
                     (
@@ -573,6 +644,8 @@ class AuditStore(BaseAuditStore):
                             [finding.to_dict() for finding in analysis.findings],
                             ensure_ascii=False,
                         ),
+                        getattr(analysis, "revision", 1),
+                        getattr(analysis, "supersedes_order_id", None),
                         order_id,
                     ),
                 )
@@ -607,10 +680,16 @@ class AuditStore(BaseAuditStore):
                         datetime.now(UTC).isoformat(),
                     ),
                 )
-                self.connection.execute(
-                    "UPDATE analyses SET status = ? WHERE po_number = ?",
-                    (decision, po_number),
-                )
+                if decision == "needs_changes":
+                    self.connection.execute(
+                        "UPDATE analyses SET status = ?, requested_changes = ? WHERE po_number = ?",
+                        (decision, note, po_number),
+                    )
+                else:
+                    self.connection.execute(
+                        "UPDATE analyses SET status = ? WHERE po_number = ?",
+                        (decision, po_number),
+                    )
                 self.append_audit_block(
                     po_number,
                     f"DECISION_{decision.upper()}",
@@ -624,8 +703,6 @@ class AuditStore(BaseAuditStore):
                     },
                 )
                 return int(cursor.lastrowid)
-
-
 
     def history(self, po_number: str) -> dict[str, list[dict[str, object]]]:
         with self._lock:
@@ -649,6 +726,7 @@ class AuditStore(BaseAuditStore):
         search: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        include_superseded: bool = False,
     ) -> list[dict[str, Any]]:
         with self._lock:
             query = """
@@ -661,6 +739,9 @@ class AuditStore(BaseAuditStore):
                     a.source_file,
                     a.order_json,
                     a.findings_json,
+                    a.revision,
+                    a.supersedes_order_id,
+                    a.requested_changes,
                     a.created_at,
                     (SELECT d.decision FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS latest_decision,
                     (SELECT d.actor FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS latest_actor,
@@ -672,6 +753,8 @@ class AuditStore(BaseAuditStore):
             if status:
                 query += " AND a.status = ?"
                 params.append(status)
+            elif not include_superseded:
+                query += " AND a.status != 'superseded'"
             if search:
                 query += " AND (a.po_number LIKE ? OR a.customer LIKE ?)"
                 term = f"%{search}%"
@@ -683,6 +766,24 @@ class AuditStore(BaseAuditStore):
             rows = self.connection.execute(query, params).fetchall()
             return [dict(row) for row in rows]
 
+    def _enrich_order_row(self, data: dict[str, Any]) -> dict[str, Any]:
+        po_number = data["po_number"]
+        data["decisions"] = [
+            dict(d)
+            for d in self.connection.execute(
+                "SELECT * FROM decisions WHERE po_number = ? ORDER BY id ASC",
+                (po_number,),
+            ).fetchall()
+        ]
+        data["revisions"] = [
+            dict(r)
+            for r in self.connection.execute(
+                "SELECT id, po_number, customer, status, total, revision, supersedes_order_id, source_file, created_at FROM analyses WHERE po_number = ? ORDER BY revision ASC, id ASC",
+                (po_number,),
+            ).fetchall()
+        ]
+        return data
+
     def get_order(self, po_or_id: str | int) -> dict[str, Any] | None:
         with self._lock:
             if isinstance(po_or_id, int) or str(po_or_id).isdigit():
@@ -691,23 +792,12 @@ class AuditStore(BaseAuditStore):
                 ).fetchone()
             else:
                 row = self.connection.execute(
-                    "SELECT * FROM analyses WHERE po_number = ? ORDER BY id DESC LIMIT 1",
+                    "SELECT * FROM analyses WHERE po_number = ? ORDER BY revision DESC, id DESC LIMIT 1",
                     (str(po_or_id),),
                 ).fetchone()
             if not row:
                 return None
-            data = dict(row)
-            data["decisions"] = [
-                dict(d)
-                for d in self.connection.execute(
-                    "SELECT * FROM decisions WHERE po_number = ? ORDER BY id ASC",
-                    (data["po_number"],),
-                ).fetchall()
-            ]
-            return data
-
-    def get_order_by_po(self, po_number: str) -> dict[str, Any] | None:
-        return self.get_order(po_number)
+            return self._enrich_order_row(dict(row))
 
     def get_dashboard_stats(self) -> dict[str, Any]:
 
@@ -1194,11 +1284,59 @@ class PostgresAuditStore(BaseAuditStore):
         if hasattr(self, "_pool"):
             self._pool.close()
 
-    def has_po(self, po_number: str) -> bool:
+    def has_po(self, po_number: str, customer: str | None = None) -> bool:
         with self._pool.connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT 1 FROM analyses WHERE po_number = %s LIMIT 1", (po_number,))
+                if customer:
+                    cur.execute("SELECT 1 FROM analyses WHERE po_number = %s AND customer = %s AND status != 'superseded' LIMIT 1", (po_number, customer))
+                else:
+                    cur.execute("SELECT 1 FROM analyses WHERE po_number = %s AND status != 'superseded' LIMIT 1", (po_number,))
                 return cur.fetchone() is not None
+
+    def get_order_by_po(self, po_number: str, customer: str | None = None) -> dict[str, Any] | None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                if customer:
+                    cur.execute("SELECT * FROM analyses WHERE po_number = %s AND customer = %s ORDER BY revision DESC, id DESC LIMIT 1", (po_number, customer))
+                else:
+                    cur.execute("SELECT * FROM analyses WHERE po_number = %s ORDER BY revision DESC, id DESC LIMIT 1", (po_number,))
+                row = cur.fetchone()
+                if not row:
+                    return None
+                data = dict(row)
+                po_num = data["po_number"]
+                cur.execute("SELECT * FROM decisions WHERE po_number = %s ORDER BY id ASC", (po_num,))
+                data["decisions"] = [dict(d) for d in cur.fetchall()]
+                cur.execute(
+                    "SELECT id, po_number, customer, status, total, revision, supersedes_order_id, source_file, created_at FROM analyses WHERE po_number = %s ORDER BY revision ASC, id ASC",
+                    (po_num,),
+                )
+                data["revisions"] = [dict(r) for r in cur.fetchall()]
+                return data
+
+    def get_order_revisions(self, po_number: str, customer: str | None = None) -> list[dict[str, Any]]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                if customer:
+                    cur.execute("SELECT * FROM analyses WHERE po_number = %s AND customer = %s ORDER BY revision ASC, id ASC", (po_number, customer))
+                else:
+                    cur.execute("SELECT * FROM analyses WHERE po_number = %s ORDER BY revision ASC, id ASC", (po_number,))
+                return [dict(r) for r in cur.fetchall()]
+
+    def get_recent_customer_orders(self, customer: str, days: int = 14) -> list[dict[str, Any]]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM analyses WHERE customer = %s AND status != 'superseded' ORDER BY id DESC LIMIT 50",
+                    (customer,),
+                )
+                return [dict(r) for r in cur.fetchall()]
+
+    def mark_superseded(self, order_id: int) -> None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE analyses SET status = 'superseded' WHERE id = %s", (order_id,))
+            conn.commit()
 
     def record_analysis(self, analysis: Analysis, source_file: str) -> int:
         with self._pool.connection() as conn:
@@ -1207,8 +1345,8 @@ class PostgresAuditStore(BaseAuditStore):
                     """
                     INSERT INTO analyses (
                         po_number, customer, status, total, source_file,
-                        order_json, findings_json, created_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        order_json, findings_json, revision, supersedes_order_id, created_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """,
                     (
@@ -1219,6 +1357,8 @@ class PostgresAuditStore(BaseAuditStore):
                         source_file,
                         json.dumps(analysis.order.to_dict(), ensure_ascii=False),
                         json.dumps([f.to_dict() for f in analysis.findings], ensure_ascii=False),
+                        getattr(analysis, "revision", 1),
+                        getattr(analysis, "supersedes_order_id", None),
                         datetime.now(UTC).isoformat(),
                     ),
                 )
@@ -1234,7 +1374,7 @@ class PostgresAuditStore(BaseAuditStore):
                     """
                     UPDATE analyses
                     SET po_number = %s, customer = %s, status = %s, total = %s,
-                        order_json = %s, findings_json = %s
+                        order_json = %s, findings_json = %s, revision = %s, supersedes_order_id = %s
                     WHERE id = %s
                     """,
                     (
@@ -1244,6 +1384,8 @@ class PostgresAuditStore(BaseAuditStore):
                         str(analysis.order.total),
                         json.dumps(analysis.order.to_dict(), ensure_ascii=False),
                         json.dumps([f.to_dict() for f in analysis.findings], ensure_ascii=False),
+                        getattr(analysis, "revision", 1),
+                        getattr(analysis, "supersedes_order_id", None),
                         order_id,
                     ),
                 )
@@ -1277,6 +1419,16 @@ class PostgresAuditStore(BaseAuditStore):
                     ),
                 )
                 d_id = int(cur.fetchone()["id"])
+                if decision == "needs_changes":
+                    cur.execute(
+                        "UPDATE analyses SET status = %s, requested_changes = %s WHERE po_number = %s",
+                        (decision, note, po_number),
+                    )
+                else:
+                    cur.execute(
+                        "UPDATE analyses SET status = %s WHERE po_number = %s",
+                        (decision, po_number),
+                    )
             conn.commit()
             return d_id
 
@@ -1295,12 +1447,13 @@ class PostgresAuditStore(BaseAuditStore):
         search: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        include_superseded: bool = False,
     ) -> list[dict[str, Any]]:
         with self._pool.connection() as conn:
             with conn.cursor() as cur:
                 query = """
                     SELECT a.id, a.po_number, a.customer, a.status, a.total, a.source_file,
-                           a.order_json, a.findings_json, a.created_at,
+                           a.order_json, a.findings_json, a.revision, a.supersedes_order_id, a.requested_changes, a.created_at,
                            (SELECT d.decision FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS latest_decision,
                            (SELECT d.actor FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS latest_actor,
                            (SELECT d.created_at FROM decisions d WHERE d.po_number = a.po_number ORDER BY d.id DESC LIMIT 1) AS decided_at
@@ -1311,6 +1464,8 @@ class PostgresAuditStore(BaseAuditStore):
                 if status:
                     query += " AND a.status = %s"
                     params.append(status)
+                elif not include_superseded:
+                    query += " AND a.status != 'superseded'"
                 if search:
                     query += " AND (a.po_number ILIKE %s OR a.customer ILIKE %s)"
                     term = f"%{search}%"
@@ -1326,13 +1481,19 @@ class PostgresAuditStore(BaseAuditStore):
                 if isinstance(po_or_id, int) or str(po_or_id).isdigit():
                     cur.execute("SELECT * FROM analyses WHERE id = %s LIMIT 1", (int(po_or_id),))
                 else:
-                    cur.execute("SELECT * FROM analyses WHERE po_number = %s ORDER BY id DESC LIMIT 1", (str(po_or_id),))
+                    cur.execute("SELECT * FROM analyses WHERE po_number = %s ORDER BY revision DESC, id DESC LIMIT 1", (str(po_or_id),))
                 row = cur.fetchone()
                 if not row:
                     return None
                 data = dict(row)
-                cur.execute("SELECT * FROM decisions WHERE po_number = %s ORDER BY id ASC", (data["po_number"],))
+                po_num = data["po_number"]
+                cur.execute("SELECT * FROM decisions WHERE po_number = %s ORDER BY id ASC", (po_num,))
                 data["decisions"] = [dict(d) for d in cur.fetchall()]
+                cur.execute(
+                    "SELECT id, po_number, customer, status, total, revision, supersedes_order_id, source_file, created_at FROM analyses WHERE po_number = %s ORDER BY revision ASC, id ASC",
+                    (po_num,),
+                )
+                data["revisions"] = [dict(r) for r in cur.fetchall()]
                 return data
 
     def get_order_by_po(self, po_number: str) -> dict[str, Any] | None:

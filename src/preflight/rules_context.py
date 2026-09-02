@@ -73,6 +73,8 @@ class RuleContext:
     policy_version: str = "2.0"
     order_date: str | None = None
     duplicate: bool = False
+    recent_customer_orders: tuple[Order, ...] = ()
+    revision_diff: dict[str, Any] | None = None
     fx_rates: Mapping[str, Decimal] = field(default_factory=dict)  # "USD_VND" -> rate
     fx_source: str = "static"  # "static" | "live" | "none"
 
@@ -89,6 +91,7 @@ def build_rule_context(
     policy: RulePolicy | None = None,
     fx_provider: Callable[[str, str], tuple[Decimal, str]] | None = None,
     duplicate: bool | None = None,
+    revision_diff: dict[str, Any] | None = None,
 ) -> RuleContext:
     """Central factory for building immutable RuleContext from store, master data, and policies."""
     if policy is None:
@@ -116,7 +119,39 @@ def build_rule_context(
     # 4. Duplication Check
     is_duplicate = duplicate if duplicate is not None else store.has_po(order.po_number)
 
-    # 5. FX Rates for non-VND orders
+    # 5. Recent customer orders for near-duplicate detection
+    recent_orders: list[Order] = []
+    if hasattr(store, "get_recent_customer_orders"):
+        try:
+            recent_rows = store.get_recent_customer_orders(raw_customer, days=14)
+            for r in recent_rows:
+                ord_data = r.get("order_json")
+                if ord_data:
+                    import json
+                    from preflight.models import LineItem
+                    od = json.loads(ord_data) if isinstance(ord_data, str) else ord_data
+                    items = tuple(
+                        LineItem(
+                            sku=it.get("sku", ""),
+                            quantity=int(it.get("quantity", 1)),
+                            unit_price=Decimal(str(it.get("unit_price", 0))),
+                            uom=it.get("uom", "PCS"),
+                        )
+                        for it in od.get("items", [])
+                    )
+                    recent_orders.append(
+                        Order(
+                            po_number=od.get("po_number", r.get("po_number", "")),
+                            customer=od.get("customer", r.get("customer", "")),
+                            items=items,
+                            currency=od.get("currency", "VND"),
+                            order_date=od.get("order_date") or r.get("created_at"),
+                        )
+                    )
+        except Exception:
+            pass
+
+    # 6. FX Rates for non-VND orders
     fx_rates: dict[str, Decimal] = {}
     fx_source = "static"
     order_currency = (order.currency or "VND").strip().upper()
@@ -148,6 +183,8 @@ def build_rule_context(
         policy_version=getattr(policy, "version", "2.0"),
         order_date=order_date,
         duplicate=is_duplicate,
+        recent_customer_orders=tuple(recent_orders),
+        revision_diff=revision_diff,
         fx_rates=fx_rates,
         fx_source=fx_source,
     )

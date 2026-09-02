@@ -100,7 +100,7 @@ class OrderSummaryResponse(BaseModel):
     id: int = Field(..., description="Primary analysis ID in audit store")
     po_number: str = Field(..., description="Purchase Order number (e.g. PO-10428)")
     customer: str = Field(..., description="Customer company name")
-    status: Literal["ready_for_approval", "review_required", "blocked", "approved", "rejected", "needs_changes", "extraction_review"] = (
+    status: Literal["ready_for_approval", "review_required", "blocked", "approved", "rejected", "needs_changes", "extraction_review", "superseded"] = (
         Field(..., description="Lifecycle status")
     )
     risk_level: Literal["LOW", "MEDIUM", "HIGH"] = Field(..., description="Computed risk score")
@@ -110,49 +110,34 @@ class OrderSummaryResponse(BaseModel):
     findings_count: int = Field(..., description="Total validation warnings/errors")
     error_count: int = Field(..., description="Total blocking errors")
     warning_count: int = Field(..., description="Total review warnings")
+    revision: int = Field(1, description="Revision sequence number")
+    supersedes_order_id: int | None = Field(None, description="ID of previous order superseded by this revision")
+    requested_changes: str | None = Field(None, description="Change request notes if any")
     source_file: str = Field(..., description="Source filename or origin channel")
     created_at: str = Field(..., description="Received timestamp")
     latest_decision: str | None = Field(None, description="Latest human decision if any")
     decided_at: str | None = Field(None, description="Decision timestamp if any")
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "id": 1,
-                "po_number": "PO-10428",
-                "customer": "Northstar Retail",
-                "status": "review_required",
-                "risk_level": "MEDIUM",
-                "total": "18500000.00",
-                "currency": "VND",
-                "items_count": 2,
-                "findings_count": 1,
-                "error_count": 0,
-                "warning_count": 1,
-                "source_file": "order-10428.pdf",
-                "created_at": "2026-09-01T08:00:00Z",
-                "latest_decision": None,
-                "decided_at": None,
-            }
-        }
-    }
 
 
 class OrderDetailResponse(BaseModel):
     id: int = Field(..., description="Order ID in audit store")
     po_number: str = Field(..., description="Purchase Order identifier")
     customer: str = Field(..., description="Customer legal entity name")
-    status: Literal["ready_for_approval", "review_required", "blocked", "approved", "rejected", "needs_changes", "extraction_review"] = (
+    status: Literal["ready_for_approval", "review_required", "blocked", "approved", "rejected", "needs_changes", "extraction_review", "superseded"] = (
         Field(..., description="Lifecycle verification state")
     )
     risk_level: str = Field(..., description="Computed risk level")
     total: Decimal = Field(..., description="Total order amount")
     currency: str = Field("VND", description="Currency code")
+    revision: int = Field(1, description="Revision sequence number")
+    supersedes_order_id: int | None = Field(None, description="ID of previous order superseded by this revision")
+    requested_changes: str | None = Field(None, description="Change request notes if any")
     source_file: str = Field(..., description="Original file path or channel")
     created_at: str = Field(..., description="Ingestion timestamp")
     items: list[LineItemResponse] = Field(default_factory=list, description="Parsed line items")
     findings: list[FindingResponse] = Field(default_factory=list, description="Validation findings")
     decisions: list[dict[str, Any]] = Field(default_factory=list, description="Audit decision timeline")
+    revisions: list[dict[str, Any]] = Field(default_factory=list, description="All revision history")
 
 
 class DecisionRequest(BaseModel):

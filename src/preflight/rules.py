@@ -84,8 +84,24 @@ def analyze_order(
     order_date_str = context.order_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # -------------------------------------------------------------
-    # 0. Duplicate PO Detection
+    # 0. Duplicate & Revision PO Detection
     # -------------------------------------------------------------
+    if context.revision_diff:
+        findings.append(
+            registry.make(
+                code="REVISED_ORDER",
+                severity="info",
+                message=f"Đơn hàng được nộp lại theo phiên bản mới. Thay đổi: {context.revision_diff.get('summary', 'Đã cập nhật dữ liệu.')}",
+                evidence={
+                    "summary": context.revision_diff.get("summary", ""),
+                    "changes": context.revision_diff.get("changes", []),
+                    "old_total": str(context.revision_diff.get("old_total", "")),
+                    "new_total": str(context.revision_diff.get("new_total", "")),
+                    "rule_version": context.policy_version,
+                },
+            )
+        )
+
     if context.duplicate:
         findings.append(
             registry.make(
@@ -99,6 +115,37 @@ def analyze_order(
                 },
             )
         )
+    elif context.recent_customer_orders:
+        curr_items = {(it.sku.strip().upper(), it.quantity) for it in order.items}
+        for cand in context.recent_customer_orders:
+            if cand.po_number.strip().upper() == order.po_number.strip().upper():
+                continue
+            cand_items = {(it.sku.strip().upper(), it.quantity) for it in cand.items}
+            union_len = len(curr_items | cand_items)
+            if union_len == 0:
+                continue
+            jaccard = len(curr_items & cand_items) / union_len
+            cand_tot = cand.grand_total if hasattr(cand, "grand_total") else cand.total
+            curr_tot = order.grand_total
+            tot_diff_ratio = abs(curr_tot - cand_tot) / max(Decimal("1"), cand_tot)
+            if jaccard >= 0.9 and tot_diff_ratio < Decimal("0.01"):
+                findings.append(
+                    registry.make(
+                        code="POSSIBLE_DUPLICATE",
+                        severity="warning",
+                        message=(
+                            f"Nghi ngờ trùng lặp với đơn hàng {cand.po_number} "
+                            f"(độ tương đồng dòng hàng {jaccard*100:.0f}%, chênh lệch tổng tiền {tot_diff_ratio*100:.1f}%)."
+                        ),
+                        evidence={
+                            "matched_po": cand.po_number,
+                            "jaccard_similarity": f"{jaccard*100:.0f}%",
+                            "candidate_total": str(cand_tot),
+                            "rule_version": context.policy_version,
+                        },
+                    )
+                )
+                break
 
     # -------------------------------------------------------------
     # 1. Customer Credit & Debt Risk Rules (Configurable Policy)

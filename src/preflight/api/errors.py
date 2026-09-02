@@ -84,6 +84,32 @@ class DecisionConflict(PreflightError):
     message_vi = "Xung đột trạng thái quyết định đơn hàng."
 
 
+class DuplicatePendingError(PreflightError):
+    status_code = 409
+    code = "DUPLICATE_PENDING"
+    title = "Conflict - Duplicate Pending Order"
+    message_vi = "Đơn hàng này đang chờ duyệt. Thay bằng bản mới?"
+
+    def __init__(
+        self,
+        message_vi: str | None = None,
+        *,
+        existing_order_id: int | str | None = None,
+        po_number: str | None = None,
+    ):
+        super().__init__(message_vi or self.message_vi)
+        self.existing_order_id = existing_order_id
+        self.po_number = po_number
+
+    def to_problem_dict(self, request_id: str | None = None) -> dict[str, Any]:
+        doc = super().to_problem_dict(request_id)
+        if self.existing_order_id is not None:
+            doc["existing_order_id"] = self.existing_order_id
+        if self.po_number is not None:
+            doc["po_number"] = self.po_number
+        return doc
+
+
 class ValidationFailed(PreflightError):
     status_code = 422
     code = "VALIDATION_FAILED"
