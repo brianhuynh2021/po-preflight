@@ -540,7 +540,7 @@ export function createApiClient(config: ClientConfig = {}) {
           message_id: string;
           sender: string;
           subject: string;
-          status: "PROCESSED" | "PARTIAL" | "IGNORED" | "ERROR" | "DUPLICATE";
+          status: "PROCESSED" | "PARTIAL" | "IGNORED" | "ERROR" | "DUPLICATE" | "GAVE_UP";
           orders_created: number;
           analysis_ids: number[];
           po_numbers: string[];

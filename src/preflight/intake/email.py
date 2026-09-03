@@ -5,7 +5,7 @@ import email.policy
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import parseaddr
+from email.utils import parseaddr, parsedate_to_datetime
 import imaplib
 import logging
 import os
@@ -29,6 +29,31 @@ SUPPORTED_EXTENSIONS = {".xlsx", ".xls", ".csv", ".pdf", ".png", ".jpg", ".jpeg"
 DEFAULT_TEMPLATE_PATH = "examples/templates/PO_MAU.xlsx"
 # A poll runs synchronously, so cap how many messages one call may parse.
 DEFAULT_MAX_MESSAGES = 20
+
+# Attachments are read fully into memory, so refuse anything unreasonable.
+MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024  # 25 MB, matches common provider caps
+MAX_ATTACHMENTS_PER_MESSAGE = 20
+
+# Network calls must never hang the poll loop forever.
+DEFAULT_NETWORK_TIMEOUT = 30
+
+# How many times a failing message is retried before it is given up on. Without
+# a ceiling, a permanently broken mail is retried every cycle and, once the
+# per-poll cap fills with such mail, new orders are never reached.
+MAX_PROCESSING_ATTEMPTS = 3
+
+# Fetch beyond the per-poll cap so that new mail sitting behind a backlog of
+# failed mail can still be prioritised, bounded so a huge mailbox stays cheap.
+FETCH_OVERSCAN = 5
+MAX_FETCH_WINDOW = 200
+
+# Local-parts that indicate an automated mailbox. Replying to one of these can
+# bounce straight back into this inbox and loop forever.
+AUTOMATED_LOCAL_PARTS = frozenset({
+    "mailer-daemon", "postmaster", "noreply", "no-reply", "donotreply",
+    "do-not-reply", "bounce", "bounces", "notification", "notifications",
+    "automailer", "auto-reply", "autoreply",
+})
 
 
 @dataclass
@@ -70,6 +95,23 @@ class EmailIntakeConfig:
         )
 
 
+def _received_sort_key(msg: EmailMessageItem) -> str:
+    """Sortable timestamp for a message, oldest first.
+
+    Falls back to the raw header (then empty) when the date is unparseable, so
+    a malformed Date never breaks ordering for the rest of the mailbox.
+    """
+    try:
+        parsed = parsedate_to_datetime(msg.date_str)
+        if parsed is not None:
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            return parsed.astimezone(UTC).isoformat()
+    except (TypeError, ValueError):
+        pass
+    return msg.date_str or ""
+
+
 @dataclass
 class EmailAttachment:
     filename: str
@@ -95,6 +137,26 @@ class EmailMessageItem:
     body_text: str = ""
     attachments: list[EmailAttachment] = field(default_factory=list)
     raw_uid: str | None = None
+    # Headers set by mailing lists and auto-responders; used to avoid mail loops.
+    auto_submitted: str = ""
+    precedence: str = ""
+    list_id: str = ""
+
+    @property
+    def is_automated(self) -> bool:
+        """True when replying to this message risks a mail loop.
+
+        Bounces, out-of-office responders and list traffic must never receive an
+        auto-reply: the reply bounces back into this same inbox and repeats.
+        """
+        if self.auto_submitted and self.auto_submitted.lower().strip() != "no":
+            return True
+        if self.precedence.lower().strip() in ("bulk", "list", "junk", "auto_reply"):
+            return True
+        if self.list_id:
+            return True
+        local_part = self.sender_email.split("@", 1)[0].lower()
+        return local_part in AUTOMATED_LOCAL_PARTS
 
 
 @dataclass
@@ -102,7 +164,7 @@ class EmailProcessResult:
     message_id: str
     sender_email: str
     subject: str
-    status: str  # "PROCESSED", "PARTIAL", "IGNORED", "ERROR", "DUPLICATE"
+    status: str  # PROCESSED | PARTIAL | IGNORED | ERROR | DUPLICATE | GAVE_UP
     orders_created: int = 0
     analysis_ids: list[int] = field(default_factory=list)
     po_numbers: list[str] = field(default_factory=list)
@@ -151,8 +213,22 @@ class EmailIntakeService:
 
                 if "attachment" in content_disposition or filename:
                     if filename:
+                        if len(attachments) >= MAX_ATTACHMENTS_PER_MESSAGE:
+                            logger.warning(
+                                "Message %s exceeds %d attachments; ignoring the rest.",
+                                msg_id, MAX_ATTACHMENTS_PER_MESSAGE,
+                            )
+                            continue
                         payload = part.get_payload(decode=True)
                         if payload:
+                            # Oversized payloads are already in memory here, but
+                            # dropping them keeps them out of the parser.
+                            if len(payload) > MAX_ATTACHMENT_BYTES:
+                                logger.warning(
+                                    "Skipping oversized attachment '%s' (%d bytes) in %s",
+                                    filename, len(payload), msg_id,
+                                )
+                                continue
                             attachments.append(
                                 EmailAttachment(
                                     filename=filename,
@@ -178,11 +254,17 @@ class EmailIntakeService:
             body_text=body_text,
             attachments=attachments,
             raw_uid=uid,
+            auto_submitted=msg.get("Auto-Submitted", "") or "",
+            precedence=msg.get("Precedence", "") or "",
+            list_id=msg.get("List-Id", "") or "",
         )
 
     def fetch_unread_messages(self, max_messages: int | None = None) -> list[EmailMessageItem]:
         """Connect to IMAP server and fetch UNSEEN messages (at most max_messages)."""
         limit = DEFAULT_MAX_MESSAGES if max_messages is None else max(1, max_messages)
+        # Look past the cap so poll_once can pick fresh mail ahead of a backlog
+        # of previously failed messages before trimming to the cap itself.
+        limit = min(limit * FETCH_OVERSCAN, MAX_FETCH_WINDOW)
 
         if self._imap_client is not None:
             return list(self._imap_client.fetch_messages())[:limit]
@@ -194,20 +276,31 @@ class EmailIntakeService:
         messages: list[EmailMessageItem] = []
         try:
             if self.config.imap_ssl:
-                imap = imaplib.IMAP4_SSL(self.config.imap_host, self.config.imap_port)
+                imap = imaplib.IMAP4_SSL(
+                    self.config.imap_host, self.config.imap_port,
+                    timeout=DEFAULT_NETWORK_TIMEOUT,
+                )
             else:
-                imap = imaplib.IMAP4(self.config.imap_host, self.config.imap_port)
+                imap = imaplib.IMAP4(
+                    self.config.imap_host, self.config.imap_port,
+                    timeout=DEFAULT_NETWORK_TIMEOUT,
+                )
 
             imap.login(self.config.imap_user, self.config.imap_password)
             imap.select(self.config.imap_folder)
 
-            typ, data = imap.search(None, "UNSEEN")
-            if typ == "OK" and data[0]:
-                for num in data[0].split()[:limit]:
-                    typ, msg_data = imap.fetch(num, "(RFC822)")
+            # UID search/fetch: sequence numbers shift as the mailbox changes,
+            # so flagging by them can mark the wrong message.
+            typ, data = imap.uid("SEARCH", None, "UNSEEN")
+            if typ == "OK" and data and data[0]:
+                for uid in data[0].split()[:limit]:
+                    # BODY.PEEK avoids setting \Seen here; the flag is set
+                    # explicitly in mark_processed() only after the message has
+                    # actually been handled, so a crash mid-poll leaves it unread.
+                    typ, msg_data = imap.uid("FETCH", uid, "(BODY.PEEK[])")
                     if typ == "OK" and msg_data and isinstance(msg_data[0], tuple):
                         raw_email = msg_data[0][1]
-                        parsed = self.parse_mime_message(raw_email, uid=num.decode())
+                        parsed = self.parse_mime_message(raw_email, uid=uid.decode())
                         messages.append(parsed)
 
             imap.close()
@@ -224,12 +317,56 @@ class EmailIntakeService:
 
         return messages
 
+    def mark_processed(self, uids: list[str]) -> int:
+        """Flag handled messages as \\Seen so later polls skip them.
+
+        Without this the same mail is re-fetched every cycle, and once the
+        per-poll cap fills with old messages, genuinely new orders are never
+        reached. Returns how many UIDs were flagged.
+        """
+        if not uids:
+            return 0
+
+        if self._imap_client is not None:
+            marker = getattr(self._imap_client, "mark_seen", None)
+            return marker(uids) if marker else 0
+
+        if not self.config.imap_host or not self.config.imap_user:
+            return 0
+
+        try:
+            if self.config.imap_ssl:
+                imap = imaplib.IMAP4_SSL(
+                    self.config.imap_host, self.config.imap_port,
+                    timeout=DEFAULT_NETWORK_TIMEOUT,
+                )
+            else:
+                imap = imaplib.IMAP4(
+                    self.config.imap_host, self.config.imap_port,
+                    timeout=DEFAULT_NETWORK_TIMEOUT,
+                )
+            imap.login(self.config.imap_user, self.config.imap_password)
+            imap.select(self.config.imap_folder)
+            typ, _ = imap.uid("STORE", ",".join(uids), "+FLAGS", "(\\Seen)")
+            imap.close()
+            imap.logout()
+            if typ != "OK":
+                logger.warning("IMAP refused to flag UIDs %s as Seen", uids)
+                return 0
+            return len(uids)
+        except Exception as exc:
+            # Non-fatal: the orders are already saved, and idempotency stops a
+            # re-poll from duplicating them.
+            logger.error("Could not flag messages as Seen: %s", exc)
+            return 0
+
     def send_auto_reply(
         self,
         to_email: str,
         subject: str,
         body: str,
         attachment_path: str | Path | None = None,
+        in_reply_to: str | None = None,
     ) -> bool:
         """Send automated response via SMTP or mock."""
         if not to_email:
@@ -247,6 +384,14 @@ class EmailIntakeService:
             msg["From"] = self.config.smtp_from
             msg["To"] = to_email
             msg["Subject"] = subject
+            # Mark this as machine-generated so well-behaved responders on the
+            # far side do not reply to it and start a loop.
+            msg["Auto-Submitted"] = "auto-replied"
+            msg["X-Auto-Response-Suppress"] = "All"
+            if in_reply_to:
+                # Keeps the reply in the customer's original mail thread.
+                msg["In-Reply-To"] = f"<{in_reply_to}>"
+                msg["References"] = f"<{in_reply_to}>"
             msg.attach(MIMEText(body, "plain", "utf-8"))
 
             if attachment_path and Path(attachment_path).exists():
@@ -257,9 +402,15 @@ class EmailIntakeService:
                 msg.attach(part)
 
             if self.config.smtp_ssl:
-                server = smtplib.SMTP_SSL(self.config.smtp_host, self.config.smtp_port)
+                server = smtplib.SMTP_SSL(
+                    self.config.smtp_host, self.config.smtp_port,
+                    timeout=DEFAULT_NETWORK_TIMEOUT,
+                )
             else:
-                server = smtplib.SMTP(self.config.smtp_host, self.config.smtp_port)
+                server = smtplib.SMTP(
+                    self.config.smtp_host, self.config.smtp_port,
+                    timeout=DEFAULT_NETWORK_TIMEOUT,
+                )
                 server.starttls()
 
             if self.config.smtp_user and self.config.smtp_password:
@@ -282,6 +433,24 @@ class EmailIntakeService:
         existing_log = self.store.get_email_inbox_log(msg.message_id)
         # PARTIAL counts as processed: some orders were already recorded, so a
         # re-poll must not duplicate them. ERROR is retried (nothing landed).
+        attempts = int(existing_log.get("attempts", 0)) if existing_log else 0
+        if existing_log and existing_log.get("status") == "ERROR" and attempts >= MAX_PROCESSING_ATTEMPTS:
+            # Give up rather than retry forever; a human needs to look at it.
+            logger.warning(
+                "Message %s failed %d times; giving up.", msg.message_id, attempts
+            )
+            return EmailProcessResult(
+                message_id=msg.message_id,
+                sender_email=msg.sender_email,
+                subject=msg.subject,
+                status="GAVE_UP",
+                orders_created=0,
+                error_message=(
+                    f"Đã thử xử lý {attempts} lần không thành công. "
+                    f"Cần nhân viên kiểm tra thủ công."
+                ),
+            )
+
         if existing_log and existing_log.get("status") in ("PROCESSED", "PARTIAL", "IGNORED"):
             logger.info("Email message %s already processed. Skipping.", msg.message_id)
             return EmailProcessResult(
@@ -292,14 +461,38 @@ class EmailIntakeService:
                 orders_created=existing_log.get("orders_created", 0),
             )
 
-        # 2. Resolve Customer by sender email
+        # 2. Never auto-reply to bounces, vacation responders or list traffic:
+        #    the reply lands back in this inbox and loops. Log and move on.
+        if msg.is_automated:
+            logger.info("Skipping automated message %s from %s", msg.message_id, msg.sender_email)
+            self.store.record_email_inbox_log(
+                message_id=msg.message_id,
+                sender=msg.sender_email,
+                subject=msg.subject,
+                received_at=msg.date_str,
+                attachments_count=len(msg.attachments),
+                orders_created=0,
+                status="IGNORED",
+                error_message="Thư tự động (bounce/auto-reply/mailing list) - không xử lý, không trả lời.",
+            )
+            return EmailProcessResult(
+                message_id=msg.message_id,
+                sender_email=msg.sender_email,
+                subject=msg.subject,
+                status="IGNORED",
+                orders_created=0,
+                error_message="Thư tự động - bỏ qua để tránh vòng lặp email.",
+                auto_reply_sent=False,
+            )
+
+        # 3. Resolve Customer by sender email
         matched_customer = self.store.get_customer_by_contact_email(msg.sender_email)
         resolved_customer_name = matched_customer.name if matched_customer else None
 
-        # 3. Filter valid attachments
+        # 4. Filter valid attachments
         valid_attachments = [a for a in msg.attachments if a.is_supported]
 
-        # 4. Handle case with NO valid attachments (e.g. .docx or empty mail)
+        # 5. Handle case with NO valid attachments (e.g. .docx or empty mail)
         if not valid_attachments:
             err_msg = "Không tìm thấy file đính kèm hợp lệ (.xlsx, .xls, .csv, .pdf, .json, ảnh)."
             self.store.record_email_inbox_log(
@@ -329,6 +522,7 @@ class EmailIntakeService:
                 subject=reply_subject,
                 body=reply_body,
                 attachment_path=template_file,
+                in_reply_to=msg.message_id,
             )
 
             return EmailProcessResult(
@@ -342,7 +536,7 @@ class EmailIntakeService:
                 customer_resolved=resolved_customer_name,
             )
 
-        # 5. Process valid attachments
+        # 6. Process valid attachments
         orders_created = 0
         analysis_ids: list[int] = []
         po_numbers: list[str] = []
@@ -425,7 +619,7 @@ class EmailIntakeService:
                 except Exception:
                     logger.warning("Could not persist attachment error for '%s'", attachment.filename)
 
-        # 6. Record log & Send auto-reply reflecting the real outcome
+        # 7. Record log & Send auto-reply reflecting the real outcome
         failed_lines = "".join(
             f"- {name}: {reason}\n" for name, reason in failed_attachments
         )
@@ -484,6 +678,7 @@ class EmailIntakeService:
                 subject=reply_subject,
                 body=reply_body,
                 attachment_path=template_file,
+                in_reply_to=msg.message_id,
             )
 
             return EmailProcessResult(
@@ -529,6 +724,7 @@ class EmailIntakeService:
                 subject=f"Re: {msg.subject} - Không tiếp nhận được đơn hàng",
                 body=reply_body,
                 attachment_path=template_file,
+                in_reply_to=msg.message_id,
             )
 
             return EmailProcessResult(
@@ -550,8 +746,47 @@ class EmailIntakeService:
     ) -> list[EmailProcessResult]:
         """Fetch unread messages (up to max_messages) and process them sequentially."""
         messages = self.fetch_unread_messages(max_messages=max_messages)
+
+        cap = DEFAULT_MAX_MESSAGES if max_messages is None else max(1, max_messages)
+
+        # Split by whether this mailbox has been seen before. A backlog of
+        # unreadable mail must never consume the whole per-poll budget, or a
+        # new order sitting behind it waits cycle after cycle.
+        fresh: list[EmailMessageItem] = []
+        retried: list[EmailMessageItem] = []
+        for m in messages:
+            log = self.store.get_email_inbox_log(m.message_id)
+            (retried if log else fresh).append(m)
+
+        # Newest first among unseen mail. An old message still sitting unread
+        # has usually already failed to parse on a previous cycle, so serving
+        # today's orders first keeps the queue responsive; the older ones still
+        # get their turn from the remaining budget and the retry lane.
+        fresh.sort(key=_received_sort_key, reverse=True)
+        retried.sort(key=_received_sort_key)
+
+        # Reserve most of the budget for first-time mail, but always leave room
+        # to retry, so transient failures still get another attempt.
+        retry_budget = max(1, cap // 4)
+        selected = fresh[: cap - retry_budget]
+        selected += retried[: cap - len(selected)]
+        # Any budget the retry queue did not use goes back to fresh mail.
+        if len(selected) < cap:
+            already = {id(m) for m in selected}
+            selected += [m for m in fresh if id(m) not in already][: cap - len(selected)]
+
+        messages = selected
+
         results: list[EmailProcessResult] = []
+        handled_uids: list[str] = []
+
         for msg in messages:
             res = self.process_message(msg, catalog_path=catalog_path)
             results.append(res)
+            # An ERROR is retryable, so leave it unread for the next poll.
+            # Everything else is settled and must not be picked up again.
+            if msg.raw_uid and res.status != "ERROR":  # GAVE_UP included: stop retrying
+                handled_uids.append(msg.raw_uid)
+
+        self.mark_processed(handled_uids)
         return results

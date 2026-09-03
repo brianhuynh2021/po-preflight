@@ -77,16 +77,25 @@ export function SettingsView() {
       const res = await api.emailIntake.poll();
       const totalCreated = res.results.reduce((acc, curr) => acc + curr.orders_created, 0);
       const failed = res.results.flatMap((r) => r.failed_attachments);
+      // Messages abandoned after repeated failures need a human, so they must
+      // be called out rather than folded into the attachment error list.
+      const gaveUp = res.results.filter((r) => r.status === "GAVE_UP");
       // A partial result must not be reported as a clean success: the sender
       // was told which files failed, and the operator needs to see them too.
       setEmailFeedback(
-        failed.length > 0
+        failed.length > 0 || gaveUp.length > 0
           ? {
               type: "warning",
               message:
                 `Đã quét ${res.processed_count} thư, tiếp nhận ${totalCreated} đơn hàng. ` +
-                `${failed.length} tệp không đọc được: ` +
-                failed.map((f) => `${f.filename} (${f.error})`).join("; "),
+                (failed.length > 0
+                  ? `${failed.length} tệp không đọc được: ` +
+                    failed.map((f) => `${f.filename} (${f.error})`).join("; ") + ". "
+                  : "") +
+                (gaveUp.length > 0
+                  ? `${gaveUp.length} thư đã thử nhiều lần không thành công, cần kiểm tra thủ công: ` +
+                    gaveUp.map((r) => r.subject).join("; ")
+                  : ""),
             }
           : {
               type: "success",

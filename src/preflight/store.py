@@ -277,6 +277,7 @@ CREATE TABLE IF NOT EXISTS email_inbox_logs (
     orders_created INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL,
     error_message TEXT,
+    attempts INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_email_inbox_msg_id ON email_inbox_logs(message_id);
@@ -535,6 +536,7 @@ CREATE TABLE IF NOT EXISTS email_inbox_logs (
     orders_created INTEGER NOT NULL DEFAULT 0,
     status VARCHAR(32) NOT NULL,
     error_message TEXT,
+    attempts INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_pg_email_inbox_msg_id ON email_inbox_logs(message_id);
@@ -957,6 +959,12 @@ class AuditStore(BaseAuditStore):
                 pass
             try:
                 self.connection.execute("ALTER TABLE users ADD COLUMN locked_until TEXT;")
+            except Exception:
+                pass
+            try:
+                self.connection.execute(
+                    "ALTER TABLE email_inbox_logs ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1;"
+                )
             except Exception:
                 pass
             self.connection.executescript(SQLITE_SCHEMA)
@@ -2102,12 +2110,13 @@ class AuditStore(BaseAuditStore):
             now = datetime.now(UTC).isoformat()
             self.connection.execute(
                 """
-                INSERT INTO email_inbox_logs (message_id, sender, subject, received_at, attachments_count, orders_created, status, error_message, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO email_inbox_logs (message_id, sender, subject, received_at, attachments_count, orders_created, status, error_message, attempts, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
                 ON CONFLICT(message_id) DO UPDATE SET
                     status = excluded.status,
                     orders_created = excluded.orders_created,
-                    error_message = excluded.error_message
+                    error_message = excluded.error_message,
+                    attempts = email_inbox_logs.attempts + 1
                 """,
                 (message_id, sender, subject, received_at, attachments_count, orders_created, status, error_message, now),
             )
@@ -4060,12 +4069,13 @@ class PostgresAuditStore(BaseAuditStore):
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO email_inbox_logs (message_id, sender, subject, received_at, attachments_count, orders_created, status, error_message, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    INSERT INTO email_inbox_logs (message_id, sender, subject, received_at, attachments_count, orders_created, status, error_message, attempts, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, CURRENT_TIMESTAMP)
                     ON CONFLICT(message_id) DO UPDATE SET
                         status = EXCLUDED.status,
                         orders_created = EXCLUDED.orders_created,
-                        error_message = EXCLUDED.error_message
+                        error_message = EXCLUDED.error_message,
+                        attempts = email_inbox_logs.attempts + 1
                     """,
                     (message_id, sender, subject, received_at, attachments_count, orders_created, status, error_message),
                 )

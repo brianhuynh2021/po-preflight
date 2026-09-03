@@ -5,7 +5,8 @@ import json
 import os
 import tempfile
 import unittest
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
+from email.utils import format_datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -14,6 +15,7 @@ from fastapi.testclient import TestClient
 
 from preflight.api.app import app
 from preflight.intake.email import (
+    MAX_ATTACHMENT_BYTES,
     EmailAttachment,
     EmailIntakeConfig,
     EmailIntakeService,
@@ -60,11 +62,18 @@ class MockSMTPClient:
 
 
 class MockIMAPClient:
+    """Mailbox mock that honours \\Seen, so re-polling behaves like a real server."""
+
     def __init__(self, messages: list[EmailMessageItem] | None = None):
         self.messages = messages or []
+        self.seen: set[str] = set()
 
     def fetch_messages(self) -> list[EmailMessageItem]:
-        return list(self.messages)
+        return [m for m in self.messages if m.raw_uid not in self.seen]
+
+    def mark_seen(self, uids: list[str]) -> int:
+        self.seen.update(uids)
+        return len(uids)
 
 
 class TestEmailIntake(unittest.TestCase):
@@ -336,6 +345,185 @@ class TestEmailIntake(unittest.TestCase):
 
         results = service.poll_once(catalog_path=self.catalog_path, max_messages=3)
         self.assertEqual(len(results), 3)
+
+    def test_automated_sender_is_never_auto_replied(self):
+        """A bounce must not be answered, or the reply loops back into this inbox."""
+        for sender, label in [
+            ("MAILER-DAEMON@googlemail.com", "bounce"),
+            ("noreply@somebank.vn", "noreply"),
+        ]:
+            with self.subTest(sender=label):
+                msg = EmailMessageItem(
+                    message_id=f"auto-{label}@x.vn",
+                    sender_name="Mail Delivery System",
+                    sender_email=sender,
+                    subject="Delivery Status Notification (Failure)",
+                    date_str=datetime.now(UTC).isoformat(),
+                    attachments=[],
+                )
+                res = self.service.process_message(msg, catalog_path=self.catalog_path)
+                self.assertEqual(res.status, "IGNORED")
+                self.assertFalse(res.auto_reply_sent)
+
+        # Header-flagged auto-responders are caught even from a normal address.
+        vacation = EmailMessageItem(
+            message_id="auto-vacation@x.vn",
+            sender_name="Nguoi Dung",
+            sender_email="orders@northstar.vn",
+            subject="Out of office",
+            date_str=datetime.now(UTC).isoformat(),
+            attachments=[],
+            auto_submitted="auto-replied",
+        )
+        res = self.service.process_message(vacation, catalog_path=self.catalog_path)
+        self.assertEqual(res.status, "IGNORED")
+        self.assertFalse(res.auto_reply_sent)
+
+        # Nothing at all should have been sent across every case above.
+        self.assertEqual(self.smtp_client.sent_messages, [])
+
+    def test_processed_messages_are_flagged_seen(self):
+        """Handled mail must be flagged, or every poll re-fetches it forever."""
+        good = create_sample_po_xlsx_bytes("PO-SEEN-001", "MOUSE-WL", 1)
+        msg = EmailMessageItem(
+            message_id="msg-seen-01@northstar.vn",
+            sender_name="Purchasing Team",
+            sender_email="orders@northstar.vn",
+            subject="Đơn hàng cần đánh dấu",
+            date_str=datetime.now(UTC).isoformat(),
+            raw_uid="11",
+            attachments=[EmailAttachment(filename="PO.xlsx", content_bytes=good)],
+        )
+        imap = MockIMAPClient([msg])
+        service = EmailIntakeService(
+            store=self.store, smtp_client=MockSMTPClient(), imap_client=imap
+        )
+
+        first = service.poll_once(catalog_path=self.catalog_path)
+        self.assertEqual(len(first), 1)
+        self.assertEqual(first[0].status, "PROCESSED")
+        self.assertIn("11", imap.seen)
+
+        # The mailbox no longer offers it, so the next poll has nothing to do.
+        self.assertEqual(service.poll_once(catalog_path=self.catalog_path), [])
+
+    def test_failed_message_is_retried_then_given_up(self):
+        """A broken message retries a bounded number of times, then stops."""
+        msg = EmailMessageItem(
+            message_id="msg-retry-01@x.vn",
+            sender_name="Khach",
+            sender_email="customer@unknown.vn",
+            subject="Tệp hỏng",
+            date_str=datetime.now(UTC).isoformat(),
+            raw_uid="21",
+            attachments=[EmailAttachment(filename="bad.xlsx", content_bytes=b"BROKEN")],
+        )
+        imap = MockIMAPClient([msg])
+        service = EmailIntakeService(
+            store=self.store, smtp_client=MockSMTPClient(), imap_client=imap
+        )
+
+        # Failures stay unread so they can be retried.
+        for _ in range(3):
+            res = service.poll_once(catalog_path=self.catalog_path)
+            self.assertEqual(res[0].status, "ERROR")
+            self.assertNotIn("21", imap.seen)
+
+        # Once the ceiling is hit the message is abandoned and flagged, so it
+        # stops occupying the queue.
+        res = service.poll_once(catalog_path=self.catalog_path)
+        self.assertEqual(res[0].status, "GAVE_UP")
+        self.assertIn("21", imap.seen)
+
+    def test_new_order_is_not_starved_by_a_backlog_of_broken_mail(self):
+        """A fresh PO must be processed even behind a large backlog of bad mail.
+
+        Regression: the poll cap used to fill with unreadable mail every cycle,
+        so a newly arrived order was never reached at all.
+        """
+        base = datetime.now(UTC) - timedelta(days=2)
+        backlog = [
+            EmailMessageItem(
+                message_id=f"old-{i}@x.vn",
+                sender_name="X",
+                sender_email="someone@unknown.vn",
+                subject=f"Tệp hỏng {i}",
+                date_str=format_datetime(base + timedelta(minutes=i)),
+                raw_uid=str(i),
+                attachments=[EmailAttachment(filename=f"bad{i}.xlsx", content_bytes=b"BROKEN")],
+            )
+            for i in range(50)
+        ]
+        imap = MockIMAPClient(backlog)
+        service = EmailIntakeService(
+            store=self.store, smtp_client=MockSMTPClient(), imap_client=imap
+        )
+        service.poll_once(catalog_path=self.catalog_path)
+
+        # The customer sends a real order into that backlog.
+        fresh = EmailMessageItem(
+            message_id="new-order@northstar.vn",
+            sender_name="Purchasing Team",
+            sender_email="orders@northstar.vn",
+            subject="ĐƠN HÀNG MỚI",
+            date_str=format_datetime(datetime.now(UTC)),
+            raw_uid="999",
+            attachments=[
+                EmailAttachment(
+                    filename="PO.xlsx",
+                    content_bytes=create_sample_po_xlsx_bytes("PO-FRESH-001", "MOUSE-WL", 2),
+                )
+            ],
+        )
+        imap.messages.append(fresh)
+
+        results = service.poll_once(catalog_path=self.catalog_path)
+        processed = [r for r in results if r.message_id == "new-order@northstar.vn"]
+        self.assertEqual(len(processed), 1, "đơn mới phải được xử lý ngay chu kỳ kế tiếp")
+        self.assertEqual(processed[0].status, "PROCESSED")
+
+    def test_backlog_eventually_drains(self):
+        """Retries must still make progress, not be starved by fresh mail."""
+        base = datetime.now(UTC) - timedelta(days=2)
+        backlog = [
+            EmailMessageItem(
+                message_id=f"drain-{i}@x.vn",
+                sender_name="X",
+                sender_email="someone@unknown.vn",
+                subject=f"Tệp hỏng {i}",
+                date_str=format_datetime(base + timedelta(minutes=i)),
+                raw_uid=str(i),
+                attachments=[EmailAttachment(filename=f"bad{i}.xlsx", content_bytes=b"BROKEN")],
+            )
+            for i in range(30)
+        ]
+        imap = MockIMAPClient(backlog)
+        service = EmailIntakeService(
+            store=self.store, smtp_client=MockSMTPClient(), imap_client=imap
+        )
+
+        for _ in range(20):
+            if not imap.fetch_messages():
+                break
+            service.poll_once(catalog_path=self.catalog_path)
+
+        self.assertEqual(imap.fetch_messages(), [], "tồn đọng phải được dọn hết")
+
+    def test_oversized_attachment_is_skipped(self):
+        """A huge attachment must not be handed to the parser."""
+        oversized = b"x" * (MAX_ATTACHMENT_BYTES + 1)
+        raw = (
+            b"From: Khach <customer@unknown.vn>\r\n"
+            b"Subject: PO lon\r\n"
+            b'Content-Type: multipart/mixed; boundary="B"\r\n\r\n'
+            b"--B\r\n"
+            b"Content-Type: application/octet-stream\r\n"
+            b'Content-Disposition: attachment; filename="huge.xlsx"\r\n\r\n'
+            + oversized
+            + b"\r\n--B--\r\n"
+        )
+        parsed = self.service.parse_mime_message(raw)
+        self.assertEqual(parsed.attachments, [])
 
     def test_email_intake_api_routes(self):
         """Test GET /api/v1/intake/email/status and POST /api/v1/intake/email/poll."""
