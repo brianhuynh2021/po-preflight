@@ -14,6 +14,7 @@ import type {
   OrderDetail,
   OrderSummary,
   OutboxStats,
+  PilotReportResponse,
   RuleConfig,
   SKUMatchResult,
   SystemModes,
@@ -555,6 +556,32 @@ export function createApiClient(config: ClientConfig = {}) {
     getLogs: (limit = 50) => request<Array<Record<string, unknown>>>(`/api/v1/intake/email/logs?limit=${limit}`),
   };
 
+  const reports = {
+    getPilotReport: (fromDate?: string, toDate?: string): Promise<PilotReportResponse> => {
+      const q = new URLSearchParams();
+      if (fromDate) q.set("from_date", fromDate);
+      if (toDate) q.set("to_date", toDate);
+      const qs = q.toString();
+      return request<PilotReportResponse>(`/api/v1/reports/pilot${qs ? `?${qs}` : ""}`);
+    },
+    exportPilotCsvUrl: (fromDate?: string, toDate?: string): string => {
+      const q = new URLSearchParams();
+      if (fromDate) q.set("from_date", fromDate);
+      if (toDate) q.set("to_date", toDate);
+      const qs = q.toString();
+      return `${baseUrl}/api/v1/reports/pilot.csv${qs ? `?${qs}` : ""}`;
+    },
+    sendWeeklyEmail: (toEmail?: string): Promise<{ success: boolean; mode: string; message: string }> => {
+      const q = new URLSearchParams();
+      if (toEmail) q.set("to_email", toEmail);
+      const qs = q.toString();
+      return request<{ success: boolean; mode: string; message: string }>(
+        `/api/v1/reports/send-weekly-email${qs ? `?${qs}` : ""}`,
+        { method: "POST" },
+      );
+    },
+  };
+
   return {
     auth,
     orders,
@@ -575,6 +602,7 @@ export function createApiClient(config: ClientConfig = {}) {
     system,
     health,
     emailIntake,
+    reports,
     connectRealtimeStream,
   };
 }

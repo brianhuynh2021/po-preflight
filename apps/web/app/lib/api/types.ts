@@ -393,3 +393,67 @@ export interface UpdateUserPayload {
   is_active?: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Pilot Telemetry & KPI Report Schemas
+// ---------------------------------------------------------------------------
+export interface PilotReportSummary {
+  total_orders_received: number;
+  total_orders_approved: number;
+  total_orders_rejected: number;
+  total_orders_needs_changes: number;
+  total_orders_blocked: number;
+  total_orders_review_required: number;
+  total_orders_ready: number;
+  total_value_processed: number;
+  total_lines_processed: number;
+  lines_corrected_count: number;
+  lines_corrected_rate_pct: number;
+  avg_intake_to_analyzed_seconds: number;
+  avg_analyzed_to_decision_minutes: number;
+  orders_blocked_before_erp: number;
+  duplicate_po_count: number;
+  estimated_hours_saved: number;
+  avg_cost_per_order_usd: number;
+  total_cost_usd: number;
+  automation_rate_pct: number;
+}
+
+export interface PilotDailyTrend {
+  date: string;
+  received: number;
+  approved: number;
+  blocked: number;
+  value: number;
+}
+
+export interface PilotOrderSample {
+  po_number: string;
+  customer: string;
+  status: string;
+  total: number;
+  currency: string;
+  created_at: string;
+  lines_count: number;
+  findings_count: number;
+  decision_minutes: number | null;
+  cost_usd: number;
+}
+
+export interface PilotReportResponse {
+  period: {
+    from: string;
+    to: string;
+  };
+  summary: PilotReportSummary;
+  findings_distribution: Record<string, number>;
+  rag_tier_breakdown: {
+    exact_hash: number;
+    lexical_fuzzy: number;
+    semantic_vector: number;
+    llm_fallback: number;
+  };
+  daily_trends: PilotDailyTrend[];
+  orders_sample: PilotOrderSample[];
+}
+
+

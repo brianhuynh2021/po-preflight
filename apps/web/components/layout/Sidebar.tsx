@@ -15,6 +15,7 @@ import {
   Settings,
   LogOut,
   ChevronDown,
+  BarChart3,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -51,6 +52,7 @@ export function Sidebar() {
       items: [
         { label: "Tổng quan", href: "/overview", icon: LayoutDashboard },
         { label: "Đơn hàng", href: "/orders", icon: FileText },
+        { label: "Báo cáo Pilot", href: "/reports", icon: BarChart3 },
         { label: "Khách hàng", href: "/customers", icon: Users },
         { label: "Danh mục sản phẩm", href: "/catalog", icon: Package },
         { label: "Nhật ký kiểm toán", href: "/audit-log", icon: History },

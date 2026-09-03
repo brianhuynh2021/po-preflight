@@ -31,6 +31,7 @@ from preflight.api.routes import (
     matcher,
     metrics,
     orders,
+    reports,
     rules,
     system,
     users,
@@ -214,6 +215,7 @@ app.include_router(audit.router)
 app.include_router(system.router)
 app.include_router(users.router)
 app.include_router(leads.router)
+app.include_router(reports.router)
 
 
 from fastapi.exceptions import RequestValidationError

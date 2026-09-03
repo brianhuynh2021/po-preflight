@@ -169,3 +169,13 @@ test("renders the Mobile Minimal Approval view at /m/orders/PO-10428", async () 
   const html = await response.text();
   assert.match(html, /Đang tải thông tin đơn hàng|PO Preflight Mobile/);
 });
+
+test("renders the Pilot Reports view at /reports", async () => {
+  const response = await render("/reports");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Báo Cáo Đo Lường Pilot Vận Hành|Pilot Report/);
+  assert.match(html, /Thời gian tiết kiệm/);
+  assert.match(html, /Xuất CSV Báo cáo/);
+});
+
