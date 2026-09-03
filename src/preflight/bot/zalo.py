@@ -13,25 +13,65 @@ from preflight.bot.schemas import BotNotificationResult
 from preflight.store import BaseAuditStore
 
 
+VI_FINDING_MAP = {
+    "PRICE_MISMATCH": "Lệch giá niêm yết",
+    "INSUFFICIENT_STOCK": "Thiếu tồn kho",
+    "UNKNOWN_SKU": "Mã SKU lạ",
+    "INACTIVE_SKU": "Ngừng kinh doanh",
+    "DUPLICATE_PO": "Trùng số PO",
+    "CUSTOMER_BLOCKED": "Khóa tín dụng",
+    "CREDIT_LIMIT_EXCEEDED": "Vượt hạn mức nợ",
+    "INVALID_PACK_SIZE": "Sai quy cách đóng gói",
+    "MOQ_VIOLATION": "Dưới mức đặt tối thiểu (MOQ)",
+}
+
+
 def format_zalo_notification(order: dict[str, Any], web_base_url: str = "http://localhost:3000") -> dict[str, Any]:
-    """Format Zalo ZNS / Official Account transaction message payload."""
+    """Format Zalo ZNS / Official Account transaction message payload with VAT and severity breakdown."""
     po_num = order.get("po_number", "N/A")
     cust = order.get("customer", "N/A")
     status = order.get("status", "review_required")
     risk = order.get("risk_level", "MEDIUM")
-    total_val = order.get("total_value", 0)
+    subtotal = float(order.get("total_value", order.get("total", 0)))
     curr = order.get("currency", "VND")
     findings = order.get("findings", [])
+    if not findings and order.get("findings_json"):
+        try:
+            findings = json.loads(order["findings_json"])
+        except Exception:
+            findings = []
+
+    # VAT / Grand total after tax
+    vat_rate = float(order.get("tax_rate", 0.10))
+    grand_total = float(order.get("grand_total") or order.get("total_after_tax") or (subtotal * (1.0 + vat_rate)))
+
+    # Severity counts
+    err_count = sum(1 for f in findings if f.get("severity") == "error")
+    warn_count = sum(1 for f in findings if f.get("severity") == "warning")
+
+    # 3 first findings in Vietnamese
+    vi_findings_summary = []
+    for f in findings[:3]:
+        code = str(f.get("code", ""))
+        vi_name = VI_FINDING_MAP.get(code, f.get("message", code))
+        vi_findings_summary.append(vi_name)
+    findings_str = ", ".join(vi_findings_summary) if vi_findings_summary else "Hợp lệ"
+
+    subtitle_text = f"Khách: {cust} | Sau thuế: {grand_total:,.0f} {curr} | Vi phạm: {err_count} lỗi, {warn_count} cảnh báo ({findings_str})"
 
     return {
         "template_id": "PO_PREFLIGHT_ALERT_TEMPLATE",
         "template_data": {
             "order_code": po_num,
             "customer_name": cust,
-            "total_amount": f"{total_val:,.0f} {curr}",
+            "subtotal_amount": f"{subtotal:,.0f} {curr}",
+            "total_amount": f"{grand_total:,.0f} {curr}",
             "status": status.upper(),
             "risk_level": risk,
+            "error_count": str(err_count),
+            "warning_count": str(warn_count),
             "violation_count": str(len(findings)),
+            "findings_vietnamese": findings_str,
             "action_url": f"{web_base_url}/orders?search={po_num}",
         },
         "recipient": {"user_id": "MANAGER_ZALO_UID"},
@@ -47,7 +87,7 @@ def format_zalo_notification(order: dict[str, Any], web_base_url: str = "http://
                         }
                     ],
                     "title": f"📋 PO Preflight Alert — {po_num}",
-                    "subtitle": f"Khách: {cust} | {total_val:,.0f} {curr} | Trạng thái: {status.upper()}",
+                    "subtitle": subtitle_text[:120],
                     "buttons": [
                         {
                             "title": "✅ Duyệt Đơn",

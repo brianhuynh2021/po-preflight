@@ -4,6 +4,8 @@ import os
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+import time
+from pydantic import BaseModel, Field
 from preflight.api.deps import get_store
 from preflight.api.events import event_bus
 from preflight.bot.schemas import BotConfigStatus, BotNotificationResult, TelegramUpdate
@@ -13,6 +15,36 @@ from preflight.security.rbac import Role, UserPrincipal, require_role
 from preflight.store import AuditStore
 
 router = APIRouter(prefix="/api/v1/bot", tags=["Multi-Channel Approval Bots (Telegram & Zalo)"])
+
+
+class LinkCodeResponse(BaseModel):
+    code: str = Field(..., description="6-character alphanumeric linking code")
+    expires_in: int = Field(600, description="Lifetime in seconds (10 minutes)")
+    instructions: str = Field(..., description="Usage instructions")
+
+
+@router.post(
+    "/link-code",
+    response_model=LinkCodeResponse,
+    summary="Generate Self-Service Channel Linking Code",
+    description="Generate a secure 6-character code valid for 10 minutes to link Telegram or Zalo accounts.",
+)
+def generate_channel_link_code(
+    user: UserPrincipal = Depends(require_role(Role.VIEWER)),
+    store: AuditStore = Depends(get_store),
+) -> LinkCodeResponse:
+    role_val = user.role.name if hasattr(user.role, "name") else str(user.role)
+    code = store.create_channel_link_code(
+        user_id=user.username,
+        display_name=getattr(user, "display_name", None) or user.username,
+        role=role_val,
+        expires_in_seconds=600,
+    )
+    return LinkCodeResponse(
+        code=code,
+        expires_in=600,
+        instructions="Gửi lệnh /link <MÃ> cho PO Preflight Telegram Bot để liên kết tài khoản.",
+    )
 
 
 @router.get(
@@ -190,10 +222,62 @@ async def telegram_webhook(
             "result": result,
         }
 
-    # 2. Handle Text Command (e.g. /status, /orders)
+    # 2. Handle Text Command (e.g. /status, /orders, /link)
     if "message" in body and "text" in body["message"]:
         text = body["message"]["text"].strip()
         chat_id = body["message"]["chat"]["id"]
+
+        if text.startswith("/link"):
+            parts = text.split(None, 1)
+            from_user = body["message"].get("from", {})
+            from_user_id = str(from_user.get("id", ""))
+
+            if len(parts) < 2 or not parts[1].strip():
+                reply = "Cú pháp: <code>/link &lt;MÃ_LIÊN_KẾT&gt;</code>. Lấy mã liên kết tại Cài đặt tài khoản trên Web Portal."
+                return {
+                    "ok": True,
+                    "handled_event": "link_command",
+                    "reply": reply,
+                    "linked": False,
+                }
+
+            link_code = parts[1].strip()
+            res = store.consume_channel_link_code(link_code)
+            if not res:
+                reply = "❌ Mã liên kết không hợp lệ hoặc đã được sử dụng. Vui lòng tạo mã mới trên Web Portal."
+                return {
+                    "ok": True,
+                    "handled_event": "link_command",
+                    "reply": reply,
+                    "linked": False,
+                    "error": "INVALID_CODE",
+                }
+            if res.get("expired"):
+                reply = "⚠️ Mã liên kết đã hết hạn (chỉ có hiệu lực trong 10 phút). Vui lòng tạo mã mới trên Web Portal."
+                return {
+                    "ok": True,
+                    "handled_event": "link_command",
+                    "reply": reply,
+                    "linked": False,
+                    "error": "EXPIRED_CODE",
+                }
+
+            store.upsert_channel_identity(
+                channel="telegram",
+                external_id=from_user_id,
+                user_id=res["user_id"],
+                display_name=res["display_name"],
+                role=res["role"],
+            )
+            reply = f"✅ Liên kết tài khoản thành công! Xin chào <b>{res['display_name']}</b> (Vai trò: <code>{res['role']}</code>)."
+            return {
+                "ok": True,
+                "handled_event": "link_command",
+                "reply": reply,
+                "linked": True,
+                "user_id": res["user_id"],
+                "role": res["role"],
+            }
 
         if text.startswith("/orders"):
             orders = store.list_orders(limit=5)
@@ -237,7 +321,7 @@ def send_zalo_alert(
 @router.post(
     "/zalo/webhook",
     summary="Zalo OA Webhook Receiver",
-    description="Receive user button click events from Zalo OA with HMAC-SHA256 signature verification.",
+    description="Receive user button click events from Zalo OA with HMAC-SHA256 signature and anti-replay verification.",
 )
 async def zalo_webhook(
     request: Request,
@@ -246,6 +330,23 @@ async def zalo_webhook(
     raw_body = await request.body()
     signature = request.headers.get("X-Zalo-Signature", "")
     timestamp = request.headers.get("X-Zalo-Timestamp", "")
+
+    # 1. Verify timestamp is within ±5 minutes (300 seconds)
+    if timestamp:
+        try:
+            ts_val = float(timestamp)
+            if ts_val > 1e11:
+                ts_val = ts_val / 1000.0
+            if abs(time.time() - ts_val) > 300.0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Zalo webhook timestamp outside valid ±5 minutes window.",
+                )
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Zalo webhook timestamp.",
+            )
 
     zalo_service = ZaloBotService(store=store)
 
@@ -262,6 +363,13 @@ async def zalo_webhook(
         body = await request.json()
     except Exception:
         body = {}
+
+    # 2. Anti-replay deduplication: check and record event_id
+    event_id = str(body.get("event_id") or body.get("message", {}).get("msg_id") or "")
+    if event_id:
+        is_fresh = store.record_processed_webhook_event(channel="zalo", event_id=event_id)
+        if not is_fresh:
+            return {"ok": True, "status": "ignored", "reason": "replay_detected"}
 
     result = zalo_service.process_webhook_event(body)
 

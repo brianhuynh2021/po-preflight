@@ -66,6 +66,20 @@ CREATE TABLE IF NOT EXISTS channel_identities (
     created_at TEXT NOT NULL,
     PRIMARY KEY(channel, external_id)
 );
+CREATE TABLE IF NOT EXISTS channel_link_codes (
+    code TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    expires_at REAL NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS processed_webhook_events (
+    channel TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    processed_at REAL NOT NULL,
+    PRIMARY KEY(channel, event_id)
+);
 CREATE TABLE IF NOT EXISTS sku_alias_learning (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     customer_id TEXT NOT NULL,
@@ -301,6 +315,21 @@ CREATE TABLE IF NOT EXISTS channel_identities (
     PRIMARY KEY(channel, external_id)
 );
 
+CREATE TABLE IF NOT EXISTS channel_link_codes (
+    code VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    display_name VARCHAR(255) NOT NULL,
+    role VARCHAR(64) NOT NULL,
+    expires_at DOUBLE PRECISION NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS processed_webhook_events (
+    channel VARCHAR(64) NOT NULL,
+    event_id VARCHAR(255) NOT NULL,
+    processed_at DOUBLE PRECISION NOT NULL,
+    PRIMARY KEY(channel, event_id)
+);
 
 CREATE TABLE IF NOT EXISTS sku_alias_learning (
     id SERIAL PRIMARY KEY,
@@ -546,6 +575,20 @@ class BaseAuditStore(abc.ABC):
 
     @abc.abstractmethod
     def update_analysis(self, order_id: int, analysis: Analysis) -> None:
+        pass
+
+    @abc.abstractmethod
+    def create_channel_link_code(
+        self, user_id: str, display_name: str, role: str, expires_in_seconds: int = 600
+    ) -> str:
+        pass
+
+    @abc.abstractmethod
+    def consume_channel_link_code(self, code: str) -> dict[str, Any] | None:
+        pass
+
+    @abc.abstractmethod
+    def record_processed_webhook_event(self, channel: str, event_id: str) -> bool:
         pass
 
     @abc.abstractmethod
@@ -1668,6 +1711,65 @@ class AuditStore(BaseAuditStore):
                 ),
             )
             self.connection.commit()
+
+    def create_channel_link_code(
+        self, user_id: str, display_name: str, role: str, expires_in_seconds: int = 600
+    ) -> str:
+        with self._lock:
+            import secrets
+            code = secrets.token_hex(3).upper()
+            expires_at = time.time() + expires_in_seconds
+            role_str = getattr(role, "name", str(role)).strip().upper()
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO channel_link_codes (code, user_id, display_name, role, expires_at, used)
+                VALUES (?, ?, ?, ?, ?, 0)
+                """,
+                (code, str(user_id).strip(), str(display_name).strip(), role_str, expires_at),
+            )
+            self.connection.commit()
+            return code
+
+    def consume_channel_link_code(self, code: str) -> dict[str, Any] | None:
+        with self._lock:
+            clean_code = code.strip().upper()
+            row = self.connection.execute(
+                "SELECT * FROM channel_link_codes WHERE code = ? LIMIT 1", (clean_code,)
+            ).fetchone()
+            if not row:
+                return None
+            record = dict(row)
+            if record.get("used"):
+                return None
+            if time.time() > float(record["expires_at"]):
+                return {"expired": True, "user_id": record["user_id"]}
+            self.connection.execute(
+                "UPDATE channel_link_codes SET used = 1 WHERE code = ?", (clean_code,)
+            )
+            self.connection.commit()
+            return {
+                "expired": False,
+                "user_id": record["user_id"],
+                "display_name": record["display_name"],
+                "role": record["role"],
+            }
+
+    def record_processed_webhook_event(self, channel: str, event_id: str) -> bool:
+        with self._lock:
+            chan = channel.strip().lower()
+            ev_id = str(event_id).strip()
+            row = self.connection.execute(
+                "SELECT 1 FROM processed_webhook_events WHERE channel = ? AND event_id = ? LIMIT 1",
+                (chan, ev_id),
+            ).fetchone()
+            if row:
+                return False
+            self.connection.execute(
+                "INSERT INTO processed_webhook_events (channel, event_id, processed_at) VALUES (?, ?, ?)",
+                (chan, ev_id, time.time()),
+            )
+            self.connection.commit()
+            return True
 
     def create_lead(
         self,
@@ -3120,6 +3222,75 @@ class PostgresAuditStore(BaseAuditStore):
                     ),
                 )
             conn.commit()
+
+    def create_channel_link_code(
+        self, user_id: str, display_name: str, role: str, expires_in_seconds: int = 600
+    ) -> str:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                import secrets
+                code = secrets.token_hex(3).upper()
+                expires_at = time.time() + expires_in_seconds
+                role_str = getattr(role, "name", str(role)).strip().upper()
+                cur.execute(
+                    """
+                    INSERT INTO channel_link_codes (code, user_id, display_name, role, expires_at, used)
+                    VALUES (%s, %s, %s, %s, %s, 0)
+                    ON CONFLICT(code) DO UPDATE SET
+                        user_id = EXCLUDED.user_id,
+                        display_name = EXCLUDED.display_name,
+                        role = EXCLUDED.role,
+                        expires_at = EXCLUDED.expires_at,
+                        used = 0
+                    """,
+                    (code, str(user_id).strip(), str(display_name).strip(), role_str, expires_at),
+                )
+            conn.commit()
+            return code
+
+    def consume_channel_link_code(self, code: str) -> dict[str, Any] | None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                clean_code = code.strip().upper()
+                cur.execute(
+                    "SELECT * FROM channel_link_codes WHERE code = %s LIMIT 1", (clean_code,)
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                record = dict(row)
+                if record.get("used"):
+                    return None
+                if time.time() > float(record["expires_at"]):
+                    return {"expired": True, "user_id": record["user_id"]}
+                cur.execute(
+                    "UPDATE channel_link_codes SET used = 1 WHERE code = %s", (clean_code,)
+                )
+            conn.commit()
+            return {
+                "expired": False,
+                "user_id": record["user_id"],
+                "display_name": record["display_name"],
+                "role": record["role"],
+            }
+
+    def record_processed_webhook_event(self, channel: str, event_id: str) -> bool:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                chan = channel.strip().lower()
+                ev_id = str(event_id).strip()
+                cur.execute(
+                    "SELECT 1 FROM processed_webhook_events WHERE channel = %s AND event_id = %s LIMIT 1",
+                    (chan, ev_id),
+                )
+                if cur.fetchone():
+                    return False
+                cur.execute(
+                    "INSERT INTO processed_webhook_events (channel, event_id, processed_at) VALUES (%s, %s, %s)",
+                    (chan, ev_id, time.time()),
+                )
+            conn.commit()
+            return True
 
     def create_lead(
         self,

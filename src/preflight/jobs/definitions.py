@@ -200,6 +200,54 @@ async def notify(
     return {"status": "sent" if res.success else "failed", "channel": channel or "telegram"}
 
 
+@with_dead_letter_protection("escalation_check")
+async def escalation_check(ctx: dict[str, Any]) -> dict[str, Any]:
+    """Background job: Scan orders in review_required/ready_for_approval and escalate based on waiting time."""
+    from datetime import datetime, UTC
+    store: BaseAuditStore = ctx.get("store") or create_audit_store()
+    policy = store.get_policy() if hasattr(store, "get_policy") else None
+    escalation_hours = getattr(policy, "escalation_hours", 4.0) if policy else 4.0
+
+    orders = store.list_orders(limit=100)
+    now = datetime.now(UTC)
+    reminded = 0
+    escalated_director = 0
+
+    for o in orders:
+        st = o.get("status", "")
+        if st not in ("review_required", "ready_for_approval"):
+            continue
+        created_at_str = o.get("created_at")
+        if not created_at_str:
+            continue
+        try:
+            created_dt = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+            if created_dt.tzinfo is None:
+                created_dt = created_dt.replace(tzinfo=UTC)
+            age_hours = (now - created_dt).total_seconds() / 3600.0
+
+            if age_hours >= 24.0:
+                escalated_director += 1
+                event_bus.publish("order.escalated", {
+                    "order_id": o["id"],
+                    "po_number": o["po_number"],
+                    "level": "director",
+                    "age_hours": round(age_hours, 1),
+                })
+            elif age_hours >= escalation_hours:
+                reminded += 1
+                event_bus.publish("order.escalated", {
+                    "order_id": o["id"],
+                    "po_number": o["po_number"],
+                    "level": "manager_reminder",
+                    "age_hours": round(age_hours, 1),
+                })
+        except Exception:
+            continue
+
+    return {"reminded": reminded, "escalated_director": escalated_director}
+
+
 # Register all jobs in queue registry for in-memory or arq dispatch
 register_job("analyze_order", analyze_order)
 register_job("run_ocr", run_ocr)
@@ -207,3 +255,4 @@ register_job("outbox_dispatch", outbox_dispatch)
 register_job("inventory_sync", inventory_sync)
 register_job("email_poll", email_poll)
 register_job("notify", notify)
+register_job("escalation_check", escalation_check)

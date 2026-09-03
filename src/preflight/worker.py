@@ -14,6 +14,7 @@ from arq.worker import run_worker
 from preflight.jobs.definitions import (
     analyze_order,
     email_poll,
+    escalation_check,
     inventory_sync,
     notify,
     outbox_dispatch,
@@ -36,16 +37,18 @@ async def shutdown(ctx: dict[str, Any]) -> None:
 CRON_OUTBOX_MIN = os.getenv("PREFLIGHT_CRON_OUTBOX", "*")  # Every 1 minute
 CRON_INVENTORY_MIN = os.getenv("PREFLIGHT_CRON_INVENTORY", "*/30")  # Every 30 minutes
 CRON_EMAIL_MIN = os.getenv("PREFLIGHT_CRON_EMAIL", "*/2")  # Every 2 minutes
+CRON_ESCALATION_MIN = os.getenv("PREFLIGHT_CRON_ESCALATION", "*/15")  # Every 15 minutes
 
 
 class WorkerSettings:
     """arq Worker Settings for background PO processing."""
 
-    functions = [analyze_order, run_ocr, outbox_dispatch, inventory_sync, email_poll, notify]
+    functions = [analyze_order, run_ocr, outbox_dispatch, inventory_sync, email_poll, notify, escalation_check]
     cron_jobs = [
         cron(outbox_dispatch, minute=CRON_OUTBOX_MIN, unique=True),
         cron(inventory_sync, minute=CRON_INVENTORY_MIN, unique=True),
         cron(email_poll, minute=CRON_EMAIL_MIN, unique=True),
+        cron(escalation_check, minute=CRON_ESCALATION_MIN, unique=True),
     ]
 
     # Redis connection settings
