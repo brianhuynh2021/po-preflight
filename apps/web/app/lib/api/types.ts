@@ -198,7 +198,8 @@ export interface SKUMatchCandidate {
   sku: string;
   name: string;
   confidence_score: number;
-  match_tier: "EXACT_HASH" | "LEXICAL_FUZZY" | "SEMANTIC_VECTOR" | "LLM_FALLBACK";
+  match_tier: "EXACT_HASH" | "LEXICAL_FUZZY" | "SEMANTIC_VECTOR" | "LLM_FALLBACK" | string;
+  tier_used?: string;
   is_active: boolean;
   unit_price: number;
   stock: number;

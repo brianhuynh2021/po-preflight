@@ -82,7 +82,7 @@ Giải quyết bài toán: Khách ghi tên lóng/tiếng lóng Việt Nam nhưng
 - **Tier 0 (<0.5ms, 0 tokens)**: Bộ nhớ ghi nhớ biệt danh theo từng khách hàng (`Customer Active Learning Store`).
 - **Tier 1 (<1ms, 0 tokens)**: Băm chính xác O(1) Exact Hash Match.
 - **Tier 2 (<5ms, 0 tokens)**: Khoảng cách chuỗi RapidFuzz Levenshtein (bắt lỗi gõ sai chính tả).
-- **Tier 3 (<15ms, 0 tokens)**: Không gian vector ngữ nghĩa TF-IDF Character Trigrams.
+- **Tier 3 (<15ms, 0 tokens)**: Không gian vector embedding đa ngữ cục bộ (FastEmbed BGE-M3 / Multilingual E5).
 - **Tier 4 (Fallback)**: LLM Context Reasoner khi độ tin cậy < 70%.
 
 ### 2. Tự Kiểm Toán Số Học (Self-Reflection Math Grounding)

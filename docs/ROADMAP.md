@@ -38,7 +38,7 @@ gantt
 - [ ] **1.3. Hybrid SKU Matcher (3 tầng):**
   - *Tầng 1 (Exact Match):* Tra cứu mã SKU trực tiếp trong catalog (0 token).
   - *Tầng 2 (Fuzzy Match):* Sử dụng `rapidfuzz` / Levenshtein Distance để bắt lỗi chính tả nhẹ (0 token).
-  - *Tầng 3 (Vector Search):* Tích hợp `ChromaDB` / `FastEmbed` để đối soát ngữ nghĩa tên sản phẩm viết tắt hoặc mô tả tự do.
+  - *Tầng 3 (Vector Search):* Tích hợp `SQLite Vector` / `FastEmbed` để đối soát ngữ nghĩa tên sản phẩm viết tắt hoặc mô tả tự do.
 - **Tiêu chí hoàn thành (Deliverables):**
   - Tỷ lệ nhận diện SKU đúng > 98%.
   - Chi phí xử lý cho file chuẩn = $0, file ảnh scan < $0.002/đơn.
@@ -116,7 +116,7 @@ gantt
 | :--- | :--- | :--- |
 | **Agent Framework** | `LangGraph`, `LangChain` | Quản lý State, Memory, Human-in-the-loop Interrupt tốt nhất hiện nay |
 | **LLM & Vision** | `Gemini 2.0 Flash`, `GPT-4o-mini` | Tốc độ cực nhanh, giá siêu rẻ, hỗ trợ Structured Output & Prompt Caching |
-| **Vector DB / RAG** | `ChromaDB` / `Qdrant` | Nhẹ, dễ nhúng cục bộ hoặc mở rộng cloud, tìm kiếm SKU ngữ nghĩa |
+| **Vector DB / RAG** | `SQLite Vector` / `FastEmbed` | Nhẹ, nhúng cục bộ trong SQLite với brute-force cosine cực nhanh, 0 cloud dependency |
 | **Fuzzy Matching** | `RapidFuzz` | Thư viện C++ cực nhanh tính khoảng cách Levenshtein (0 token) |
 | **Backend API** | `FastAPI`, `Pydantic v2` | Hiệu năng cao, async webhook, validate schema chặt chẽ |
 | **Database & Cache** | `PostgreSQL`, `SQLite`, `Redis` | Quản lý Audit Log, Checkpoint state của LangGraph và Cache |

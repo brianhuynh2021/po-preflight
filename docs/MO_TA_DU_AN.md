@@ -58,7 +58,7 @@ flowchart TB
 
     subgraph Stanford_Brain["3. STANFORD INNER LOOP (LANGGRAPH AGENT BRAIN)"]
         IngestionAgent["Document Ingestion & OCR Agent"]
-        RAGResolver["SKU & Contract RAG Agent (ChromaDB)"]
+        RAGResolver["SKU & Contract RAG Agent (SQLite Vector / FastEmbed)"]
         RuleEngine["Deterministic Rule Engine (Python Zero-Token)"]
         Verifier["Self-Verification & Reflection"]
         RiskEvaluator["Risk Scoring (Low / Medium / High)"]
@@ -149,7 +149,7 @@ sequenceDiagram
                                       │
        ├── Lớp 1: Exact Match với Catalog DB (0 Token)
        ├── Lớp 2: Fuzzy Search (Levenshtein/BM25 - 0 Token)
-       └── Lớp 3: Vector Search (ChromaDB / FAISS - Chi phí cực thấp)
+       └── Lớp 3: Vector Search (SQLite Vector / FastEmbed BGE-M3 - Chi phí cực thấp)
                                       │
                                       ▼
                    KIỂM TRA QUY TẮC NGHIỆP VỤ (0 TOKEN)
@@ -238,7 +238,7 @@ po-preflight/
 │       │   ├── zalo.py
 │       │   ├── slack.py
 │       │   └── wechat.py
-│       ├── rag/                 # Vector Store & Embedding (ChromaDB / SKU Index)
+│       ├── rag/                 # Vector Store & Embedding (SQLite Vector / FastEmbed)
 │       ├── parsers.py           # Bộ đọc file nhanh (JSON, CSV, Text, PDF)
 │       ├── catalog.py           # Quản lý danh mục & Bảng giá
 │       ├── rules.py             # Rule Engine xác định (Zero-Token Validation)
@@ -261,7 +261,7 @@ po-preflight/
 
 - [x] **Giai đoạn 1 (MVP Hoàn thành):** Bộ đọc file thuần, Rule engine kiểm tra giá/tồn kho/trùng lặp, Audit log SQLite, CLI analyze, Web prototype.
 - [ ] **Giai đoạn 2 (RAG & Tối ưu AI):**
-  - Tích hợp ChromaDB / FAISS cho Vector Search SKU và Hợp đồng khách hàng.
+  - Tích hợp SQLite Vector / FastEmbed cho Vector Search SKU và Hợp đồng khách hàng.
   - Tích hợp Gemini Flash / Claude Haiku cho bóc tách tài liệu PDF/Ảnh scan phức tạp.
 - [ ] **Giai đoạn 3 (LangGraph & Multi-Channel Approval):**
   - Xây dựng LangGraph StateGraph với cơ chế Human-In-The-Loop Interrupt.

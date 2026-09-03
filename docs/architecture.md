@@ -54,14 +54,14 @@ flowchart TB
         API["FastAPI Gateway & Webhook Router"]
         Worker["Document Processing Worker"]
         AgentEngine["LangGraph Agentic Engine"]
-        RAGService["SKU & Contract RAG (ChromaDB)"]
+        RAGService["SKU & Contract RAG (FastEmbed Local)"]
         Rules["Deterministic Zero-Token Rule Engine"]
         Audit["Audit Trail Service"]
     end
 
     subgraph Data["Data services"]
         DB[("PostgreSQL / SQLite")]
-        VectorStore[("ChromaDB Vector Store")]
+        VectorStore[("SQLite Vector Embeddings")]
         Files[("S3 / Local Document Store")]
         Secrets["AWS Secrets Manager"]
     end

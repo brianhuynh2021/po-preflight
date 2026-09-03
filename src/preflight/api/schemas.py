@@ -100,7 +100,7 @@ class OrderSummaryResponse(BaseModel):
     id: int = Field(..., description="Primary analysis ID in audit store")
     po_number: str = Field(..., description="Purchase Order number (e.g. PO-10428)")
     customer: str = Field(..., description="Customer company name")
-    status: Literal["ready_for_approval", "review_required", "blocked", "approved", "rejected", "needs_changes", "extraction_review", "superseded"] = (
+    status: Literal["ready_for_approval", "review_required", "blocked", "approved", "rejected", "needs_changes", "extraction_review", "superseded", "received"] = (
         Field(..., description="Lifecycle status")
     )
     risk_level: Literal["LOW", "MEDIUM", "HIGH"] = Field(..., description="Computed risk score")

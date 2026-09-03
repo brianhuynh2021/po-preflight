@@ -80,7 +80,7 @@ def analyze_order(
 
     findings: list[Finding] = []
     catalog = context.catalog
-    matcher = HybridSKUMatcher(catalog)
+    matcher: HybridSKUMatcher | None = None
     order_date_str = context.order_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # -------------------------------------------------------------
@@ -317,6 +317,8 @@ def analyze_order(
         product = catalog.get(item.sku)
 
         if product is None:
+            if matcher is None:
+                matcher = HybridSKUMatcher(catalog)
             resolution = matcher.resolve(item.sku, customer_id=order.customer)
             if resolution.is_confident and resolution.matched_sku:
                 findings.append(

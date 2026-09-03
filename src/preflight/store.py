@@ -91,6 +91,14 @@ CREATE TABLE IF NOT EXISTS sku_alias_learning (
 );
 CREATE INDEX IF NOT EXISTS idx_sku_alias_learning ON sku_alias_learning(customer_id, raw_query);
 
+CREATE TABLE IF NOT EXISTS product_embeddings (
+    sku TEXT PRIMARY KEY,
+    vector_blob BLOB NOT NULL,
+    text_hash TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_product_embeddings_sku ON product_embeddings(sku);
+
 CREATE TABLE IF NOT EXISTS audit_blocks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     block_index INTEGER NOT NULL,
@@ -342,6 +350,14 @@ CREATE TABLE IF NOT EXISTS sku_alias_learning (
 );
 CREATE INDEX IF NOT EXISTS idx_pg_sku_alias_learning ON sku_alias_learning(customer_id, raw_query);
 
+CREATE TABLE IF NOT EXISTS product_embeddings (
+    sku VARCHAR(128) PRIMARY KEY,
+    vector_blob BYTEA NOT NULL,
+    text_hash VARCHAR(64) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pg_product_embeddings_sku ON product_embeddings(sku);
+
 CREATE TABLE IF NOT EXISTS audit_blocks (
     id SERIAL PRIMARY KEY,
     block_index INTEGER NOT NULL,
@@ -589,6 +605,18 @@ class BaseAuditStore(abc.ABC):
 
     @abc.abstractmethod
     def record_processed_webhook_event(self, channel: str, event_id: str) -> bool:
+        pass
+
+    @abc.abstractmethod
+    def save_product_embedding(self, sku: str, vector_bytes: bytes, text_hash: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def get_product_embeddings(self) -> list[dict[str, Any]]:
+        pass
+
+    @abc.abstractmethod
+    def get_product_embedding(self, sku: str) -> dict[str, Any] | None:
         pass
 
     @abc.abstractmethod
@@ -1770,6 +1798,38 @@ class AuditStore(BaseAuditStore):
             )
             self.connection.commit()
             return True
+
+    def save_product_embedding(self, sku: str, vector_bytes: bytes, text_hash: str) -> None:
+        with self._lock:
+            self.connection.execute(
+                """
+                INSERT INTO product_embeddings (sku, vector_blob, text_hash, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(sku) DO UPDATE SET
+                    vector_blob = excluded.vector_blob,
+                    text_hash = excluded.text_hash,
+                    updated_at = excluded.updated_at
+                """,
+                (sku.strip().upper(), vector_bytes, text_hash, datetime.now(UTC).isoformat()),
+            )
+            self.connection.commit()
+
+    def get_product_embeddings(self) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self.connection.execute(
+                "SELECT sku, vector_blob, text_hash, updated_at FROM product_embeddings"
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_product_embedding(self, sku: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT sku, vector_blob, text_hash, updated_at FROM product_embeddings WHERE sku = ? LIMIT 1",
+                (sku.strip().upper(),),
+            ).fetchone()
+            if not row:
+                return None
+            return dict(row)
 
     def create_lead(
         self,
@@ -3291,6 +3351,41 @@ class PostgresAuditStore(BaseAuditStore):
                 )
             conn.commit()
             return True
+
+    def save_product_embedding(self, sku: str, vector_bytes: bytes, text_hash: str) -> None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO product_embeddings (sku, vector_blob, text_hash, updated_at)
+                    VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT(sku) DO UPDATE SET
+                        vector_blob = EXCLUDED.vector_blob,
+                        text_hash = EXCLUDED.text_hash,
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (sku.strip().upper(), vector_bytes, text_hash),
+                )
+            conn.commit()
+
+    def get_product_embeddings(self) -> list[dict[str, Any]]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT sku, vector_blob, text_hash, updated_at FROM product_embeddings")
+                rows = cur.fetchall()
+                return [dict(r) for r in rows]
+
+    def get_product_embedding(self, sku: str) -> dict[str, Any] | None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT sku, vector_blob, text_hash, updated_at FROM product_embeddings WHERE sku = %s LIMIT 1",
+                    (sku.strip().upper(),),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                return dict(row)
 
     def create_lead(
         self,

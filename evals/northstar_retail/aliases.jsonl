@@ -1,0 +1,7 @@
+{"raw": "laptop văn phòng a14", "expected_sku": "LAPTOP-A14"}
+{"raw": "A14 Business Laptop 16GB", "expected_sku": "LAPTOP-A14"}
+{"raw": "Màn hình 27 inch", "expected_sku": "MONITOR-27"}
+{"raw": "LCD Monitor 27", "expected_sku": "MONITOR-27"}
+{"raw": "Đế cắm đa năng Type C", "expected_sku": "DOCK-USBC"}
+{"raw": "cáp mạng cat6 3 mét", "expected_sku": "CAB-CAT6-3M"}
+{"raw": "tai nghe call center", "expected_sku": "HEADSET-PRO"}

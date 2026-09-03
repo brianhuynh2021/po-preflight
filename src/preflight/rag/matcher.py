@@ -1,10 +1,11 @@
 from typing import Any
 from preflight.models import Product
 
+from preflight.rag.calibration import get_calibrated_thresholds
 from preflight.rag.exact import ExactMatcher
 from preflight.rag.fuzzy import FuzzyLexicalMatcher
 from preflight.rag.llm_fallback import LLMContextResolver
-from preflight.rag.schemas import MatchResult
+from preflight.rag.schemas import MatchCandidate, MatchResult
 from preflight.rag.vector import VectorSemanticMatcher
 from preflight.observability.tracing import trace_span
 from preflight.observability.metrics import metrics_registry
@@ -16,17 +17,18 @@ class HybridSKUMatcher:
     Tier 0 (Active Learning Alias Store): < 0.5ms, 0 tokens
     Tier 1 (Exact Hash): < 1ms, 0 tokens
     Tier 2 (Fuzzy Lexical): < 5ms, 0 tokens
-    Tier 3 (Semantic Vector): < 15ms, 0 tokens
-    Tier 4 (LLM Context Reasoner): Fallback when confidence < 70%
+    Tier 3 (Local Multilingual Semantic Vector): < 15ms, 0 tokens
+    Tier 4 (Constrained LLM Context Reasoner): Fallback when confidence < threshold
     """
 
     def __init__(self, catalog: dict[str, Product], store: Any | None = None):
         self.catalog = catalog
         self.store = store
         self._in_memory_aliases: dict[tuple[str, str], str] = {}
+        calibrated = get_calibrated_thresholds()
         self.tier1_exact = ExactMatcher(catalog)
-        self.tier2_fuzzy = FuzzyLexicalMatcher(catalog, threshold=0.75)
-        self.tier3_vector = VectorSemanticMatcher(catalog, threshold=0.35)
+        self.tier2_fuzzy = FuzzyLexicalMatcher(catalog, threshold=calibrated["fuzzy_threshold"])
+        self.tier3_vector = VectorSemanticMatcher(catalog, store=store, threshold=calibrated["vector_threshold"])
         self.tier4_llm = LLMContextResolver(catalog, store=store)
 
     def learn_alias(self, customer_id: str, raw_query: str, target_sku: str) -> None:
@@ -97,33 +99,48 @@ class HybridSKUMatcher:
         # -------------------------------------------------------------
         # TIER 2: Fuzzy Lexical Match via RapidFuzz (0 tokens, <5ms)
         # -------------------------------------------------------------
-        fuzzy_res = self.tier2_fuzzy.match(raw_query)
-        if fuzzy_res is not None and fuzzy_res.confidence_score >= 0.80:
+        fuzzy_res = self.tier2_fuzzy.match(clean_query)
+        if fuzzy_res is not None and fuzzy_res.confidence_score >= 0.85:
             return fuzzy_res
 
+        # Gather candidates across tiers
+        all_candidates: list[MatchCandidate] = []
+        if fuzzy_res and fuzzy_res.candidates:
+            all_candidates.extend(fuzzy_res.candidates)
+
         # -------------------------------------------------------------
-        # TIER 3: Semantic Vector Match (0 LLM tokens, <15ms)
+        # TIER 3: Local Multilingual Semantic Vector Match (<15ms, 0 tokens)
         # -------------------------------------------------------------
-        vector_res = self.tier3_vector.match(raw_query)
-        if vector_res is not None and vector_res.confidence_score >= 0.35:
-            if fuzzy_res and fuzzy_res.candidates:
-                merged = vector_res.candidates + fuzzy_res.candidates
-                seen = set()
-                deduped = []
-                for c in merged:
-                    if c.sku not in seen:
-                        seen.add(c.sku)
-                        deduped.append(c)
-                vector_res.candidates = deduped[:3]
+        vector_res = self.tier3_vector.match(clean_query)
+        if vector_res and vector_res.candidates:
+            all_candidates = vector_res.candidates + all_candidates
+
+        # Deduplicate candidates
+        seen_skus = set()
+        deduped_candidates: list[MatchCandidate] = []
+        for c in all_candidates:
+            if c.sku not in seen_skus:
+                seen_skus.add(c.sku)
+                deduped_candidates.append(c)
+
+        # Tier 3: Confident if score >= threshold AND margin between top-1 and top-2 >= 0.05
+        has_margin = True
+        if vector_res and len(vector_res.candidates) > 1:
+            margin = vector_res.candidates[0].score - vector_res.candidates[1].score
+            has_margin = margin >= 0.05
+
+        if vector_res is not None and vector_res.confidence_score >= 0.50 and has_margin:
+            vector_res.candidates = deduped_candidates[:5]
             return vector_res
 
-        if fuzzy_res is not None:
+        if fuzzy_res is not None and fuzzy_res.confidence_score >= 0.70:
+            fuzzy_res.candidates = deduped_candidates[:5]
             return fuzzy_res
 
         # -------------------------------------------------------------
-        # TIER 4: LLM Context Reasoner (Cross-reference customer history)
+        # TIER 4: LLM Context Reasoner (Constrained to top 20 candidates)
         # -------------------------------------------------------------
-        return self.tier4_llm.match(raw_query, customer_id=customer_id)
+        return self.tier4_llm.match(clean_query, customer_id=customer_id, candidates=deduped_candidates[:20])
 
     def batch_resolve(self, queries: list[str], customer_id: str | None = None) -> list[MatchResult]:
         return [self.resolve(q, customer_id=customer_id) for q in queries]

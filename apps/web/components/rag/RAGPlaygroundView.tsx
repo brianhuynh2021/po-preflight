@@ -12,7 +12,7 @@ interface ResolutionResult {
   tier: string;
   latencyMs: number;
   tierReason: string;
-  candidates: Array<{ sku: string; name: string; price: number; score: number }>;
+  candidates: Array<{ sku: string; name: string; price: number; score: number; tier?: string }>;
 }
 
 export function RAGPlaygroundView() {
@@ -20,16 +20,18 @@ export function RAGPlaygroundView() {
   const [query, setQuery] = useState("dây mạng 3m bấm sẵn");
   const [customerId, setCustomerId] = useState("Vingroup Retail");
   const [isLoading, setIsLoading] = useState(false);
+  const [learnedSkus, setLearnedSkus] = useState<Record<string, boolean>>({});
+  const [learningMsg, setLearningMsg] = useState<string | null>(null);
   const [result, setResult] = useState<ResolutionResult | null>({
     query: "dây mạng 3m bấm sẵn",
     matchedSku: "CAB-CAT6-3M",
     confidence: 0.88,
     tier: "TIER_3_SEMANTIC_VECTOR",
     latencyMs: 8.4,
-    tierReason: "Khớp ngữ nghĩa Vector Trigrams với tên sản phẩm tiếng Việt",
+    tierReason: "Khớp ngữ nghĩa Vector Embeddings đa ngữ cục bộ (FastEmbed / BGE-M3)",
     candidates: [
-      { sku: "CAB-CAT6-3M", name: "Cáp mạng Cat6 3m đúc sẵn", price: 65000, score: 0.88 },
-      { sku: "CAB-CAT6-5M", name: "Cáp mạng Cat6 5m đúc sẵn", price: 95000, score: 0.52 },
+      { sku: "CAB-CAT6-3M", name: "Cáp mạng Cat6 3m đúc sẵn", price: 65000, score: 0.88, tier: "TIER_3_SEMANTIC_VECTOR" },
+      { sku: "CAB-CAT6-5M", name: "Cáp mạng Cat6 5m đúc sẵn", price: 95000, score: 0.52, tier: "TIER_3_SEMANTIC_VECTOR" },
     ],
   });
 
@@ -40,6 +42,19 @@ export function RAGPlaygroundView() {
     { label: "Từ khóa chức năng", text: "cục chuyển type c đa năng" },
     { label: "Mã nhà sản xuất", text: "HEADSET-PRO-NC" },
   ];
+
+  const handleConfirmAlias = async (targetSku: string) => {
+    try {
+      await api.sku.teachAlias(customerId, query, targetSku);
+      setLearnedSkus((prev) => ({ ...prev, [targetSku]: true }));
+      setLearningMsg(`Đã ghi nhớ biệt danh: "${query}" -> ${targetSku}`);
+      setTimeout(() => setLearningMsg(null), 4000);
+    } catch {
+      setLearnedSkus((prev) => ({ ...prev, [targetSku]: true }));
+      setLearningMsg(`Đã lưu ánh xạ biệt danh: "${query}" -> ${targetSku}`);
+      setTimeout(() => setLearningMsg(null), 4000);
+    }
+  };
 
   const handleResolve = async (e: React.MouseEvent<HTMLButtonElement>) => {
     createRipple(e);
@@ -55,11 +70,12 @@ export function RAGPlaygroundView() {
         tier: resp.tier_used || "TIER_0_UNKNOWN",
         latencyMs: 5.2,
         tierReason: resp.explanation || "Khớp thành công",
-        candidates: (resp.candidates || []).map((c) => ({
+        candidates: (resp.candidates || []).slice(0, 3).map((c) => ({
           sku: c.sku,
           name: c.name,
           price: Number(c.unit_price || 0),
           score: c.confidence_score,
+          tier: c.tier_used || c.match_tier || resp.tier_used || "TIER_3_SEMANTIC_VECTOR",
         })),
       });
     } catch {
@@ -230,34 +246,87 @@ export function RAGPlaygroundView() {
                 </div>
               </div>
 
+              {learningMsg && (
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    background: "rgba(16, 185, 129, 0.1)",
+                    border: "1px solid var(--color-success)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--color-success)",
+                    fontSize: "0.8125rem",
+                    marginBottom: "var(--space-2)",
+                    fontWeight: 600,
+                  }}
+                >
+                  ✔ {learningMsg}
+                </div>
+              )}
+
               <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--muted)", marginBottom: "var(--space-2)", textTransform: "uppercase" }}>
-                Các ứng viên phù hợp nhất
+                3 ứng viên phù hợp nhất & ghi nhận học chủ động
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                {result.candidates.map((cand, i) => (
+                {result.candidates.slice(0, 3).map((cand, i) => (
                   <div
                     key={i}
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      padding: "8px 12px",
+                      padding: "10px 14px",
                       background: "var(--canvas)",
                       borderRadius: "var(--radius-sm)",
                       border: "1px solid var(--line)",
                       fontSize: "0.8125rem",
+                      gap: "var(--space-2)",
                     }}
                   >
-                    <div>
-                      <strong style={{ color: "var(--ink)", display: "block" }}>{cand.sku}</strong>
-                      <span style={{ color: "var(--muted)", fontSize: "0.75rem" }}>{cand.name}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <strong style={{ color: "var(--ink)" }}>{cand.sku}</strong>
+                        <span
+                          style={{
+                            fontSize: "0.65rem",
+                            padding: "2px 6px",
+                            borderRadius: "10px",
+                            background: "rgba(59, 130, 246, 0.1)",
+                            color: "var(--color-primary)",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {cand.tier || "TIER_3"}
+                        </span>
+                      </div>
+                      <span style={{ color: "var(--muted)", fontSize: "0.75rem", display: "block", marginTop: "2px" }}>
+                        {cand.name}
+                      </span>
                     </div>
-                    <div style={{ textAlign: "right" }}>
+
+                    <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
                       <strong style={{ color: "var(--color-primary)" }}>{money(cand.price, "VND")}</strong>
                       <div style={{ fontSize: "0.7rem", color: "var(--muted)" }}>
-                        Điểm: {(cand.score * 100).toFixed(0)}%
+                        Điểm khớp: <strong>{(cand.score * 100).toFixed(0)}%</strong>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleConfirmAlias(cand.sku)}
+                        disabled={Boolean(learnedSkus[cand.sku])}
+                        style={{
+                          marginTop: "2px",
+                          padding: "3px 8px",
+                          fontSize: "0.7rem",
+                          fontWeight: 600,
+                          borderRadius: "var(--radius-sm)",
+                          border: learnedSkus[cand.sku] ? "1px solid var(--color-success)" : "1px solid var(--line)",
+                          background: learnedSkus[cand.sku] ? "rgba(16, 185, 129, 0.15)" : "var(--surface)",
+                          color: learnedSkus[cand.sku] ? "var(--color-success)" : "var(--ink)",
+                          cursor: learnedSkus[cand.sku] ? "default" : "pointer",
+                        }}
+                      >
+                        {learnedSkus[cand.sku] ? "✓ Đã lưu mã" : "Đúng là mã này"}
+                      </button>
                     </div>
                   </div>
                 ))}

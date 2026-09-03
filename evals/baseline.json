@@ -1,0 +1,6 @@
+{
+  "precision_at_1": 95.0,
+  "recall": 100.0,
+  "tier4_rate": 0.0,
+  "min_allowed_precision": 93.0
+}

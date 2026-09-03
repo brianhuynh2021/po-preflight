@@ -248,6 +248,18 @@ async def escalation_check(ctx: dict[str, Any]) -> dict[str, Any]:
     return {"reminded": reminded, "escalated_director": escalated_director}
 
 
+@with_dead_letter_protection("rebuild_product_embeddings")
+async def rebuild_product_embeddings(ctx: dict[str, Any]) -> dict[str, Any]:
+    """Background job: Re-index all catalog product embeddings and learned aliases in SQLite/Postgres."""
+    from preflight.api.deps import get_catalog
+    from preflight.rag.vector import VectorSemanticMatcher
+    store: BaseAuditStore = ctx.get("store") or create_audit_store()
+    catalog = get_catalog()
+    matcher = VectorSemanticMatcher(catalog, store=store)
+    matcher.index_catalog()
+    return {"status": "completed", "indexed_skus": len(catalog)}
+
+
 # Register all jobs in queue registry for in-memory or arq dispatch
 register_job("analyze_order", analyze_order)
 register_job("run_ocr", run_ocr)
@@ -256,3 +268,4 @@ register_job("inventory_sync", inventory_sync)
 register_job("email_poll", email_poll)
 register_job("notify", notify)
 register_job("escalation_check", escalation_check)
+register_job("rebuild_product_embeddings", rebuild_product_embeddings)

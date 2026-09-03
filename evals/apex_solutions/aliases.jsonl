@@ -1,0 +1,5 @@
+{"raw": "LAPTOP-A14-BIZ", "expected_sku": "LAPTOP-A14"}
+{"raw": "monitor 27in 4k", "expected_sku": "MONITOR-27"}
+{"raw": "cáp lan cat6 3m đúc sẵn", "expected_sku": "CAB-CAT6-3M"}
+{"raw": "headset pro audio", "expected_sku": "HEADSET-PRO"}
+{"raw": "dock usbc hub", "expected_sku": "DOCK-USBC"}
