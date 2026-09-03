@@ -141,6 +141,13 @@ tiếng Việt.
 | `SMTP_FROM` | | `noreply@preflight.vn` | Nên là địa chỉ có thật của công ty |
 | `SMTP_SSL` | | `false` | `false` ⇒ dùng STARTTLS |
 | `EMAIL_POLL_INTERVAL` | | `120` | Giây, chỉ dùng cho chế độ `--loop` |
+| `EMAIL_DRY_RUN` | | `false` | `true` ⇒ chỉ đọc: **không gửi mail, không đánh dấu đã đọc** |
+| `EMAIL_ALLOWED_SENDERS` | | — | Danh sách email (phân cách bằng dấu phẩy). Chỉ xử lý thư từ các địa chỉ này, thư khác bỏ qua hoàn toàn |
+
+> **Chạy thử với hộp thư có sẵn:** luôn đặt `EMAIL_DRY_RUN=true` và
+> `EMAIL_ALLOWED_SENDERS` trước. Hệ thống coi **mọi thư chưa đọc** là PO cần
+> xử lý, nên nếu trỏ vào hộp thư cá nhân mà không giới hạn, bạn bè và đối tác
+> của bạn sẽ nhận được mail tự động "vui lòng gửi lại đơn hàng".
 
 > **Lưu ý:** hộp thư dùng cho intake nên là hộp thư **riêng** (vd
 > `po@congty.vn`), không dùng chung với hộp thư cá nhân — mọi thư chưa đọc
@@ -177,6 +184,7 @@ curl "$API/api/v1/intake/email/logs?limit=50" -H "X-API-Key: $KEY"
 | `ERROR` | Không bóc tách được tệp nào | ❌ (để thử lại) | ✅ Báo không nhận được |
 | `GAVE_UP` | Đã thử `MAX_PROCESSING_ATTEMPTS` (3) lần | ✅ | ❌ |
 | `DUPLICATE` | Đã xử lý trước đó (theo `Message-ID`) | ✅ | ❌ |
+| `SKIPPED` | Người gửi ngoài `EMAIL_ALLOWED_SENDERS` | ❌ | ❌ |
 
 ### 6.4 Cơ chế an toàn
 

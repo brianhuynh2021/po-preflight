@@ -525,6 +525,85 @@ class TestEmailIntake(unittest.TestCase):
         parsed = self.service.parse_mime_message(raw)
         self.assertEqual(parsed.attachments, [])
 
+    def test_dry_run_never_sends_mail_or_touches_the_mailbox(self):
+        """Dry run must leave a real mailbox exactly as it was found."""
+        msg = EmailMessageItem(
+            message_id="dry-01@northstar.vn",
+            sender_name="Purchasing Team",
+            sender_email="orders@northstar.vn",
+            subject="Đơn hàng thử nghiệm",
+            date_str=datetime.now(UTC).isoformat(),
+            raw_uid="31",
+            attachments=[
+                EmailAttachment(
+                    filename="PO.xlsx",
+                    content_bytes=create_sample_po_xlsx_bytes("PO-DRY-001", "MOUSE-WL", 1),
+                )
+            ],
+        )
+        imap = MockIMAPClient([msg])
+        smtp = MockSMTPClient()
+        service = EmailIntakeService(
+            config=EmailIntakeConfig(dry_run=True),
+            store=self.store,
+            smtp_client=smtp,
+            imap_client=imap,
+        )
+
+        results = service.poll_once(catalog_path=self.catalog_path)
+        self.assertEqual(results[0].status, "PROCESSED")
+
+        # No reply may leave the building, and nothing may be marked read.
+        self.assertEqual(smtp.sent_messages, [])
+        self.assertFalse(results[0].auto_reply_sent)
+        self.assertEqual(imap.seen, set())
+
+    def test_allowed_senders_ignores_unrelated_mail(self):
+        """An allow-list makes a shared or personal inbox safe to poll."""
+        wanted = EmailMessageItem(
+            message_id="allow-01@northstar.vn",
+            sender_name="Purchasing Team",
+            sender_email="orders@northstar.vn",
+            subject="Đơn hàng thật",
+            date_str=datetime.now(UTC).isoformat(),
+            raw_uid="41",
+            attachments=[
+                EmailAttachment(
+                    filename="PO.xlsx",
+                    content_bytes=create_sample_po_xlsx_bytes("PO-ALLOW-001", "MOUSE-WL", 1),
+                )
+            ],
+        )
+        # Personal mail that happens to sit in the same mailbox.
+        unrelated = EmailMessageItem(
+            message_id="allow-02@bank.vn",
+            sender_name="Ngân hàng",
+            sender_email="thongbao@nganhang.vn",
+            subject="Sao kê tài khoản tháng 9",
+            date_str=datetime.now(UTC).isoformat(),
+            raw_uid="42",
+            attachments=[EmailAttachment(filename="saoke.pdf", content_bytes=b"%PDF-1.4 fake")],
+        )
+
+        imap = MockIMAPClient([wanted, unrelated])
+        smtp = MockSMTPClient()
+        service = EmailIntakeService(
+            config=EmailIntakeConfig(allowed_senders=frozenset({"orders@northstar.vn"})),
+            store=self.store,
+            smtp_client=smtp,
+            imap_client=imap,
+        )
+
+        results = service.poll_once(catalog_path=self.catalog_path)
+        by_id = {r.message_id: r for r in results}
+
+        self.assertEqual(by_id["allow-01@northstar.vn"].status, "PROCESSED")
+        self.assertEqual(by_id["allow-02@bank.vn"].status, "SKIPPED")
+
+        # The bank must never be written to, and its mail must stay unread.
+        self.assertEqual([m["to"] for m in smtp.sent_messages], ["orders@northstar.vn"])
+        self.assertNotIn("42", imap.seen)
+
     def test_email_intake_api_routes(self):
         """Test GET /api/v1/intake/email/status and POST /api/v1/intake/email/poll."""
         client = TestClient(app, headers={"X-API-Key": "pf_dev_adm_9901"})

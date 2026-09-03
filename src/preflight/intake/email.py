@@ -74,6 +74,13 @@ class EmailIntakeConfig:
     
     poll_interval_seconds: int = 120
     enabled: bool = False
+    # Safety switches for trying the flow against a real mailbox.
+    # dry_run: never send a reply and never flag anything \Seen, so the mailbox
+    # is left exactly as it was found. allowed_senders: only handle mail from
+    # these addresses, so unrelated mail in a shared or personal inbox is
+    # skipped entirely.
+    dry_run: bool = False
+    allowed_senders: frozenset[str] = frozenset()
 
     @classmethod
     def from_env(cls) -> EmailIntakeConfig:
@@ -92,6 +99,12 @@ class EmailIntakeConfig:
             smtp_ssl=os.getenv("SMTP_SSL", "false").lower() in ("true", "1", "yes"),
             poll_interval_seconds=int(os.getenv("EMAIL_POLL_INTERVAL", "120")),
             enabled=os.getenv("EMAIL_INTAKE_ENABLED", "false").lower() in ("true", "1", "yes"),
+            dry_run=os.getenv("EMAIL_DRY_RUN", "false").lower() in ("true", "1", "yes"),
+            allowed_senders=frozenset(
+                addr.strip().lower()
+                for addr in os.getenv("EMAIL_ALLOWED_SENDERS", "").split(",")
+                if addr.strip()
+            ),
         )
 
 
@@ -164,7 +177,7 @@ class EmailProcessResult:
     message_id: str
     sender_email: str
     subject: str
-    status: str  # PROCESSED | PARTIAL | IGNORED | ERROR | DUPLICATE | GAVE_UP
+    status: str  # PROCESSED | PARTIAL | IGNORED | ERROR | DUPLICATE | GAVE_UP | SKIPPED
     orders_created: int = 0
     analysis_ids: list[int] = field(default_factory=list)
     po_numbers: list[str] = field(default_factory=list)
@@ -327,6 +340,10 @@ class EmailIntakeService:
         if not uids:
             return 0
 
+        if self.config.dry_run:
+            logger.info("[DRY RUN] Không đánh dấu đã đọc %d thư: %s", len(uids), uids)
+            return 0
+
         if self._imap_client is not None:
             marker = getattr(self._imap_client, "mark_seen", None)
             return marker(uids) if marker else 0
@@ -370,6 +387,12 @@ class EmailIntakeService:
     ) -> bool:
         """Send automated response via SMTP or mock."""
         if not to_email:
+            return False
+
+        if self.config.dry_run:
+            logger.info(
+                "[DRY RUN] Không gửi mail tới %s | Tiêu đề: %s", to_email, subject
+            )
             return False
 
         if self._smtp_client is not None:
@@ -461,7 +484,26 @@ class EmailIntakeService:
                 orders_created=existing_log.get("orders_created", 0),
             )
 
-        # 2. Never auto-reply to bounces, vacation responders or list traffic:
+        # 2. When an allow-list is set, ignore everything else. This makes it
+        #    safe to point the poller at a mailbox that also carries unrelated
+        #    mail: nothing outside the list is read, answered or flagged.
+        allowed = self.config.allowed_senders
+        if allowed and msg.sender_email not in allowed:
+            logger.info(
+                "Bỏ qua thư từ %s (không nằm trong EMAIL_ALLOWED_SENDERS)",
+                msg.sender_email,
+            )
+            return EmailProcessResult(
+                message_id=msg.message_id,
+                sender_email=msg.sender_email,
+                subject=msg.subject,
+                status="SKIPPED",
+                orders_created=0,
+                error_message="Người gửi không nằm trong danh sách cho phép.",
+                auto_reply_sent=False,
+            )
+
+        # 3. Never auto-reply to bounces, vacation responders or list traffic:
         #    the reply lands back in this inbox and loops. Log and move on.
         if msg.is_automated:
             logger.info("Skipping automated message %s from %s", msg.message_id, msg.sender_email)
@@ -485,14 +527,14 @@ class EmailIntakeService:
                 auto_reply_sent=False,
             )
 
-        # 3. Resolve Customer by sender email
+        # 4. Resolve Customer by sender email
         matched_customer = self.store.get_customer_by_contact_email(msg.sender_email)
         resolved_customer_name = matched_customer.name if matched_customer else None
 
-        # 4. Filter valid attachments
+        # 5. Filter valid attachments
         valid_attachments = [a for a in msg.attachments if a.is_supported]
 
-        # 5. Handle case with NO valid attachments (e.g. .docx or empty mail)
+        # 6. Handle case with NO valid attachments (e.g. .docx or empty mail)
         if not valid_attachments:
             err_msg = "Không tìm thấy file đính kèm hợp lệ (.xlsx, .xls, .csv, .pdf, .json, ảnh)."
             self.store.record_email_inbox_log(
@@ -536,7 +578,7 @@ class EmailIntakeService:
                 customer_resolved=resolved_customer_name,
             )
 
-        # 6. Process valid attachments
+        # 7. Process valid attachments
         orders_created = 0
         analysis_ids: list[int] = []
         po_numbers: list[str] = []
@@ -619,7 +661,7 @@ class EmailIntakeService:
                 except Exception:
                     logger.warning("Could not persist attachment error for '%s'", attachment.filename)
 
-        # 7. Record log & Send auto-reply reflecting the real outcome
+        # 8. Record log & Send auto-reply reflecting the real outcome
         failed_lines = "".join(
             f"- {name}: {reason}\n" for name, reason in failed_attachments
         )
@@ -785,7 +827,7 @@ class EmailIntakeService:
             results.append(res)
             # An ERROR is retryable, so leave it unread for the next poll.
             # Everything else is settled and must not be picked up again.
-            if msg.raw_uid and res.status != "ERROR":  # GAVE_UP included: stop retrying
+            if msg.raw_uid and res.status not in ("ERROR", "SKIPPED"):
                 handled_uids.append(msg.raw_uid)
 
         self.mark_processed(handled_uids)
