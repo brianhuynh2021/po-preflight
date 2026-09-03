@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DecisionType, PurchaseOrder } from "@/app/lib/types";
 import {
   MIN_NOTE_LENGTH,
@@ -29,6 +29,33 @@ export function DecisionModal({
 }) {
   const [action, setAction] = useState<DecisionType>(initialAction);
   const { user } = useAppState();
+  const modalRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+      if (e.key === "Tab" && modalRef.current) {
+        const focusables = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length > 0) {
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   const errorCount = order.findings.filter((f) => f.severity === "Error").length;
   const isAllowed = canDecide(order.status, action);
@@ -42,6 +69,7 @@ export function DecisionModal({
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
+        ref={modalRef}
         className="modal decision-modal"
         role="dialog"
         aria-modal="true"

@@ -154,3 +154,18 @@ test("renders the Users & Approval Matrix view at /users", async () => {
   assert.match(html, /Quản lý Người dùng &amp; Ma trận Phê duyệt/);
   assert.match(html, /Tổng người dùng/);
 });
+
+test("renders the Admin Diagnostics Tools view at /admin/tools", async () => {
+  const response = await render("/admin/tools");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Công cụ kỹ thuật &amp; RAG|Admin Diagnostics/);
+  assert.match(html, /LangGraph/);
+});
+
+test("renders the Mobile Minimal Approval view at /m/orders/PO-10428", async () => {
+  const response = await render("/m/orders/PO-10428");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Đang tải thông tin đơn hàng|PO Preflight Mobile/);
+});

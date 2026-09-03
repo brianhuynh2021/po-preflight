@@ -443,7 +443,7 @@ async def upload_order(
 def confirm_extraction(
     order_id: str,
     payload: ConfirmExtractionRequest,
-    user: UserPrincipal = Depends(require_role(Role.MANAGER)),
+    user: UserPrincipal = Depends(require_role(Role.SALES_ADMIN)),
     store: AuditStore = Depends(get_audit_store),
     catalog: dict[str, Product] = Depends(get_catalog),
 ) -> OrderDetailResponse:

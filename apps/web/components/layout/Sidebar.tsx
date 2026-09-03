@@ -5,12 +5,9 @@ import {
   Activity,
   LayoutDashboard,
   FileText,
-  ScanLine,
   Package,
   Users,
   UserCheck,
-  Workflow,
-  Zap,
   ShieldCheck,
   RefreshCw,
   Lock,
@@ -18,6 +15,7 @@ import {
   Settings,
   LogOut,
   ChevronDown,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import { useAppState } from "@/components/app/AppStateProvider";
@@ -53,7 +51,6 @@ export function Sidebar() {
       items: [
         { label: "Tổng quan", href: "/overview", icon: LayoutDashboard },
         { label: "Đơn hàng", href: "/orders", icon: FileText },
-        { label: "Xem xét trích xuất", href: "/staging", icon: ScanLine },
         { label: "Khách hàng", href: "/customers", icon: Users },
         { label: "Danh mục sản phẩm", href: "/catalog", icon: Package },
         { label: "Nhật ký kiểm toán", href: "/audit-log", icon: History },
@@ -69,9 +66,8 @@ export function Sidebar() {
               { label: "Luật & Chính sách", href: "/rules", icon: ShieldCheck },
               { label: "Đồng bộ ERP Outbox", href: "/erp-sync", icon: RefreshCw },
               { label: "Giám sát & Sức khỏe", href: "/admin/health", icon: Activity },
-              { label: "Kiểm thử SKU (RAG)", href: "/rag-playground", icon: Zap },
-              { label: "Sơ đồ LangGraph", href: "/agent-graph", icon: Workflow },
-              { label: "Chứng thư Merkle", href: "/audit-certificate", icon: Lock },
+              { label: "Công cụ chẩn đoán & RAG", href: "/admin/tools", icon: Wrench },
+              { label: "Chứng thư nhật ký (chuỗi băm SHA-256)", href: "/audit-certificate", icon: Lock },
             ],
           },
         ]
