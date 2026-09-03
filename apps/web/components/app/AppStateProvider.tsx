@@ -42,6 +42,7 @@ const AppStateContext = createContext<AppState | null>(null);
 
 function mapBackendStatusToFE(backendStatus: string): OrderStatus {
   const s = (backendStatus || "").toLowerCase();
+  if (s.includes("received")) return "Received";
   if (s.includes("ready") || s === "ready_for_approval") return "Ready";
   if (s.includes("block")) return "Blocked";
   if (s.includes("approv")) return "Approved";
@@ -211,11 +212,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     const cleanup = api.connectRealtimeStream(
       (payload) => {
         setIsLiveConnected(true);
-        if (payload.event === "order.created" || payload.event === "order.decided" || payload.event === "erp.synced") {
+        if (
+          payload.event === "order.created" ||
+          payload.event === "order.analyzed" ||
+          payload.event === "order.received" ||
+          payload.event === "order.decided" ||
+          payload.event === "erp.synced"
+        ) {
           setActivity((prev) => [
             {
               title: `Sự kiện: ${payload.event}`,
-              detail: `Đơn ${String(payload.data?.po_number || "")} — trạng thái: ${String(payload.data?.status || "đã xử lý")}`,
+              detail: `Đơn ${String(payload.data?.po_number || "")} — trạng thái: ${String(payload.data?.status || "đã cập nhật")}`,
               time: "Vừa xong",
               type: "system",
             },

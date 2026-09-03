@@ -23,6 +23,9 @@ class SystemModesResponse(BaseModel):
     fx: str = Field(..., description="FX exchange rate provider mode (live or static)")
     environment: str = Field(..., description="Current deployment environment")
     auth_required: bool = Field(..., description="Whether API key authentication is enforced")
+    sse: str = Field("single_process", description="SSE transport mode (redis_pubsub or single_process)")
+    queue: str = Field("in_memory", description="Job queue backend (arq_redis or in_memory)")
+    rate_limiter: str = Field("in_memory", description="Rate limiter backend (redis or in_memory)")
 
 
 @router.get(
@@ -82,6 +85,12 @@ def get_system_modes(
 
     company = os.getenv("PREFLIGHT_COMPANY_NAME", cfg.company_name).strip()
 
+    # Redis-backed modes (SSE, Job Queue, Rate Limiter)
+    redis_url = os.getenv("REDIS_URL", "").strip()
+    sse_mode = "redis_pubsub" if (redis_url and redis_url.startswith("redis")) else "single_process"
+    queue_mode = "arq_redis" if (redis_url and redis_url.startswith("redis")) else "in_memory"
+    rate_limiter_mode = "redis" if (redis_url and redis_url.startswith("redis")) else "in_memory"
+
     return SystemModesResponse(
         company_name=company,
         database=db_mode,
@@ -92,4 +101,7 @@ def get_system_modes(
         fx=fx_mode,
         environment=env,
         auth_required=auth_req,
+        sse=sse_mode,
+        queue=queue_mode,
+        rate_limiter=rate_limiter_mode,
     )

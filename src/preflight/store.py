@@ -535,6 +535,16 @@ class BaseAuditStore(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def record_received_order(
+        self,
+        po_number: str,
+        customer: str,
+        source_file: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
+        pass
+
+    @abc.abstractmethod
     def update_analysis(self, order_id: int, analysis: Analysis) -> None:
         pass
 
@@ -1022,6 +1032,50 @@ class AuditStore(BaseAuditStore):
                     "revision": getattr(analysis, "revision", 1),
                     "supersedes_order_id": getattr(analysis, "supersedes_order_id", None),
                 },
+            )
+            return res_id
+
+    def record_received_order(
+        self,
+        po_number: str,
+        customer: str,
+        source_file: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
+        """Record an in-flight received order awaiting async background OCR extraction."""
+        with self._lock:
+            cursor = self.connection.cursor()
+            order_dict = {
+                "po_number": po_number,
+                "customer": customer,
+                "items": [],
+                "currency": "VND",
+                "total": 0,
+                "metadata": metadata or {},
+            }
+            now = datetime.now(UTC).isoformat()
+            cursor.execute(
+                """
+                INSERT INTO analyses (
+                    po_number, customer, status, total, source_file,
+                    order_json, findings_json, revision, supersedes_order_id, created_at
+                ) VALUES (?, ?, 'received', '0', ?, ?, '[]', 1, NULL, ?)
+                """,
+                (
+                    po_number,
+                    customer,
+                    source_file,
+                    json.dumps(order_dict, ensure_ascii=False),
+                    now,
+                ),
+            )
+            self.connection.commit()
+            res_id = int(cursor.lastrowid or 0)
+            self.append_audit_block(
+                po_number,
+                "ORDER_RECEIVED",
+                "system:ocr_intake",
+                {"source_file": source_file, "status": "received", "order_id": res_id},
             )
             return res_id
 
@@ -2511,6 +2565,50 @@ class PostgresAuditStore(BaseAuditStore):
                 res_id = int(cur.fetchone()["id"])
             conn.commit()
             analysis.analysis_id = res_id
+            return res_id
+
+    def record_received_order(
+        self,
+        po_number: str,
+        customer: str,
+        source_file: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                order_dict = {
+                    "po_number": po_number,
+                    "customer": customer,
+                    "items": [],
+                    "currency": "VND",
+                    "total": 0,
+                    "metadata": metadata or {},
+                }
+                now = datetime.now(UTC).isoformat()
+                cur.execute(
+                    """
+                    INSERT INTO analyses (
+                        po_number, customer, status, total, source_file,
+                        order_json, findings_json, revision, supersedes_order_id, created_at
+                    ) VALUES (%s, %s, 'received', '0', %s, %s, '[]', 1, NULL, %s)
+                    RETURNING id
+                    """,
+                    (
+                        po_number,
+                        customer,
+                        source_file,
+                        json.dumps(order_dict, ensure_ascii=False),
+                        now,
+                    ),
+                )
+                res_id = int(cur.fetchone()["id"])
+            conn.commit()
+            self.append_audit_block(
+                po_number,
+                "ORDER_RECEIVED",
+                "system:ocr_intake",
+                {"source_file": source_file, "status": "received", "order_id": res_id},
+            )
             return res_id
 
     def update_analysis(self, order_id: int, analysis: Analysis) -> None:

@@ -123,7 +123,7 @@ class OrderDetailResponse(BaseModel):
     id: int = Field(..., description="Order ID in audit store")
     po_number: str = Field(..., description="Purchase Order identifier")
     customer: str = Field(..., description="Customer legal entity name")
-    status: Literal["ready_for_approval", "review_required", "blocked", "approved", "rejected", "needs_changes", "extraction_review", "superseded"] = (
+    status: Literal["ready_for_approval", "review_required", "blocked", "approved", "rejected", "needs_changes", "extraction_review", "superseded", "received"] = (
         Field(..., description="Lifecycle verification state")
     )
     risk_level: str = Field(..., description="Computed risk level")
@@ -138,6 +138,15 @@ class OrderDetailResponse(BaseModel):
     findings: list[FindingResponse] = Field(default_factory=list, description="Validation findings")
     decisions: list[dict[str, Any]] = Field(default_factory=list, description="Audit decision timeline")
     revisions: list[dict[str, Any]] = Field(default_factory=list, description="All revision history")
+
+
+class AsyncOrderReceivedResponse(BaseModel):
+    status: Literal["received"] = Field("received", description="Status indicating order was received and enqueued for async OCR")
+    order_id: int = Field(..., description="Created order ID in audit store")
+    po_number: str = Field(..., description="PO tracking number")
+    message: str = Field("Đang bóc tách dữ liệu bằng AI OCR trong nền...", description="Informational message for operator")
+    sse_channel: str = Field("/api/v1/events/stream", description="SSE stream endpoint to monitor processing completion")
+
 
 
 class DecisionRequest(BaseModel):

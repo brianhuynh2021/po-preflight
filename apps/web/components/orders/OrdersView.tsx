@@ -238,10 +238,14 @@ export function OrdersView() {
             if (file) {
               showToast(`Đang tải lên và xử lý ${name}...`);
               try {
-                await api.orders.upload(file, name);
+                const res = await api.orders.upload(file, name);
                 await refreshOrders();
                 await loadStats();
-                showToast(`Đã tải lên và kiểm tra xong đơn hàng ${name}.`, "success");
+                if (res && res.status === "received") {
+                  showToast(`Đã tiếp nhận ${name}. Đang bóc tách dữ liệu bằng AI OCR trong nền...`);
+                } else {
+                  showToast(`Đã tải lên và kiểm tra xong đơn hàng ${name}.`, "success");
+                }
               } catch (err) {
                 showToast(describeError(err), "error");
               }

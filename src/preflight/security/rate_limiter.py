@@ -14,14 +14,29 @@ import os
 
 
 class SlidingWindowRateLimiter:
-    """Thread-safe sliding window rate limiter for DDoS and abuse mitigation."""
+    """Thread-safe sliding window rate limiter for DDoS and abuse mitigation.
+    
+    Supports:
+    - Redis-backed distributed sliding window across processes when REDIS_URL is present.
+    - Thread-safe in-memory deque sliding window fallback.
+    """
 
-    def __init__(self, default_limit: int = 120, window_seconds: int = 60):
+    def __init__(self, default_limit: int = 120, window_seconds: int = 60, redis_url: str | None = None):
         self.default_limit = default_limit
         self.window_seconds = window_seconds
         self._history: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
         self.enabled = os.getenv("PREFLIGHT_RATE_LIMIT_ENABLED", "true").lower() in ("true", "1", "yes")
+        self.redis_url = redis_url or os.getenv("REDIS_URL")
+        self._redis = None
+
+        if self.redis_url:
+            try:
+                import redis
+                self._redis = redis.Redis.from_url(self.redis_url, decode_responses=True)
+                self._redis.ping()
+            except Exception:
+                self._redis = None
 
         # Custom path limits
         self.path_limits: dict[str, int] = {
@@ -29,6 +44,13 @@ class SlidingWindowRateLimiter:
             "/api/v1/ingest/extract": 30,  # 30 OCR extractions/min
             "/api/v1/bot/telegram/webhook": 60,  # 60 webhooks/min
         }
+
+    @property
+    def mode(self) -> str:
+        current_redis = os.getenv("REDIS_URL") or self.redis_url
+        if current_redis:
+            return "redis"
+        return "in_memory"
 
     def is_allowed(self, client_key: str, path: str = "") -> tuple[bool, int]:
         """Check if request is within rate limit. Returns (is_allowed, remaining_requests)."""
@@ -39,9 +61,37 @@ class SlidingWindowRateLimiter:
         cutoff = now - self.window_seconds
         limit = self.path_limits.get(path, self.default_limit)
 
+        current_redis_url = os.getenv("REDIS_URL") or self.redis_url
+        if current_redis_url:
+            if not self._redis:
+                try:
+                    import redis
+                    self._redis = redis.Redis.from_url(current_redis_url, decode_responses=True)
+                except Exception:
+                    self._redis = None
+
+            if self._redis:
+                key = f"preflight:ratelimit:{client_key}:{path or 'default'}"
+                try:
+                    pipe = self._redis.pipeline()
+                    pipe.zremrangebyscore(key, 0, cutoff)
+                    pipe.zcard(key)
+                    _, count = pipe.execute()
+
+                    if count >= limit:
+                        return False, 0
+
+                    pipe = self._redis.pipeline()
+                    pipe.zadd(key, {f"{now}_{time.time_ns()}": now})
+                    pipe.expire(key, self.window_seconds + 5)
+                    pipe.execute()
+                    return True, max(0, limit - (count + 1))
+                except Exception:
+                    pass
+
+        # In-memory fallback
         with self._lock:
             timestamps = self._history[client_key]
-            # Evict timestamps outside sliding window
             while timestamps and timestamps[0] < cutoff:
                 timestamps.popleft()
 
@@ -55,6 +105,13 @@ class SlidingWindowRateLimiter:
         """Clear all rate limit histories."""
         with self._lock:
             self._history.clear()
+        if self._redis:
+            try:
+                keys = self._redis.keys("preflight:ratelimit:*")
+                if keys:
+                    self._redis.delete(*keys)
+            except Exception:
+                pass
 
 
 global_rate_limiter = SlidingWindowRateLimiter()

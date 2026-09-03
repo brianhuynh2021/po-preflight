@@ -89,6 +89,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Max messages to process per poll (default 20)",
     )
 
+    # Worker Subcommand
+    worker_cmd = subparsers.add_parser("worker", help="Start background arq job queue worker")
+    worker_cmd.add_argument("--burst", action="store_true", help="Execute queued jobs and exit when empty")
+
     # Seed Demo Subcommand
     subparsers.add_parser("seed-demo", help="Seed demo organization, catalog, customers, and sample orders")
 
@@ -199,6 +203,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "seed-demo":
         return run_seed_demo()
+
+    if args.command == "worker":
+        from preflight.worker import start_worker
+        start_worker(burst=args.burst)
+        return 0
 
     if args.command == "users":
         from preflight.models import User

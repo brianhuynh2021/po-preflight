@@ -14,7 +14,8 @@ export type OrderStatus =
   | "Blocked"
   | "Approved"
   | "Changes requested"
-  | "Rejected";
+  | "Rejected"
+  | "Received";
 
 /** Tone tokens per status. Colour never carries meaning alone — always pair with the label. */
 export const STATUS_TONE: Record<OrderStatus, string> = {
@@ -24,6 +25,7 @@ export const STATUS_TONE: Record<OrderStatus, string> = {
   Approved: "#386b8e",
   "Changes requested": "#b45309",
   Rejected: "#57534e",
+  Received: "#7c3aed",
 };
 
 export const STATUS_LABEL_VI: Record<OrderStatus, string> = {
@@ -33,6 +35,7 @@ export const STATUS_LABEL_VI: Record<OrderStatus, string> = {
   Approved: "Đã duyệt",
   "Changes requested": "Yêu cầu sửa",
   Rejected: "Đã từ chối",
+  Received: "Đang bóc tách…",
 };
 
 // --------------------------------------------------------------- findings

@@ -26,6 +26,7 @@ from preflight.api.errors import (
 from preflight.api.events import event_bus
 from preflight.api.logging_config import logger
 from preflight.api.schemas import (
+    AsyncOrderReceivedResponse,
     ConfirmExtractionRequest,
     DecisionRequest,
     DecisionResponse,
@@ -41,6 +42,11 @@ from preflight.rules_context import build_rule_context
 from preflight.security.rbac import Role, UserPrincipal, require_role
 from preflight.services.customer_resolver import resolve_customer
 from preflight.services.decisions import DecisionError, Principal, decide_order
+from preflight.services.order_service import (
+    create_received_order_for_ocr,
+    is_ocr_needed,
+    process_order_sync,
+)
 from preflight.store import AuditStore
 
 
@@ -258,7 +264,7 @@ def get_order_source_file(
 
 @router.post(
     "/upload",
-    response_model=OrderDetailResponse,
+    response_model=OrderDetailResponse | AsyncOrderReceivedResponse,
     status_code=201,
     summary="Upload & Preflight PO Document",
     description="Upload a PO file (PDF, JSON, CSV, or TXT), parse items, optionally stage in extraction_review, or run deterministic rules.",
@@ -270,14 +276,14 @@ async def upload_order(
     user: UserPrincipal = Depends(require_role(Role.VIEWER)),
     store: AuditStore = Depends(get_audit_store),
     catalog: dict[str, Product] = Depends(get_catalog),
-) -> OrderDetailResponse:
+) -> OrderDetailResponse | Response:
 
     filename = file.filename or "uploaded_order.tmp"
     suffix = Path(filename).suffix.lower()
-    ALLOWED_EXTENSIONS = {".json", ".pdf", ".png", ".jpg", ".jpeg", ".txt", ".csv"}
+    ALLOWED_EXTENSIONS = {".json", ".pdf", ".png", ".jpg", ".jpeg", ".txt", ".csv", ".xlsx", ".xls"}
     if suffix not in ALLOWED_EXTENSIONS:
         raise UnsupportedFormat(
-            f"Định dạng tệp '{suffix}' không được hỗ trợ. Vui lòng tải lên tệp PDF, JSON, PNG, JPG hoặc TXT."
+            f"Định dạng tệp '{suffix}' không được hỗ trợ. Vui lòng tải lên tệp Excel (.xlsx), PDF, JSON, PNG, JPG hoặc CSV."
         )
 
     MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB Limit
@@ -298,7 +304,17 @@ async def upload_order(
                 )
         temp_path.write_bytes(content)
 
-        # Parse order in dedicated guarded try-block
+        # Check if file requires AI OCR / Vision extraction (Scanned PDF or Raster Image)
+        if is_ocr_needed(bytes(content), filename):
+            result = create_received_order_for_ocr(
+                file_bytes=bytes(content),
+                filename=filename,
+                store=store,
+                user_name=user.username,
+            )
+            return JSONResponse(status_code=202, content=result)
+
+        # Parse deterministic order in dedicated guarded try-block
         try:
             order = parse_order(temp_path)
             order.created_by = user.username

@@ -27,8 +27,13 @@ class OutboxSyncWorker:
         self.adapter = adapter or MockSAPAdapter()
         self.metrics_registry = metrics_registry
 
-    def process_batch(self, limit: int = 10) -> list[ERPSyncResponse]:
+    def process_batch(self, limit: int = 10, lease_seconds: float = 60.0) -> list[ERPSyncResponse]:
         """Fetch pending outbox events and dispatch them to ERP."""
+        # Recover events stuck in PROCESSING due to worker crash
+        recovered = self.outbox_store.recover_stale_leases(lease_seconds=lease_seconds)
+        if recovered > 0:
+            logger.info(f"Recovered {recovered} stale ERP outbox event leases back to PENDING.")
+
         pending_events = self.outbox_store.fetch_pending(limit=limit)
         responses: list[ERPSyncResponse] = []
 

@@ -9,7 +9,8 @@ export type OrderStatus =
   | "approved"
   | "rejected"
   | "needs_changes"
-  | "extraction_review";
+  | "extraction_review"
+  | "received";
 
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 
@@ -139,6 +140,9 @@ export interface SystemModes {
   fx: string;
   environment: string;
   auth_required: boolean;
+  sse?: string;
+  queue?: string;
+  rate_limiter?: string;
 }
 
 export interface DashboardStats {

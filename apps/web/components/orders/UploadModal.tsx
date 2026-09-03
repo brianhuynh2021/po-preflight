@@ -28,7 +28,7 @@ export function UploadModal({
         <label className="drop-zone">
           <input
             type="file"
-            accept=".pdf,.csv,.json,.txt,.xlsx,.xls,.xlsm"
+            accept=".pdf,.csv,.json,.txt,.xlsx,.xls,.xlsm,.png,.jpg,.jpeg"
             onChange={(event) => {
               if (event.target.files?.length) {
                 onFile(event.target.files[0].name, event.target.files[0]);
@@ -38,7 +38,7 @@ export function UploadModal({
 
           <span className="upload-symbol">＋</span>
           <strong>Drop a file here or choose a file</strong>
-          <small>PDF, Excel (.xlsx/.xls), CSV, JSON, or TXT · Maximum 20 MB</small>
+          <small>PDF, Excel (.xlsx/.xls), CSV, JSON, PNG/Ảnh chụp, hoặc TXT · Maximum 20 MB</small>
 
         </label>
         <div className="modal-note">

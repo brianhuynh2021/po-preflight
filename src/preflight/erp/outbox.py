@@ -121,6 +121,10 @@ class BaseOutboxStore(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def recover_stale_leases(self, lease_seconds: float = 60.0) -> int:
+        pass
+
+    @abc.abstractmethod
     def mark_sent(self, event_id: str, tx_id: str, adapter_type: ERPAdapterType | str) -> None:
         pass
 
@@ -272,6 +276,22 @@ class OutboxStore(BaseOutboxStore):
                 data["total_amount"] = Decimal(str(data["total_amount"]))
                 results.append(ERPSyncPayload(**data))
             return results
+
+    def recover_stale_leases(self, lease_seconds: float = 60.0) -> int:
+        """Reset events stuck in PROCESSING for longer than lease_seconds back to PENDING."""
+        now = time.time()
+        stale_threshold = now - lease_seconds
+        with self.conn:
+            cur = self.conn.cursor()
+            cur.execute(
+                """
+                UPDATE erp_outbox
+                SET status = ?, updated_at = ?
+                WHERE status = ? AND updated_at < ?
+                """,
+                (ERPEventStatus.PENDING.value, now, ERPEventStatus.PROCESSING.value, stale_threshold),
+            )
+            return cur.rowcount
 
     def mark_sent(self, event_id: str, tx_id: str, adapter_type: ERPAdapterType | str) -> None:
         """Mark an outbox event as successfully synchronized to ERP."""
@@ -522,6 +542,23 @@ class PostgresOutboxStore(BaseOutboxStore):
                     results.append(ERPSyncPayload(**data))
             conn.commit()
             return results
+
+    def recover_stale_leases(self, lease_seconds: float = 60.0) -> int:
+        """Reset events stuck in PROCESSING for longer than lease_seconds back to PENDING."""
+        now = time.time()
+        stale_threshold = now - lease_seconds
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE erp_outbox
+                    SET status = %s, updated_at = %s
+                    WHERE status = %s AND updated_at < %s
+                    """,
+                    (ERPEventStatus.PENDING.value, now, ERPEventStatus.PROCESSING.value, stale_threshold),
+                )
+                conn.commit()
+                return cur.rowcount
 
     def mark_sent(self, event_id: str, tx_id: str, adapter_type: ERPAdapterType | str) -> None:
         adapter_val = adapter_type.value if hasattr(adapter_type, "value") else str(adapter_type)
