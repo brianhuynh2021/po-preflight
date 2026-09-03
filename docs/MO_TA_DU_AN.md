@@ -1,181 +1,109 @@
-# PO PREFLIGHT: HỆ THỐNG TRỢ LÝ AI ĐỐI SOÁT & PHÊ DUYỆT ĐƠN ĐẶT HÀNG (PURCHASE ORDER) ĐA KÊNH
+# PO PREFLIGHT — HỆ THỐNG ĐỐI SOÁT & TIỀN KIỂM ĐƠN HÀNG B2B TỰ ĐỘNG
 
-> **Phiên bản:** 2.0 (Kiến trúc Agentic AI + RAG + Multi-Channel Approval)  
-> **Ngôn ngữ:** Tiếng Việt / English  
-> **Mục tiêu:** Tự động hóa tiếp nhận, kiểm tra tính hợp lệ của đơn hàng (PO) qua quy tắc xác định và suy luận thông minh, hỗ trợ phê duyệt tức thì qua **Telegram, Zalo, Slack, WeChat, Web Portal** trước khi ghi nhận vào ERP.
+> **Mục tiêu:** Tự động hóa tiếp nhận, kiểm tra tính hợp lệ của đơn hàng (PO) qua quy tắc xác định và suy luận thông minh, hỗ trợ phê duyệt tức thì qua **Telegram, Zalo Official Account, Web Portal** trước khi ghi nhận vào ERP (MISA AMIS, Bravo, Fast, Odoo, SAP B1).
 
 ---
 
-## 1. Ý NGHĨA & BÀI TOÁN KINH DOANH (BUSINESS VALUE)
+## 1. VẤN ĐỀ THỰC TẾ & ĐỘNG LỰC SẢN PHẨM
 
-### 1.1. Thực trạng tại các doanh nghiệp B2B, Phân phối & Sản xuất
-- Hàng ngày, bộ phận kinh doanh (Sales Admin / Operations) nhận hàng trăm đơn đặt hàng (**Purchase Orders - PO**) từ khách hàng gửi qua nhiều kênh: Email (file PDF, Excel, ảnh chụp scan, Word), tin nhắn mạng xã hội (Zalo, WeChat, Telegram, Slack).
-- **Thách thức lớn:**
-  1. **Nhập liệu thủ công (Manual Data Entry):** Mất 15–30 phút cho mỗi đơn để đọc, đối chiếu từng mã hàng và gõ lại vào hệ thống ERP (SAP, Odoo, Oracle, v.v.).
-  2. **Sai lệch giá và chính sách (Price Discrepancy):** Khách đặt theo giá cũ chưa cập nhật, sai mức chiết khấu khối lượng hoặc sai đơn vị tính (hộp / thùng / kiện).
-  3. **Thiếu tồn kho & Hàng ngừng kinh doanh (Out of Stock / Inactive SKU):** Đơn vị đặt sản phẩm đã ngừng sản xuất hoặc số lượng vượt quá khả năng đáp ứng của kho hàng.
-  4. **Trùng lặp đơn hàng (Duplicate Orders):** Khách gửi lại nhiều lần qua cả email và tin nhắn, dẫn đến nguy cơ xuất kho trùng lặp.
-  5. **Quy trình phê duyệt phân tán, chậm trễ:** Quản lý không có mặt tại văn phòng để vào ERP duyệt, dẫn đến ách tắc xử lý đơn hàng.
+- Hàng ngày, bộ phận kinh doanh (Sales Admin / Operations) nhận hàng trăm đơn đặt hàng (**Purchase Orders - PO**) từ khách hàng gửi qua nhiều kênh: Email (file PDF, Excel, ảnh chụp scan), tin nhắn Zalo, Telegram.
+- **Nỗi đau lớn nhất:**
+  1. **Tốn nhân lực & thời gian:** Mất từ 15 - 30 phút cho mỗi đơn hàng để rà soát thủ công: Mã SKU khách viết có đúng không? Giá đặt có đúng theo hợp đồng đã ký? Kho còn đủ hàng không? Khách hàng có bị nợ quá hạn hoặc vượt hạn mức tín dụng không?
+  2. **Rủi ro sai sót tai hại:** Nhân viên nhập nhầm giá, bán dưới giá vốn, hoặc đơn hàng của khách nợ xấu vẫn được chuyển cho kho xuất hàng.
+  3. **Chi phí sửa sai đắt đỏ:** Khi đơn hàng đã vào ERP, việc hủy hóa đơn VAT, thu hồi hàng từ xe tải, hạch toán điều chỉnh kế toán tốn gấp 10 lần thời gian so với việc chặn lại từ đầu.
 
-### 1.2. Giá trị PO Preflight mang lại
-- **Giảm 90% thời gian xử lý đơn:** Tự động đọc và bóc tách dữ liệu từ file PO trong vài giây.
-- **Loại bỏ 100% lỗi giá & tồn kho trước khi vào ERP:** Đối soát tự động với danh mục sản phẩm, hợp đồng và bảng giá.
-- **Phê duyệt mọi lúc mọi nơi (Mobile-first Approval):** Quản lý có thể bấm nút **[Duyệt / Từ chối / Yêu cầu sửa]** ngay trên **Telegram, Zalo, Slack hoặc WeChat**.
-- **Nguyên tắc cốt lõi "Human-In-The-Loop":** AI chỉ đóng vai trò trợ lý tiền kiểm toán (preflight), **tuyệt đối không tự ý ghi vào ERP nếu chưa có xác nhận rõ ràng từ con người**.
-
-### 1.3. Triết lý Thiết kế AI-Native (Tinh thần Cursor trong Vận hành Đơn hàng)
-Hệ thống không đi theo lối mòn tự động hóa cứng nhắc cũ mà áp dụng 5 trụ cột trải nghiệm AI-Native đỉnh cao:
-1. **Minh bạch tuyệt đối — AI không phải hộp đen (High-Trust Grounding):** Mọi cảnh báo sai giá hay thiếu tồn kho đều chỉ rõ bằng chứng cụ thể (ví dụ: *Khách đặt 75.000đ vs Bảng giá Phụ lục 02 ký ngày 15/01/2026 là 72.000đ*).
-2. **Xử lý ngầm chủ động — Không bắt người dùng chờ (Proactive & Zero-Wait):** File PO gửi qua email/Zalo được hệ thống âm thầm bóc tách và đối soát ngầm trong nền. Khi mở app hay tin nhắn Zalo, kết quả đã được dọn sẵn tức thì.
-3. **Sửa lỗi không tốn sức — Chuyển từ Nhập liệu sang Xác nhận (Frictionless Correction):** 98% dữ liệu sạch được điền tự động. Với 2% dòng có vấn đề, AI đưa sẵn gợi ý chuẩn nhất kèm 1 nút bấm chấp nhận sửa đổi.
-4. **Hiểu sâu ngữ cảnh khách hàng (Context-Centric Reasoning):** Đơn hàng được soi xét trong toàn bộ bối cảnh riêng của khách hàng đó: lịch sử đơn cũ 6 tháng qua, hạn mức công nợ, chính sách chiết khấu riêng và thói quen gọi tên sản phẩm.
-5. **Khuếch đại năng lực con người — Người dùng luôn làm chủ (Human in the Driver's Seat):** AI làm toàn bộ việc nặng bới tìm lỗi sai, con người giữ quyền lực tối cao quyết định việc đồng bộ vào ERP.
+- **Giải pháp của PO Preflight:**
+  - Đóng vai trò là **"Người gác cổng tiền kiểm" (Preflight Inspector)**: Phân tích, chuẩn hóa và đối soát đơn hàng **trước khi** cho phép đẩy vào ERP.
+  - **Phê duyệt di động 1 chạm (Mobile-first Approval):** Quản lý có thể bấm nút **[Duyệt / Từ chối / Yêu cầu sửa]** ngay trên **Telegram, Zalo OA hoặc màn hình di động tối giản** (`/m/orders/:id`).
 
 ---
 
-## 2. KIẾN TRÚC TỔNG THỂ: KẾT HỢP MIT OUTER SYSTEM + STANFORD INNER LOOP
+## 2. HIỆN TRẠNG NĂNG LỰC HỆ THỐNG (SYSTEM STATUS)
 
-Dự án áp dụng mô hình chuẩn quốc tế kết hợp giữa:
-1. **MIT Outer System (Hệ thống điều phối & Thực thi giá trị thực):** Quản trị kênh giao tiếp, API, phân quyền, bảo mật, Human-In-The-Loop và kết nối ERP.
-2. **Stanford Inner Loop (Bộ não tác tử - Reasoning & Self-Verification):** Quy trình tư duy, tìm kiếm ngữ nghĩa (RAG), tự kiểm tra chéo (Self-Reflection) và sửa sai trước khi ra quyết định.
+| Thành phần kỹ thuật | Cơ chế & Công nghệ | Trạng thái hiện tại |
+|---|---|---|
+| **Bóc tách đa định dạng (Multi-format Intake)** | Parser JSON, CSV, Text + Gemini Flash Vision OCR cho ảnh scan/PDF | **Chạy thật (Production Ready)** |
+| **Bảo đảm số học (Math Grounding)** | Self-Reflection Math Verifier (đối soát tổng tiền, thuế VAT, chiết khấu dòng) | **Chạy thật (Production Ready)** |
+| **Bộ so khớp SKU 4-Tier Hybrid** | Tier 1 Exact Hash → Tier 2 Fuzzy → Tier 3 FastEmbed Vector → Tier 4 LLM | **Chạy thật (Production Ready)** |
+| **Đồ thị điều phối luồng (Stateful Workflow)** | LangGraph StateGraph với SQLite/Postgres Checkpointer & ngắt chờ duyệt HITL | **Chạy thật (Production Ready)** |
+| **Động cơ luật B2B (Rules Engine)** | Kiểm tra giá hợp đồng, hạn mức công nợ, tồn kho ATP, MOQ, quy cách đóng gói UOM | **Chạy thật (Production Ready)** |
+| **Phê duyệt đa kênh di động (Mobile Approval)** | Telegram Bot Webhook + Zalo OA Rich Interactive Cards + Web `/m/orders/:id` | **Chạy thật (Production Ready)** |
+| **Cổng kết nối ERP (ERP Outbox)** | Transactional Outbox Pattern với MISA AMIS Live, Odoo, SAP S/4HANA (Hỗ trợ Dry-run) | **Chạy thật (Production Ready)** |
+| **Cơ sở dữ liệu kép (Dual-backend Storage)** | SQLite (WAL mode) cho Edge/On-premise và PostgreSQL cho Cloud với Alembic | **Chạy thật (Production Ready)** |
+| **Nhật ký mật mã học (Audit Hash Chain)** | Chuỗi băm SHA-256 tuần tự chống sửa đổi (Tamper-evident Cryptographic Hash Chain) | **Chạy thật (Production Ready)** |
+| **Email Intake Worker** | IMAP Poller với khóa phân tán chống xử lý trùng lặp và idempotency | **Chạy thật (Production Ready)** |
+| **Kênh phụ trợ Slack & WeChat** | Slack App Block Kit & WeChat Work Webhook | **Kế hoạch mở rộng (Roadmap)** |
+
+---
+
+## 3. KIẾN TRÚC TỔNG THỂ: LANGGRAPH STATEFUL WORKFLOW & ZERO-TOKEN RULES
+
+Dự án áp dụng mô hình kiến trúc phân lớp hiện đại:
+1. **Lớp Điều phối & An toàn (FastAPI Gateway & Guardrails):** Quản trị kênh giao tiếp, API, xác thực phiên cookie / API Key, phân quyền RBAC đa cấp bậc, Human-In-The-Loop và kết nối Transactional Outbox.
+2. **Bộ não tác tử & Đối soát luật (LangGraph Stateful Brain & Rules Engine):** Quy trình bóc tách tự phản ánh số học, giải quyết mã SKU 4 tầng (RAG Hybrid), kiểm tra bộ quy tắc B2B xác định không phụ thuộc token LLM.
 
 ```mermaid
 flowchart TB
     subgraph Channels["1. CÁC KÊNH TIẾP NHẬN & PHÊ DUYỆT (CHANNELS)"]
-        Telegram["Telegram Bot"]
-        Zalo["Zalo Official Account / ZNS"]
-        Slack["Slack App"]
-        WeChat["WeChat Work / Official"]
-        WebPortal["Web Portal (Next.js)"]
+        Telegram["Telegram Bot (Inline Buttons)"]
+        Zalo["Zalo Official Account (Rich Cards)"]
+        MobileWeb["Mobile Minimal View (/m/orders/:id)"]
+        WebPortal["Web Portal (Next.js 16 + React 19)"]
     end
 
-    subgraph MIT_Outer["2. MIT OUTER SYSTEM (ĐIỀU PHỐI & AN TOÀN)"]
-        Gateway["API Gateway & Webhook Router"]
-        Guardrails["Security Guardrails & Tenant Isolation"]
-        AuditService["Audit Trail Service (SQLite / PostgreSQL)"]
-        ERPAdapter["ERP Integration Adapter (Odoo / SAP / API)"]
+    subgraph Core_Platform["2. HỆ THỐNG ĐIỀU PHỐI & AN TOÀN (CORE PLATFORM)"]
+        Gateway["FastAPI Gateway & Webhook Router"]
+        Guardrails["Security Guardrails & RBAC Enforcement"]
+        AuditService["Cryptographic SHA-256 Audit Chain"]
+        ERPOutbox["Transactional Outbox (MISA / Odoo / SAP)"]
     end
 
-    subgraph Stanford_Brain["3. STANFORD INNER LOOP (LANGGRAPH AGENT BRAIN)"]
-        IngestionAgent["Document Ingestion & OCR Agent"]
-        RAGResolver["SKU & Contract RAG Agent (SQLite Vector / FastEmbed)"]
-        RuleEngine["Deterministic Rule Engine (Python Zero-Token)"]
-        Verifier["Self-Verification & Reflection"]
-        RiskEvaluator["Risk Scoring (Low / Medium / High)"]
+    subgraph Agent_Brain["3. BỘ NÃO TÁC TỬ & ĐỐI SOÁT LUẬT (LANGGRAPH & RAG)"]
+        IngestionAgent["Document Ingestion & Gemini Vision OCR"]
+        RAGResolver["4-Tier Hybrid SKU Resolver (Exact -> Fuzzy -> FastEmbed -> LLM)"]
+        RuleEngine["Deterministic B2B Rule Engine (Zero-Token)"]
+        Verifier["Self-Reflection Math Verifier"]
+        RiskEvaluator["Risk Assessment (Low / Medium / High)"]
     end
 
     Channels --> Gateway
     Gateway --> Guardrails
     Guardrails --> IngestionAgent
     
-    IngestionAgent --> RAGResolver
+    IngestionAgent --> Verifier
+    Verifier --> RAGResolver
     RAGResolver --> RuleEngine
-    RuleEngine --> Verifier
-    Verifier -- "Phát hiện điểm bất thường" --> IngestionAgent
-    Verifier -- "Kết quả chuẩn xác" --> RiskEvaluator
+    RuleEngine --> RiskEvaluator
     
     RiskEvaluator --> Channels
     RiskEvaluator --> AuditService
     
-    Channels -- "Người có thẩm quyền bấm [APPROVE]" --> ERPAdapter
-    ERPAdapter --> AuditService
+    Channels -- "Người có thẩm quyền bấm [APPROVE]" --> ERPOutbox
+    ERPOutbox --> AuditService
 ```
 
 ---
 
-## 3. SƠ ĐỒ LUỒNG XỬ LÝ CHI TIẾT (END-TO-END FLOW)
+## 4. CHI TIẾT BỘ SO KHỚP SKU 4-TIER WATERFALL HYBRID RAG
 
-### 3.1. Sơ đồ tuần tự (Sequence Flow)
+Để đạt độ chính xác cao nhất với chi phí thấp nhất, hệ thống triển khai chiến lược 4 tầng theo thứ tự ưu tiên:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Customer as Khách hàng / Nhân viên
-    participant Channel as Telegram / Zalo / Slack / Web
-    participant Router as Preflight Gateway
-    participant Brain as LangGraph Agent + RAG
-    participant DB as Audit DB & Vector Store
-    actor Manager as Quản lý phê duyệt
-    participant ERP as Hệ thống ERP
-
-    Customer->>Channel: Gửi file PO (PDF, Ảnh, Excel, JSON)
-    Channel->>Router: Webhook chuyển tiếp tài liệu
-    Router->>DB: Lưu tài liệu gốc & Tạo phiên kiểm toán (Pending)
-    Router->>Brain: Khởi chạy luồng phân tích Preflight
-    
-    Brain->>Brain: Tầng 1: Parser bóc tách dữ liệu (Header + Line Items)
-    Brain->>DB: Tầng 2: Tra cứu RAG Hợp đồng & Danh mục SKU
-    Brain->>Brain: Tầng 3: Chạy Rules kiểm tra Giá, Tồn kho, Trùng mã PO
-    Brain->>Brain: Tầng 4: Self-Verify & Đánh giá rủi ro (Risk Level)
-    
-    Brain->>DB: Ghi nhận kết quả phân tích & Findings
-    Brain->>Channel: Gửi Thẻ báo cáo phê duyệt (Interactive Card + Nút bấm)
-    
-    alt Đơn hàng hợp lệ (Low Risk) hoặc Cần xem xét (High Risk)
-        Channel->>Manager: Thông báo qua Telegram / Zalo / Slack
-        Manager->>Channel: Nhấn nút [Phê duyệt / Approve] kèm ghi chú
-        Channel->>Router: Gửi Action Webhook đã xác thực
-        Router->>DB: Lưu quyết định của con người (Audit Log)
-        Router->>ERP: Ghi đơn hàng chính thức vào ERP
-        Router->>Channel: Phản hồi thông báo: "Đơn hàng PO-XXX đã tạo thành công trên ERP!"
-    else Quản lý từ chối hoặc Yêu cầu sửa
-        Manager->>Channel: Nhấn nút [Từ chối / Request Change]
-        Router->>DB: Cập nhật trạng thái REJECTED / CHANGES_REQUESTED
-        Router->>Customer: Thông báo lý do cần điều chỉnh
-    end
-```
+1. **Tier 1: Exact Matching (Khớp chính xác tuyệt đối)**
+   - Hash Lookup trực tiếp từ bảng mã SKU niêm yết và Barcode. Độ trễ: `< 1ms`. Chi phí: `$0`.
+2. **Tier 2: Lexical Fuzzy Matching (Khớp mờ ký tự)**
+   - Sử dụng thuật toán Levenshtein cải tiến (`RapidFuzz`). Bắt lỗi gõ nhầm ký tự, thiếu dấu gạch ngang, thay thế `O` bằng `0`. Độ trễ: `~5ms`. Chi phí: `$0`.
+3. **Tier 3: Semantic Vector Search (Tìm kiếm ngữ nghĩa đa ngữ)**
+   - Sử dụng mô hình `FastEmbed` (`paraphrase-multilingual-MiniLM-L12-v2`) chạy hoàn toàn nội bộ (local on-premise). Hiểu tiếng lóng, tên gọi địa phương tiếng Việt (ví dụ: *"dây mạng 3m bấm sẵn"* $\rightarrow$ `CAB-CAT6-3M`). Độ trễ: `~25ms`. Chi phí: `$0`.
+4. **Tier 4: LLM Fallback (Suy luận ngôn ngữ lớn)**
+   - Kích hoạt chỉ khi 3 tầng trên không đạt ngưỡng tin cậy. Sử dụng Gemini Flash với prompt tối ưu và cấu trúc JSON nghiêm ngặt. Độ trễ: `~450ms`. Chi phí: `~$0.0001 USD / call`.
 
 ---
 
-## 4. CHIẾN LƯỢC TỐI ƯU CHI PHÍ: GIẢM 70% – 90% GỌI LLM
+## 5. CƠ CHẾ PHÊ DUYỆT ĐA KÊNH & DI ĐỘNG (MULTI-CHANNEL APPROVAL)
 
-Để hệ thống hoạt động với tốc độ dưới 1 giây và chi phí token gần như bằng 0, dự án áp dụng chiến lược **"Deterministic First, AI as Fallback"**:
+Khi phát hiện đơn hàng có cảnh báo (`Review required` hoặc `Blocked`), hệ thống tạo thẻ tóm tắt trực quan:
 
-```
-                              FILE ĐƠN HÀNG (PO)
-                                      │
-               ┌──────────────────────┴──────────────────────┐
-               ▼                                             ▼
-    [Dạng bảng có cấu trúc]                       [Dạng phi cấu trúc]
-    (JSON, CSV, Excel, Text PDF)                  (Ảnh chụp, Scan, Layout phức tạp)
-               │                                             │
-               ▼                                             ▼
-     Python Parser thuần (0 Token)                 Gọi LLM Vision / Flash (1 lần duy nhất)
-               │                                             │
-               └──────────────────────┬──────────────────────┘
-                                      │
-                                      ▼
-                   TÌM KIẾM & CHUẨN HÓA MÃ SKU (3 LỚP)
-                                      │
-       ├── Lớp 1: Exact Match với Catalog DB (0 Token)
-       ├── Lớp 2: Fuzzy Search (Levenshtein/BM25 - 0 Token)
-       └── Lớp 3: Vector Search (SQLite Vector / FastEmbed BGE-M3 - Chi phí cực thấp)
-                                      │
-                                      ▼
-                   KIỂM TRA QUY TẮC NGHIỆP VỤ (0 TOKEN)
-                                      │
-       ├── So khớp chênh lệch Đơn giá: Python `if/else` (0 Token)
-       ├── Đối soát Tồn kho khả dụng: Python `if/else` (0 Token)
-       ├── Kiểm tra Trùng lặp Mã đơn: SQL `SELECT 1` (0 Token)
-       └── Tính toán Tổng tiền & Thuế: Python Math (0 Token)
-                                      │
-                                      ▼
-                  PHÊ DUYỆT ĐA KÊNH & GHI NHẬN ERP (0 TOKEN)
-```
-
-### Các nguyên tắc kỹ thuật then chốt:
-1. **Zero-Token Business Rules:** Tuyệt đối không để LLM làm phép tính nhân chia giá tiền hay kiểm tra tồn kho (tránh ảo giác toán học - hallucination).
-2. **Single-Pass Structured Extraction:** Khi bắt buộc dùng LLM cho file scan, chỉ gọi **1 lần duy nhất** với đầu ra chuẩn hóa dạng Pydantic / JSON Schema thay vì lặp từng dòng.
-3. **Prompt Caching:** Tận dụng bộ nhớ đệm System Prompt và Schema định sẵn để giảm tới 90% chi phí input token.
-4. **Mô hình ngôn ngữ nhỏ (SLM):** Sử dụng các mô hình siêu nhẹ và chi phí thấp (Gemini 2.0 Flash / GPT-4o-mini / Claude 3.5 Haiku) cho tác vụ bóc tách văn bản.
-
----
-
-## 5. TÍCH HỢP PHÊ DUYỆT ĐA KÊNH (MULTI-CHANNEL APPROVAL)
-
-Hệ thống cho phép gửi báo cáo phân tích và nhận lệnh phê duyệt trực tiếp từ nhiều nền tảng:
-
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                        THẺ BÁO CÁO PHÊ DUYỆT ĐƠN HÀNG                            │
 │  Mã đơn: PO-2026-8892                 Khách hàng: Công ty Cổ phần ABC           │
@@ -192,81 +120,50 @@ Hệ thống cho phép gửi báo cáo phân tích và nhận lệnh phê duyệ
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 5.1. Telegram
-- **Cơ chế:** Sử dụng Telegram Bot API với `InlineKeyboardMarkup` (các nút bấm tương tác Callback).
-- **Quy trình:** Khi phát hiện PO, Bot gửi báo cáo dạng Markdown vào Group phê duyệt. Quản lý bấm nút `Approve`, bot cập nhật trạng thái tin nhắn tức thì và kích hoạt ERP sync.
+### 5.1. Telegram Bot
+- Gửi thông báo HTML kèm Inline Keyboard `[✅ Duyệt Đơn] [❌ Từ Chối] [📝 Yêu Cầu Sửa]`.
+- Callback Webhook kiểm tra bí mật chống giả mạo (`X-Telegram-Bot-Api-Secret-Token`).
 
-### 5.2. Zalo (Zalo Official Account & Zalo ZNS)
-- **Cơ chế:** Gửi tin nhắn tương tác qua Zalo OA OpenAPI hoặc Zalo Notification Service (ZNS) kèm Button Action Webhook.
-- **Ưu điểm tại Việt Nam:** Tiện lợi tối đa cho cấp quản lý sử dụng Zalo hàng ngày trên điện thoại.
+### 5.2. Zalo Official Account (Zalo OA)
+- Gửi thẻ tin nhắn tương tác kèm các nút hành động qua OpenAPI / ZNS.
+- Kiểm tra chữ ký HMAC-SHA256 bảo đảm an toàn thông điệp.
 
-- **Tích hợp Slack App & Webhooks:** Cho phép gửi tin nhắn thông báo dạng Block Kit và nhận lệnh phê duyệt trực tiếp qua kênh chat.
-
-### 5.4. WeChat (WeChat Work / Enterprise WeChat)
-- **Cơ chế:** Sử dụng WeChat Work Webhook Bot với định dạng `template_card` (Interactive Cards).
-- **Phục vụ:** Các doanh nghiệp có chuỗi cung ứng hoặc đối tác sản xuất tại thị trường nói tiếng Trung.
-
-### 5.5. Web Portal (Next.js Prototype)
-- **Cơ chế:** Bảng điều khiển trung tâm (Dashboard) quản lý toàn bộ hàng đợi đơn hàng, chi tiết từng dòng vi phạm, biểu đồ thời gian thực và lịch sử kiểm toán chi tiết (Audit Trail Timeline).
+### 5.3. Giao diện Di động Tối giản (`/m/orders/:id`)
+- Màn hình dành riêng cho duyệt trên điện thoại khi không dùng Telegram/Zalo, hiển thị đầy đủ thông tin đơn hàng, danh sách cảnh báo và 3 nút duyệt lớn kèm ô ghi chú giải trình.
 
 ---
 
-## 6. MÔ HÌNH MULTI-AGENT TEAM VỚI LANGGRAPH
-
-Khi phát triển mở rộng, hệ thống vận hành theo cơ chế phân quyền tác tử:
-
-1. **Ingestion Agent (Multimodal Vision):** Đọc layout, OCR, trích xuất cấu trúc dữ liệu thô.
-2. **Catalog & SKU Resolution Agent (RAG):** Tìm kiếm và khớp nối các SKU viết tắt, sai chính tả, mô tả mơ hồ về mã chuẩn của doanh nghiệp.
-3. **Contract & Policy Auditor Agent:** Tra cứu bảng giá riêng theo từng khách hàng, điều khoản công nợ và hạn mức tín dụng.
-4. **Inventory & Warehouse Agent:** Kiểm tra số lượng tồn kho khả dụng tại từng kho hàng gần nhất, cảnh báo hàng thiếu.
-5. **Supervisor & Human-In-The-Loop Agent:** Tổng hợp báo cáo, phân loại mức độ rủi ro (Low / Medium / High), điều phối gửi thông báo qua các kênh chat và quản lý điểm ngắt (`interrupt`) chờ con người bấm duyệt.
-
----
-
-## 7. CẤU TRÚC THƯ MỤC DỰ ÁN SAU KHI NÂNG CẤP
+## 6. CẤU TRÚC MÃ NGUỒN THỰC TẾ (CODEBASE STRUCTURE)
 
 ```text
 po-preflight/
 ├── apps/
-│   ├── api/                     # FastAPI Backend (Quản lý Webhook, Auth, State)
-│   └── web/                     # Next.js Web Portal (Dashboard & Queue)
+│   └── web/                     # Next.js 16 + React 19 Frontend Dashboard & Portal
+│       ├── app/(marketing)/     # Trang giới thiệu, bảng giá (/pricing), an ninh (/security)
+│       ├── app/(protected)/     # Các màn hình vận hành (/orders, /staging, /reports, /settings)
+│       └── app/m/orders/[id]/   # Màn hình phê duyệt di động tối giản
 ├── src/
 │   └── preflight/
-│       ├── agents/              # LangGraph Agents (Ingestion, RAG, Auditor, Supervisor)
-│       ├── channels/            # Module tích hợp đa kênh (Telegram, Zalo, Slack, WeChat)
-│       │   ├── telegram.py
-│       │   ├── zalo.py
-│       │   ├── slack.py
-│       │   └── wechat.py
-│       ├── rag/                 # Vector Store & Embedding (SQLite Vector / FastEmbed)
-│       ├── parsers.py           # Bộ đọc file nhanh (JSON, CSV, Text, PDF)
-│       ├── catalog.py           # Quản lý danh mục & Bảng giá
-│       ├── rules.py             # Rule Engine xác định (Zero-Token Validation)
-│       ├── models.py            # Pydantic Schemas & Data Contracts
-│       ├── store.py             # SQLite / PostgreSQL Audit Trail Store
-│       └── cli.py               # Giao diện dòng lệnh CLI
-├── docs/
-│   ├── MO_TA_DU_AN.md           # Tài liệu mô tả dự án chi tiết (Tiếng Việt)
-│   ├── PRD.md                   # Yêu cầu sản phẩm chi tiết
-│   ├── architecture.md          # Kiến trúc kỹ thuật và sơ đồ
-│   └── ui-specification.md      # Quy chuẩn giao diện người dùng
-├── examples/                    # Dữ liệu mẫu (Catalog, Đơn hàng PO JSON/CSV/PDF)
-├── tests/                       # Bộ kiểm thử tự động (Unit & Integration Tests)
-└── pyproject.toml               # Cấu hình dự án & Dependencies
+│       ├── api/                 # FastAPI REST Gateway & Webhook Endpoints
+│       │   └── routes/          # orders, reports, bot, erp, users, rules, ingestion...
+│       ├── agent/               # LangGraph Workflow & State Management
+│       ├── rag/                 # 4-Tier SKU Matcher & FastEmbed Vector Search
+│       ├── rules.py             # Deterministic Rules Engine (B2B checks)
+│       ├── erp/                 # Transactional Outbox (MISA, Odoo, SAP)
+│       ├── intake/              # Email Intake IMAP Worker & Pipeline
+│       ├── security/            # RBAC, Password Hash (Argon2), SHA-256 Audit Chain
+│       ├── store.py             # Dual-backend Storage (SQLite WAL / PostgreSQL)
+│       └── models.py            # Dataclasses & Domain Models
+├── evals/                       # Bộ dữ liệu đo kiểm SKU & Tài liệu PO thực tế
+├── tests/                       # Hơn 270 unit tests & integration tests tự động
+├── docs/                        # Tài liệu nghiệp vụ, kiến trúc, playbook và security
+└── scripts/                     # Script kiểm thử CI/CD (test.sh, demo.sh)
 ```
 
 ---
 
-## 8. LỘ TRÌNH TRIỂN KHAI (IMPLEMENTATION ROADMAP)
+## 7. BẢO MẬT & TUÂN THỦ NGHỊ ĐỊNH 13/2023/NĐ-CP
 
-- [x] **Giai đoạn 1 (MVP Hoàn thành):** Bộ đọc file thuần, Rule engine kiểm tra giá/tồn kho/trùng lặp, Audit log SQLite, CLI analyze, Web prototype.
-- [ ] **Giai đoạn 2 (RAG & Tối ưu AI):**
-  - Tích hợp SQLite Vector / FastEmbed cho Vector Search SKU và Hợp đồng khách hàng.
-  - Tích hợp Gemini Flash / Claude Haiku cho bóc tách tài liệu PDF/Ảnh scan phức tạp.
-- [ ] **Giai đoạn 3 (LangGraph & Multi-Channel Approval):**
-  - Xây dựng LangGraph StateGraph với cơ chế Human-In-The-Loop Interrupt.
-  - Tích hợp Bot phê duyệt tương tác qua **Telegram & Zalo OA**.
-  - Mở rộng sang **Slack & WeChat Work**.
-- [ ] **Giai đoạn 4 (Doanh nghiệp & ERP Production):**
-  - Kết nối Adapter ERP chính thức (Odoo API / SAP / Custom REST API).
-  - Triển khai hạ tầng AWS bảo mật cao (Terraform, PostgreSQL, S3, Secrets Manager).
+- **Không chuyển dữ liệu ra nước ngoài:** Bộ nhúng vector `FastEmbed` và động cơ luật chạy hoàn toàn nội bộ trên máy chủ doanh nghiệp.
+- **Chứng thực tính bất biến:** Chuỗi băm SHA-256 kết nối từng sự kiện phân tích và quyết định của con người thành một chuỗi khối mật mã học, cho phép kiểm toán viên xác minh không có can thiệp cơ sở dữ liệu ngầm.
+- **Phân định trách nhiệm rõ ràng (SoD):** Tuân thủ tuyệt đối nguyên tắc kiểm soát nội bộ — ngăn chặn tình trạng nhân viên tự tạo và tự duyệt đơn hàng.

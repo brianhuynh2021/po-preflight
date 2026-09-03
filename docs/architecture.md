@@ -1,6 +1,6 @@
 # PO Preflight Architecture
 
-This document describes the target architecture for PO Preflight and the path from a local demonstration to an enterprise multi-agent & multi-channel deployment.
+This document describes the concrete system architecture for PO Preflight and the path from single-tenant pilot to enterprise multi-tenant deployment.
 
 ## 1. System context
 
@@ -9,11 +9,11 @@ flowchart LR
     Customer["Customer or Operations User"]
     Reviewer["Sales or Operations Manager"]
     Admin["System Administrator"]
-    MultiChannels["Channels: Telegram / Zalo / Slack / WeChat"]
+    MultiChannels["Channels: Telegram / Zalo OA / Mobile Web"]
     Web["Preflight Web Portal"]
-    Preflight["PO Preflight (Agentic Brain + RAG)"]
-    Catalog["Product Catalog & Vector Index"]
-    ERP["ERP Adapter (Odoo / SAP)"]
+    Preflight["PO Preflight Core (LangGraph + 4-Tier RAG)"]
+    Catalog["Product Catalog & Vector Embeddings"]
+    ERP["ERP Adapter (MISA AMIS / Odoo / SAP)"]
 
     Customer -->|Submit purchase order| MultiChannels
     Customer -->|Upload and review| Web
@@ -26,14 +26,14 @@ flowchart LR
     Preflight -.->|Approved orders only| ERP
 ```
 
-Preflight is the controlled intake layer between incoming purchase-order documents and downstream business systems. Multi-channel bots (Telegram, Zalo, Slack, WeChat) and the web portal are interfaces to the same workflow and audit trail.
+Preflight is the controlled intake layer between incoming purchase-order documents and downstream business systems. Multi-channel bots (Telegram, Zalo Official Account) and the web portal are unified interfaces to the same workflow and cryptographic audit trail.
 
-### 1.1 AI-Native Design Philosophy (Adapted from the Cursor Mindset)
+### 1.1 AI-Native Design Philosophy
 
-Rather than rigid legacy automation, PO Preflight applies 5 core principles of modern AI-native systems to B2B order operations:
+PO Preflight applies 5 core principles of modern AI-assisted systems to B2B order operations:
 
-1. **High-Trust Grounding Evidence:** AI is never a black box. Every validation finding provides explicit lineage and evidence (e.g., matching line 3 of the PO against Clause 2 of Customer Contract #2026-04).
-2. **Proactive Background Processing (Zero-Wait):** Documents sent via email, Zalo, or portal are ingested and analyzed asynchronously in the background. Reviewers see instant results without watching spinners.
+1. **High-Trust Grounding Evidence:** AI is never an opaque black box. Every validation finding provides explicit lineage and evidence (e.g., matching line 3 of the PO against Clause 2 of Customer Contract #2026-04).
+2. **Proactive Background Processing (Zero-Wait):** Documents sent via email or portal are ingested and analyzed asynchronously in the background. Reviewers see instant results.
 3. **Frictionless 1-Click Correction:** 98% of clean data is prepared automatically. For ambiguous lines, AI provides 1-click suggested corrections instead of forcing manual data re-entry.
 4. **Context-Centric Reasoning:** Orders are evaluated in the holistic context of customer historical orders, custom pricing agreements, and past nickname resolutions.
 5. **Human in Full Control:** AI acts as a tireless pre-flight co-pilot. Only an authenticated human decision triggers ERP synchronization.
@@ -43,38 +43,36 @@ Rather than rigid legacy automation, PO Preflight applies 5 core principles of m
 ```mermaid
 flowchart TB
     subgraph Channels["User Channels & Messaging"]
-        TelegramBot["Telegram Bot"]
-        ZaloOA["Zalo OA / ZNS"]
-        SlackApp["Slack Application"]
-        WeChatBot["WeChat Work Bot"]
+        TelegramBot["Telegram Bot (Inline Keyboards)"]
+        ZaloOA["Zalo OA (Interactive Cards)"]
+        MobileWeb["Minimal Mobile View (/m/orders/:id)"]
         WebApp["Next.js Web Portal"]
     end
 
-    subgraph Platform["Preflight Platform (MIT Outer + Stanford Inner Loop)"]
+    subgraph Platform["Preflight Platform Core Engine"]
         API["FastAPI Gateway & Webhook Router"]
-        Worker["Document Processing Worker"]
-        AgentEngine["LangGraph Agentic Engine"]
-        RAGService["SKU & Contract RAG (FastEmbed Local)"]
+        Worker["Document Processing Worker & Queue"]
+        AgentEngine["LangGraph Stateful Workflow (Checkpointed)"]
+        RAGService["4-Tier Hybrid SKU RAG (Exact/Fuzzy/Vector/LLM)"]
         Rules["Deterministic Zero-Token Rule Engine"]
-        Audit["Audit Trail Service"]
+        Audit["Cryptographic SHA-256 Audit Chain"]
     end
 
     subgraph Data["Data services"]
-        DB[("PostgreSQL / SQLite")]
-        VectorStore[("SQLite Vector Embeddings")]
+        DB[("PostgreSQL (Cloud) / SQLite WAL (Edge)")]
+        VectorStore[("FastEmbed Multilingual Embeddings")]
         Files[("S3 / Local Document Store")]
-        Secrets["AWS Secrets Manager"]
+        Secrets["Environment & Secret Management"]
     end
 
     subgraph External["Company systems"]
-        CatalogAPI["Catalog and Inventory Source"]
-        ERPAPI["ERP Adapter — Human Approved Only"]
+        CatalogAPI["Master Catalog and ATP Stock"]
+        ERPAPI["ERP Transactional Outbox (MISA / Odoo / SAP)"]
     end
 
     TelegramBot --> API
     ZaloOA --> API
-    SlackApp --> API
-    WeChatBot --> API
+    MobileWeb --> API
     WebApp --> API
     API --> Worker
     Worker --> AgentEngine
@@ -91,18 +89,20 @@ flowchart TB
     API -.-> ERPAPI
 ```
 
-### Component responsibilities
+### Component status & implementation reality
 
-| Component | Responsibility | MVP status |
+| Thành phần | Trách nhiệm | Trạng thái hiện tại |
 |---|---|---|
-| Next.js web portal | Upload, review, approval, search, and audit experience | Interactive prototype |
-| Slack application | Submit orders and act on exception notifications | Planned |
-| FastAPI application | Authentication, workflow state, business API, and integration boundary | Planned |
-| Document worker | Extraction, normalization, validation orchestration, and retries | Local core available |
-| Preflight core | Parsers, deterministic rules, reports, and audit decisions | Implemented |
-| LangGraph Agent Engine | AI-assisted extraction, hybrid SKU RAG, reflection, and channel orchestration | In progress |
-| PostgreSQL | Durable orders, findings, decisions, rules, and tenant data | Planned; SQLite used locally |
-| S3 | Original documents and generated artifacts | Planned for AWS |
+| **FastAPI Gateway** | Xác thực session/API-Key, RBAC, phân tích luật B2B, quản lý đơn hàng | **Chạy thật (Production Ready)** |
+| **Next.js Web Portal** | Giao diện React 19 / Next 16 trên Vite: Bóc tách, inline edit, audit log | **Chạy thật (Production Ready)** |
+| **Telegram & Zalo OA Bots** | Đẩy tin nhắn cảnh báo rich card, webhook callback phê duyệt 1 chạm từ di động | **Chạy thật (Production Ready)** |
+| **LangGraph Stateful Graph** | Đồ thị luồng ngắt chờ duyệt Human-In-The-Loop với SQLite/Postgres checkpointing | **Chạy thật (Production Ready)** |
+| **Bộ so khớp SKU 4-Tier** | Tier 1 Exact → Tier 2 Fuzzy → Tier 3 Vector (FastEmbed) → Tier 4 LLM fallback | **Chạy thật (Production Ready)** |
+| **Động cơ luật B2B** | Đối soát giá niêm yết, hợp đồng, tồn kho ATP, nợ quá hạn, quy cách UOM | **Chạy thật (Production Ready)** |
+| **ERP Transactional Outbox** | Hàng đợi xuất ERP idempotent hỗ trợ MISA AMIS, Odoo, SAP S/4HANA | **Chạy thật (Production Ready)** |
+| **Chuỗi băm SHA-256** | Nhật ký mật mã học tamper-evident chứng thực tính bất biến của quyết định | **Chạy thật (Production Ready)** |
+| **Email Intake Worker** | IMAP worker định kỳ tiếp nhận PO đính kèm với lock chống xử lý trùng lặp | **Chạy thật (Production Ready)** |
+| **Kênh phụ trợ Slack & WeChat** | Tích hợp mở rộng Slack Block Kit và WeChat Work | **Kế hoạch mở rộng (Roadmap)** |
 
 ## 3. Order processing sequence
 
