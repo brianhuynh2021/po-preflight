@@ -105,7 +105,7 @@ const jsonLd = {
         "@type": "Offer",
         price: "0",
         priceCurrency: "VND",
-        description: "30-day free pilot trial for enterprise distributors",
+        description: "14-day free pilot trial for enterprise distributors",
       },
       publisher: {
         "@id": "https://popreflight.vn/#organization",

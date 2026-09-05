@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useMounted } from "@/app/lib/useMounted";
 import type { PurchaseOrder } from "@/app/lib/types";
 import { money } from "@/app/lib/derive";
 import { api } from "@/app/lib/api/client";
@@ -12,6 +14,7 @@ interface SideBySideViewerProps {
 }
 
 export function SideBySideViewer({ order, onClose }: SideBySideViewerProps) {
+  const mounted = useMounted();
   const [activeTab, setActiveTab] = useState<"visual" | "json">("visual");
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [hoveredLineIndex, setHoveredLineIndex] = useState<number | null>(null);
@@ -58,7 +61,9 @@ export function SideBySideViewer({ order, onClose }: SideBySideViewerProps) {
   const handleZoomOut = () => setZoomLevel((prev) => Math.max(0.6, +(prev - 0.25).toFixed(2)));
   const handleZoomReset = () => setZoomLevel(1.0);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="side-by-side-title">
       <div
         ref={modalRef}
@@ -426,6 +431,7 @@ export function SideBySideViewer({ order, onClose }: SideBySideViewerProps) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

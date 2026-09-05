@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import {
-  BarChart3,
   Clock,
   Download,
   Mail,
@@ -10,6 +9,7 @@ import {
   ShieldAlert,
   TrendingUp,
   Zap,
+  Sparkles,
 } from "lucide-react";
 import { api } from "@/app/lib/api/client";
 import type { PilotReportResponse } from "@/app/lib/api/types";
@@ -91,6 +91,45 @@ const DEFAULT_REPORT: PilotReportResponse = {
   ],
 };
 
+// Business readable dictionary for finding codes
+const FINDING_METADATA: Record<string, { label: string; desc: string; severity: "critical" | "warning" }> = {
+  PRICE_MISMATCH: {
+    label: "Chênh lệch giá bán so với Bảng giá hợp đồng",
+    desc: "Đơn giá trên PO sai khác với Catalog chiết khấu đã ký",
+    severity: "warning",
+  },
+  INSUFFICIENT_STOCK: {
+    label: "Tồn kho khả dụng (ATP) không đủ đáp ứng",
+    desc: "Số lượng đặt vượt quá lượng hàng có sẵn trong kho thực tế",
+    severity: "warning",
+  },
+  UNKNOWN_SKU: {
+    label: "Mã hàng (SKU) chưa khai báo trong danh mục",
+    desc: "Mã sản phẩm lạ hoặc sai quy cách cần bóc tách kiểm tra",
+    severity: "critical",
+  },
+  DUPLICATE_PO: {
+    label: "Nghi ngờ đơn đặt hàng bị trùng lặp (Duplicate PO)",
+    desc: "Mã số PO hoặc nội dung trùng với đơn hàng đã tiếp nhận",
+    severity: "critical",
+  },
+  CREDIT_LIMIT_EXCEEDED: {
+    label: "Vượt hạn mức tín dụng / công nợ khách hàng",
+    desc: "Tổng giá trị đơn vượt quá bảo lãnh nợ cho phép",
+    severity: "warning",
+  },
+  INVALID_PACK_SIZE: {
+    label: "Sai quy cách đóng gói tối thiểu (MOQ)",
+    desc: "Số lượng đặt không chia hết cho quy cách thùng/kiện",
+    severity: "warning",
+  },
+  POSSIBLE_DUPLICATE: {
+    label: "Cảnh báo trùng lặp đơn hàng tiềm ẩn",
+    desc: "Trùng số hiệu PO cùng đối tác gửi trong 48 giờ qua",
+    severity: "critical",
+  },
+};
+
 export default function ReportsPage() {
   const [report, setReport] = useState<PilotReportResponse>(DEFAULT_REPORT);
   const [loading, setLoading] = useState(false);
@@ -114,7 +153,7 @@ export default function ReportsPage() {
           setReport(data);
         }
       } catch {
-        // Fallback to seeded demo report on connection error
+        // Fallback to seeded demo report
       }
     };
     void fetchAsync();
@@ -173,258 +212,622 @@ export default function ReportsPage() {
   const maxTrendVal = Math.max(...report.daily_trends.map((t) => t.received), 1);
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header & Actions */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
+    <div style={{ padding: "var(--space-6) var(--space-8)", maxWidth: "1400px", margin: "0 auto" }}>
+      {/* 1. Header & Quick Controls */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+          gap: "var(--space-4)",
+          marginBottom: "var(--space-6)",
+          paddingBottom: "var(--space-5)",
+          borderBottom: "1px solid var(--line)",
+        }}
+      >
         <div>
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-[var(--green)]" />
-            <h1 className="text-xl font-bold tracking-tight text-[var(--ink)]">
-              Báo Cáo Đo Lường Pilot Vận Hành
-            </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "3px 10px",
+                borderRadius: "9999px",
+                background: "rgba(16,185,129,0.1)",
+                color: "var(--color-primary)",
+                fontSize: "0.6875rem",
+                fontWeight: 700,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+              }}
+            >
+              <Sparkles size={11} />
+              Báo Cáo Hiệu Quả Pilot &amp; ROI
+            </span>
           </div>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Theo dõi thời gian tiết kiệm, tỷ lệ chặn lỗi trước ERP và độ tin cậy của 4-Tier RAG Hybrid
+          <h1
+            style={{
+              fontSize: "1.625rem",
+              fontWeight: 800,
+              letterSpacing: "-0.025em",
+              color: "var(--ink)",
+              margin: 0,
+            }}
+          >
+            Báo Cáo Đo Lường Pilot Vận Hành
+          </h1>
+          <p style={{ margin: "4px 0 0", fontSize: "0.875rem", color: "var(--muted)" }}>
+            Theo dõi thời gian tiết kiệm nhân sự, tỷ lệ ngăn chặn rủi ro tài chính và độ tin cậy của 4-Tier RAG Hybrid
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Actions bar */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
           {/* Period selector */}
-          <div className="inline-flex rounded-lg border bg-[var(--paper)] p-1 text-xs">
-            <button
-              onClick={() => setPeriodFilter("7d")}
-              className={`rounded px-2.5 py-1 font-medium transition-colors ${
-                periodFilter === "7d"
-                  ? "bg-[var(--green)] text-white"
-                  : "text-[var(--muted)] hover:text-[var(--ink)]"
-              }`}
-            >
-              7 ngày qua
-            </button>
-            <button
-              onClick={() => setPeriodFilter("30d")}
-              className={`rounded px-2.5 py-1 font-medium transition-colors ${
-                periodFilter === "30d"
-                  ? "bg-[var(--green)] text-white"
-                  : "text-[var(--muted)] hover:text-[var(--ink)]"
-              }`}
-            >
-              30 ngày qua
-            </button>
-            <button
-              onClick={() => setPeriodFilter("all")}
-              className={`rounded px-2.5 py-1 font-medium transition-colors ${
-                periodFilter === "all"
-                  ? "bg-[var(--green)] text-white"
-                  : "text-[var(--muted)] hover:text-[var(--ink)]"
-              }`}
-            >
-              Toàn thời gian
-            </button>
+          <div
+            style={{
+              display: "inline-flex",
+              background: "var(--canvas)",
+              padding: "3px",
+              borderRadius: "10px",
+              border: "1px solid var(--line)",
+            }}
+          >
+            {[
+              { key: "7d", label: "7 ngày qua" },
+              { key: "30d", label: "30 ngày qua" },
+              { key: "all", label: "Toàn bộ" },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setPeriodFilter(tab.key as "7d" | "30d" | "all")}
+                style={{
+                  padding: "5px 12px",
+                  fontSize: "0.8125rem",
+                  fontWeight: periodFilter === tab.key ? 700 : 500,
+                  color: periodFilter === tab.key ? "#ffffff" : "var(--muted)",
+                  background: periodFilter === tab.key ? "var(--color-primary)" : "transparent",
+                  border: "none",
+                  borderRadius: "7px",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
           <button
+            type="button"
             onClick={handleRefresh}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-lg border bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:bg-[var(--canvas)]"
-            title="Làm mới"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 14px",
+              fontSize: "0.8125rem",
+              fontWeight: 600,
+              color: "var(--ink)",
+              background: "var(--paper)",
+              border: "1px solid var(--line)",
+              borderRadius: "8px",
+              cursor: "pointer",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+            }}
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
             Làm mới
           </button>
 
           <button
+            type="button"
             onClick={handleDownloadCsv}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--green)] bg-[var(--green-soft)] px-3 py-1.5 text-xs font-medium text-[var(--green)] hover:opacity-90"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 14px",
+              fontSize: "0.8125rem",
+              fontWeight: 600,
+              color: "var(--color-primary)",
+              background: "rgba(16,185,129,0.08)",
+              border: "1px solid rgba(16,185,129,0.25)",
+              borderRadius: "8px",
+              cursor: "pointer",
+            }}
           >
-            <Download className="h-3.5 w-3.5" />
+            <Download size={14} />
             Xuất CSV Báo cáo
           </button>
 
           <button
+            type="button"
             onClick={handleSendWeeklyEmail}
             disabled={sendingEmail}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--green)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 16px",
+              fontSize: "0.8125rem",
+              fontWeight: 600,
+              color: "#ffffff",
+              background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+              boxShadow: "0 2px 6px rgba(16,185,129,0.3)",
+            }}
           >
-            <Mail className="h-3.5 w-3.5" />
+            <Mail size={14} />
             {sendingEmail ? "Đang gửi..." : "Gửi Email Tuần"}
           </button>
         </div>
       </div>
 
       {emailStatus && (
-        <div className="rounded-lg border border-[var(--green)] bg-[var(--green-soft)] p-3 text-xs text-[var(--green)] flex items-center justify-between">
-          <span>{emailStatus}</span>
-          <button onClick={() => setEmailStatus(null)} className="font-bold ml-2">×</button>
+        <div
+          style={{
+            marginBottom: "var(--space-5)",
+            padding: "10px 16px",
+            borderRadius: "10px",
+            background: "rgba(16,185,129,0.1)",
+            border: "1px solid rgba(16,185,129,0.3)",
+            color: "var(--color-primary)",
+            fontSize: "0.8125rem",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span style={{ fontWeight: 500 }}>{emailStatus}</span>
+          <button
+            onClick={() => setEmailStatus(null)}
+            style={{ background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}
+          >
+            ×
+          </button>
         </div>
       )}
 
-      {/* 4 Hero KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border bg-[var(--paper)] p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[var(--muted)] uppercase">Thời gian tiết kiệm</span>
-            <div className="rounded-lg bg-[var(--green-soft)] p-2 text-[var(--green)]">
-              <Clock className="h-5 w-5" />
+      {/* 2. Four Redesigned Hero KPI Cards */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+          gap: "var(--space-4)",
+          marginBottom: "var(--space-6)",
+        }}
+      >
+        {/* Card 1: Time Saved */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "16px",
+            padding: "20px 22px",
+            boxShadow: "var(--shadow-elevation-1)",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "var(--muted)",
+                }}
+              >
+                Thời gian tiết kiệm
+              </span>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "6px" }}>
+                <span
+                  style={{
+                    fontSize: "2rem",
+                    fontWeight: 800,
+                    letterSpacing: "-0.03em",
+                    color: "var(--color-primary)",
+                    lineHeight: 1,
+                  }}
+                >
+                  {summary.estimated_hours_saved}h
+                </span>
+                <span style={{ fontSize: "0.8125rem", color: "var(--muted)", fontWeight: 500 }}>
+                  / {summary.total_orders_received} đơn PO
+                </span>
+              </div>
+            </div>
+            <div
+              style={{
+                width: "42px",
+                height: "42px",
+                borderRadius: "12px",
+                background: "rgba(16,185,129,0.12)",
+                display: "grid",
+                placeItems: "center",
+                color: "var(--color-primary)",
+              }}
+            >
+              <Clock size={22} />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-[var(--green)]">
-              {summary.estimated_hours_saved}h
-            </span>
-            <span className="text-xs text-[var(--muted)]">/ {summary.total_orders_received} đơn</span>
+          <div
+            style={{
+              marginTop: "14px",
+              paddingTop: "12px",
+              borderTop: "1px solid var(--line)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: "0.75rem",
+              color: "var(--muted)",
+            }}
+          >
+            <span>Giảm từ 25 phút thủ công</span>
+            <span style={{ fontWeight: 700, color: "var(--color-primary)" }}>xuống ~2 phút/đơn</span>
           </div>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            Giảm từ 25 phút thủ công xuống ~2 phút/đơn
-          </p>
         </div>
 
-        <div className="rounded-xl border bg-[var(--paper)] p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[var(--muted)] uppercase">Chặn sai sót trước ERP</span>
-            <div className="rounded-lg bg-[var(--red-soft)] p-2 text-[var(--red)]">
-              <ShieldAlert className="h-5 w-5" />
+        {/* Card 2: Risk Blocked */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "16px",
+            padding: "20px 22px",
+            boxShadow: "var(--shadow-elevation-1)",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "var(--muted)",
+                }}
+              >
+                Chặn rủi ro trước ERP
+              </span>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "6px" }}>
+                <span
+                  style={{
+                    fontSize: "2rem",
+                    fontWeight: 800,
+                    letterSpacing: "-0.03em",
+                    color: "var(--color-error)",
+                    lineHeight: 1,
+                  }}
+                >
+                  {summary.orders_blocked_before_erp} đơn
+                </span>
+                <span style={{ fontSize: "0.8125rem", color: "var(--muted)", fontWeight: 500 }}>bị chặn lỗi</span>
+              </div>
+            </div>
+            <div
+              style={{
+                width: "42px",
+                height: "42px",
+                borderRadius: "12px",
+                background: "rgba(239,68,68,0.12)",
+                display: "grid",
+                placeItems: "center",
+                color: "var(--color-error)",
+              }}
+            >
+              <ShieldAlert size={22} />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-[var(--red)]">
-              {summary.orders_blocked_before_erp} đơn
-            </span>
-            <span className="text-xs text-[var(--muted)]">ngăn chặn rủi ro</span>
+          <div
+            style={{
+              marginTop: "14px",
+              paddingTop: "12px",
+              borderTop: "1px solid var(--line)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: "0.75rem",
+              color: "var(--muted)",
+            }}
+          >
+            <span>Bảo vệ số liệu ERP</span>
+            <span style={{ fontWeight: 700, color: "var(--color-error)" }}>Sai giá, tồn kho &amp; nợ</span>
           </div>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            Sai giá, hết tồn kho & vượt hạn mức tín dụng
-          </p>
         </div>
 
-        <div className="rounded-xl border bg-[var(--paper)] p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[var(--muted)] uppercase">Tổng giá trị xử lý</span>
-            <div className="rounded-lg bg-[var(--blue-soft)] p-2 text-[var(--blue)]">
-              <TrendingUp className="h-5 w-5" />
+        {/* Card 3: Value Processed */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "16px",
+            padding: "20px 22px",
+            boxShadow: "var(--shadow-elevation-1)",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "var(--muted)",
+                }}
+              >
+                Tổng giá trị tiền kiểm
+              </span>
+              <div style={{ marginTop: "6px" }}>
+                <span
+                  style={{
+                    fontSize: "1.625rem",
+                    fontWeight: 800,
+                    letterSpacing: "-0.025em",
+                    color: "var(--ink)",
+                    lineHeight: 1,
+                  }}
+                >
+                  {money(summary.total_value_processed)}
+                </span>
+              </div>
+            </div>
+            <div
+              style={{
+                width: "42px",
+                height: "42px",
+                borderRadius: "12px",
+                background: "rgba(59,130,246,0.12)",
+                display: "grid",
+                placeItems: "center",
+                color: "var(--color-info)",
+              }}
+            >
+              <TrendingUp size={22} />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-xl font-bold text-[var(--ink)]">
-              {money(summary.total_value_processed)}
-            </span>
+          <div
+            style={{
+              marginTop: "14px",
+              paddingTop: "12px",
+              borderTop: "1px solid var(--line)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: "0.75rem",
+              color: "var(--muted)",
+            }}
+          >
+            <span>Quy mô dòng hàng</span>
+            <span style={{ fontWeight: 700, color: "var(--ink)" }}>{summary.total_lines_processed} dòng hàng</span>
           </div>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            Tổng cộng {summary.total_lines_processed} dòng hàng đã rà soát
-          </p>
         </div>
 
-        <div className="rounded-xl border bg-[var(--paper)] p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[var(--muted)] uppercase">Chuẩn hóa tự động</span>
-            <div className="rounded-lg bg-[var(--amber-soft)] p-2 text-[var(--amber)]">
-              <Zap className="h-5 w-5" />
+        {/* Card 4: Automation Rate */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "16px",
+            padding: "20px 22px",
+            boxShadow: "var(--shadow-elevation-1)",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "var(--muted)",
+                }}
+              >
+                Tỷ lệ chuẩn hóa tự động
+              </span>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "6px" }}>
+                <span
+                  style={{
+                    fontSize: "2rem",
+                    fontWeight: 800,
+                    letterSpacing: "-0.03em",
+                    color: "var(--ink)",
+                    lineHeight: 1,
+                  }}
+                >
+                  {summary.automation_rate_pct}%
+                </span>
+                <span style={{ fontSize: "0.8125rem", color: "var(--muted)", fontWeight: 500 }}>qua 4-Tier RAG</span>
+              </div>
+            </div>
+            <div
+              style={{
+                width: "42px",
+                height: "42px",
+                borderRadius: "12px",
+                background: "rgba(245,158,11,0.12)",
+                display: "grid",
+                placeItems: "center",
+                color: "var(--color-warning)",
+              }}
+            >
+              <Zap size={22} />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-[var(--ink)]">
-              {summary.automation_rate_pct}%
-            </span>
-            <span className="text-xs text-[var(--muted)]">qua 4-Tier RAG</span>
+          <div
+            style={{
+              marginTop: "14px",
+              paddingTop: "12px",
+              borderTop: "1px solid var(--line)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: "0.75rem",
+              color: "var(--muted)",
+            }}
+          >
+            <span>Chi phí AI trung bình</span>
+            <span style={{ fontWeight: 700, color: "var(--ink)" }}>${summary.avg_cost_per_order_usd.toFixed(5)}/đơn</span>
           </div>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            Chi phí AI trung bình: ${summary.avg_cost_per_order_usd.toFixed(5)}/đơn
-          </p>
         </div>
       </div>
 
-      {/* SVG Charts Grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Daily Orders Trend Bar Chart */}
-        <div className="rounded-xl border bg-[var(--paper)] p-5 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
+      {/* 3. Main Dashboard Grid (Polished SVG Trends + Business Findings) */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(480px, 1fr))",
+          gap: "var(--space-6)",
+          marginBottom: "var(--space-6)",
+        }}
+      >
+        {/* Modern Bar Chart */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "16px",
+            padding: "24px",
+            boxShadow: "var(--shadow-elevation-1)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
             <div>
-              <h2 className="text-sm font-semibold text-[var(--ink)]">Xu Hướng Tiếp Nhận Đơn Hàng</h2>
-              <p className="text-xs text-[var(--muted)]">Số lượng đơn hàng phân theo ngày và kết quả duyệt</p>
+              <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--ink)", margin: 0 }}>
+                Xu Hướng Tiếp Nhận &amp; Phê Duyệt Đơn Hàng
+              </h2>
+              <p style={{ fontSize: "0.8125rem", color: "var(--muted)", margin: "4px 0 0" }}>
+                Số lượng đơn phân bổ theo ngày tiếp nhận và phân loại kết quả kiểm toán
+              </p>
             </div>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-[var(--green)]"></span> Duyệt
+            <div style={{ display: "flex", alignItems: "center", gap: "16px", fontSize: "0.75rem", fontWeight: 600 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--ink)" }}>
+                <span style={{ width: "10px", height: "10px", borderRadius: "3px", background: "#10b981" }} />
+                Đạt chuẩn / Đã duyệt
               </span>
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-[var(--red)]"></span> Bị chặn
+              <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--ink)" }}>
+                <span style={{ width: "10px", height: "10px", borderRadius: "3px", background: "#ef4444" }} />
+                Phát hiện lỗi / Bị chặn
               </span>
             </div>
           </div>
 
-          <div className="relative h-56 w-full pt-4">
-            <svg className="h-full w-full overflow-visible" viewBox="0 0 500 200">
-              {/* Horizontal Grid lines */}
+          <div style={{ position: "relative", width: "100%", height: "240px" }}>
+            <svg viewBox="0 0 540 220" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+              <defs>
+                <linearGradient id="barApprovedGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" />
+                  <stop offset="100%" stopColor="#059669" />
+                </linearGradient>
+                <linearGradient id="barBlockedGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#ef4444" />
+                  <stop offset="100%" stopColor="#dc2626" />
+                </linearGradient>
+              </defs>
+
+              {/* Grid Lines */}
               {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
-                const y = 180 - ratio * 150;
+                const y = 175 - ratio * 135;
                 return (
                   <g key={i}>
-                    <line x1="0" y1={y} x2="500" y2={y} stroke="var(--line)" strokeDasharray="3 3" />
-                    <text x="0" y={y - 4} fontSize="10" fill="var(--faint)">
+                    <line x1="30" y1={y} x2="520" y2={y} stroke="var(--line)" strokeDasharray="3 3" opacity="0.7" />
+                    <text x="22" y={y + 3} fontSize="10" fill="var(--muted)" textAnchor="end" fontWeight="500">
                       {Math.round(ratio * maxTrendVal)}
                     </text>
                   </g>
                 );
               })}
 
-              {/* Bars */}
+              {/* Data Bars */}
               {report.daily_trends.map((item, idx) => {
                 const totalBars = report.daily_trends.length;
-                const slotWidth = 500 / totalBars;
-                const barWidth = 28;
-                const x = idx * slotWidth + (slotWidth - barWidth) / 2;
+                const chartWidth = 480;
+                const slotWidth = chartWidth / totalBars;
+                const barWidth = 32;
+                const x = 35 + idx * slotWidth + (slotWidth - barWidth) / 2;
 
-                const approvedHeight = (item.approved / maxTrendVal) * 150;
-                const blockedHeight = (item.blocked / maxTrendVal) * 150;
-                const totalHeight = (item.received / maxTrendVal) * 150;
+                const approvedHeight = (item.approved / maxTrendVal) * 135;
+                const blockedHeight = (item.blocked / maxTrendVal) * 135;
+                const totalHeight = approvedHeight + blockedHeight;
 
-                const yApproved = 180 - approvedHeight;
+                const yApproved = 175 - approvedHeight;
                 const yBlocked = yApproved - blockedHeight;
 
                 return (
-                  <g key={item.date} className="group cursor-pointer">
-                    {/* Approved segment */}
+                  <g key={item.date} className="chart-bar-group">
+                    {/* Background Column Track */}
+                    <rect
+                      x={x - 4}
+                      y={40}
+                      width={barWidth + 8}
+                      height={135}
+                      rx="8"
+                      fill="var(--line)"
+                      opacity="0.25"
+                    />
+
+                    {/* Approved Part */}
                     <rect
                       x={x}
                       y={yApproved}
                       width={barWidth}
                       height={approvedHeight}
-                      rx="3"
-                      fill="var(--green)"
-                      opacity="0.9"
+                      rx={item.blocked > 0 ? "0" : "6"}
+                      fill="url(#barApprovedGrad)"
                     />
-                    {/* Blocked segment */}
+
+                    {/* Blocked Part */}
                     {item.blocked > 0 && (
                       <rect
                         x={x}
                         y={yBlocked}
                         width={barWidth}
                         height={blockedHeight}
-                        rx="3"
-                        fill="var(--red)"
-                        opacity="0.9"
+                        rx="6"
+                        fill="url(#barBlockedGrad)"
                       />
                     )}
-                    {/* Date label */}
+
+                    {/* Top Total Count */}
                     <text
                       x={x + barWidth / 2}
-                      y="196"
-                      fontSize="10"
+                      y={175 - totalHeight - 8}
+                      fontSize="11"
                       textAnchor="middle"
-                      fill="var(--muted)"
-                    >
-                      {item.date.slice(5)}
-                    </text>
-                    {/* Top total label */}
-                    <text
-                      x={x + barWidth / 2}
-                      y={180 - totalHeight - 6}
-                      fontSize="10"
-                      textAnchor="middle"
-                      fontWeight="bold"
+                      fontWeight="800"
                       fill="var(--ink)"
                     >
                       {item.received}
+                    </text>
+
+                    {/* Date Label */}
+                    <text
+                      x={x + barWidth / 2}
+                      y="196"
+                      fontSize="11"
+                      textAnchor="middle"
+                      fill="var(--muted)"
+                      fontWeight="600"
+                    >
+                      {item.date.slice(5)}
                     </text>
                   </g>
                 );
@@ -433,143 +836,293 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Findings Distribution */}
-        <div className="rounded-xl border bg-[var(--paper)] p-5 shadow-xs">
-          <div className="mb-4">
-            <h2 className="text-sm font-semibold text-[var(--ink)]">Phân Bổ Vi Phạm & Cảnh Báo Quy Tắc</h2>
-            <p className="text-xs text-[var(--muted)]">Tần suất vi phạm phát hiện tự động bởi Rules Engine</p>
-          </div>
+        {/* Business Friendly Findings Distribution */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "16px",
+            padding: "24px",
+            boxShadow: "var(--shadow-elevation-1)",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+          }}
+        >
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+              <div>
+                <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--ink)", margin: 0 }}>
+                  Phân Bổ Vi Phạm &amp; Cảnh Báo Quy Tắc
+                </h2>
+                <p style={{ fontSize: "0.8125rem", color: "var(--muted)", margin: "4px 0 0" }}>
+                  Phân loại trực quan các vi phạm nghiệp vụ phát hiện tự động bởi Rules Engine
+                </p>
+              </div>
+            </div>
 
-          <div className="space-y-3 pt-2">
-            {Object.entries(report.findings_distribution).map(([code, count]) => {
-              const maxCount = Math.max(...Object.values(report.findings_distribution), 1);
-              const pct = Math.round((count / maxCount) * 100);
-              const isError = ["PRICE_MISMATCH", "INSUFFICIENT_STOCK", "CREDIT_LIMIT_EXCEEDED"].includes(code);
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "12px" }}>
+              {Object.entries(report.findings_distribution).map(([code, count]) => {
+                const meta = FINDING_METADATA[code] || {
+                  label: code.replace(/_/g, " "),
+                  desc: "Quy tắc kiểm soát tự động",
+                  severity: "warning",
+                };
+                const maxCount = Math.max(...Object.values(report.findings_distribution), 1);
+                const pct = Math.round((count / maxCount) * 100);
+                const isCritical = meta.severity === "critical";
 
-              return (
-                <div key={code} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-mono font-medium text-[var(--ink)]">{code}</span>
-                    <span className="font-semibold text-[var(--muted)]">{count} lần ({pct}%)</span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-[var(--canvas)] overflow-hidden">
+                return (
+                  <div key={code} style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: "7px",
+                            height: "7px",
+                            borderRadius: "50%",
+                            background: isCritical ? "#ef4444" : "#f59e0b",
+                          }}
+                        />
+                        <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--ink)" }}>
+                          {meta.label}
+                        </span>
+                        <code
+                          style={{
+                            fontSize: "0.6875rem",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            background: "var(--canvas)",
+                            border: "1px solid var(--line)",
+                            color: "var(--muted)",
+                          }}
+                        >
+                          {code}
+                        </code>
+                      </div>
+                      <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--ink)" }}>
+                        {count} lần <span style={{ color: "var(--muted)", fontWeight: 500 }}>({pct}%)</span>
+                      </span>
+                    </div>
+
                     <div
-                      className={`h-full rounded-full transition-all ${
-                        isError ? "bg-[var(--red)]" : "bg-[var(--amber)]"
-                      }`}
-                      style={{ width: `${pct}%` }}
-                    />
+                      style={{
+                        height: "7px",
+                        width: "100%",
+                        borderRadius: "9999px",
+                        background: "var(--line)",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${pct}%`,
+                          borderRadius: "9999px",
+                          background: isCritical
+                            ? "linear-gradient(90deg, #ef4444 0%, #dc2626 100%)"
+                            : "linear-gradient(90deg, #f59e0b 0%, #d97706 100%)",
+                          transition: "width 0.4s ease",
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
-          {/* RAG Waterfall 4-Tier Breakdown */}
-          <div className="mt-6 border-t pt-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-[var(--ink)]">Hiệu Suất 4-Tier Waterfall RAG</span>
-              <span className="text-xs text-[var(--muted)]">Tỉ lệ giải quyết SKU</span>
+          {/* 4-Tier RAG Waterfall Status Strip */}
+          <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid var(--line)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--ink)" }}>
+                Hiệu Suất Khớp Mã 4-Tier Waterfall RAG
+              </span>
+              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Tỉ lệ giải quyết SKU</span>
             </div>
-            <div className="flex h-3 w-full rounded-full overflow-hidden">
+
+            {/* Segmented bar */}
+            <div
+              style={{
+                display: "flex",
+                height: "10px",
+                borderRadius: "9999px",
+                overflow: "hidden",
+                gap: "2px",
+                background: "var(--line)",
+              }}
+            >
               <div
-                style={{ width: `${report.rag_tier_breakdown.exact_hash}%` }}
-                className="bg-emerald-600"
-                title={`Exact Hash: ${report.rag_tier_breakdown.exact_hash}%`}
+                style={{ width: `${report.rag_tier_breakdown.exact_hash}%`, background: "#059669" }}
+                title={`Tier 1 Exact Hash: ${report.rag_tier_breakdown.exact_hash}%`}
               />
               <div
-                style={{ width: `${report.rag_tier_breakdown.lexical_fuzzy}%` }}
-                className="bg-teal-500"
-                title={`Lexical Fuzzy: ${report.rag_tier_breakdown.lexical_fuzzy}%`}
+                style={{ width: `${report.rag_tier_breakdown.lexical_fuzzy}%`, background: "#0d9488" }}
+                title={`Tier 2 Lexical Fuzzy: ${report.rag_tier_breakdown.lexical_fuzzy}%`}
               />
               <div
-                style={{ width: `${report.rag_tier_breakdown.semantic_vector}%` }}
-                className="bg-blue-500"
-                title={`Semantic Vector: ${report.rag_tier_breakdown.semantic_vector}%`}
+                style={{ width: `${report.rag_tier_breakdown.semantic_vector}%`, background: "#3b82f6" }}
+                title={`Tier 3 Semantic Vector: ${report.rag_tier_breakdown.semantic_vector}%`}
               />
               <div
-                style={{ width: `${report.rag_tier_breakdown.llm_fallback}%` }}
-                className="bg-amber-500"
-                title={`LLM Fallback: ${report.rag_tier_breakdown.llm_fallback}%`}
+                style={{ width: `${report.rag_tier_breakdown.llm_fallback}%`, background: "#f59e0b" }}
+                title={`Tier 4 LLM Fallback: ${report.rag_tier_breakdown.llm_fallback}%`}
               />
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-600"></span>
-                <span className="text-[var(--muted)]">Tier 1 Exact: {report.rag_tier_breakdown.exact_hash}%</span>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: "8px",
+                marginTop: "10px",
+                fontSize: "0.6875rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#059669" }} />
+                <span style={{ color: "var(--muted)" }}>Tier 1 Exact: <strong>{report.rag_tier_breakdown.exact_hash}%</strong></span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-teal-500"></span>
-                <span className="text-[var(--muted)]">Tier 2 Fuzzy: {report.rag_tier_breakdown.lexical_fuzzy}%</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#0d9488" }} />
+                <span style={{ color: "var(--muted)" }}>Tier 2 Fuzzy: <strong>{report.rag_tier_breakdown.lexical_fuzzy}%</strong></span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-blue-500"></span>
-                <span className="text-[var(--muted)]">Tier 3 Vector: {report.rag_tier_breakdown.semantic_vector}%</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#3b82f6" }} />
+                <span style={{ color: "var(--muted)" }}>Tier 3 Vector: <strong>{report.rag_tier_breakdown.semantic_vector}%</strong></span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-amber-500"></span>
-                <span className="text-[var(--muted)]">Tier 4 LLM: {report.rag_tier_breakdown.llm_fallback}%</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f59e0b" }} />
+                <span style={{ color: "var(--muted)" }}>Tier 4 LLM: <strong>{report.rag_tier_breakdown.llm_fallback}%</strong></span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Orders Sample Table */}
-      <div className="rounded-xl border bg-[var(--paper)] p-5 shadow-xs">
-        <div className="flex items-center justify-between mb-4">
+      {/* 4. Orders Sample Table */}
+      <div
+        style={{
+          background: "var(--paper)",
+          border: "1px solid var(--line)",
+          borderRadius: "16px",
+          padding: "24px",
+          boxShadow: "var(--shadow-elevation-1)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
           <div>
-            <h2 className="text-sm font-semibold text-[var(--ink)]">Chi Tiết Đơn Hàng Mẫu Trong Kỳ Đo Lường</h2>
-            <p className="text-xs text-[var(--muted)]">Thời gian xử lý và chi phí AI thực tế trên từng đơn đặt hàng</p>
+            <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--ink)", margin: 0 }}>
+              Chi Tiết Đơn Hàng Mẫu Trong Kỳ Đo Lường
+            </h2>
+            <p style={{ fontSize: "0.8125rem", color: "var(--muted)", margin: "4px 0 0" }}>
+              Thời gian đối soát thực tế và chi phí AI trên từng đơn đặt hàng
+            </p>
           </div>
-          <span className="text-xs text-[var(--muted)]">
-            Hiển thị {report.orders_sample.length} đơn
+          <span
+            style={{
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              padding: "4px 10px",
+              borderRadius: "6px",
+              background: "var(--canvas)",
+              color: "var(--muted)",
+              border: "1px solid var(--line)",
+            }}
+          >
+            Hiển thị {report.orders_sample.length} đơn mẫu
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.8125rem" }}>
             <thead>
-              <tr className="border-b text-[var(--muted)]">
-                <th className="pb-2 font-medium">Mã PO</th>
-                <th className="pb-2 font-medium">Khách hàng</th>
-                <th className="pb-2 font-medium">Ngày tiếp nhận</th>
-                <th className="pb-2 font-medium">Trạng thái</th>
-                <th className="pb-2 font-medium text-right">Giá trị</th>
-                <th className="pb-2 font-medium text-center">Số dòng</th>
-                <th className="pb-2 font-medium text-center">Cảnh báo</th>
-                <th className="pb-2 font-medium text-right">Thời gian xử lý</th>
-                <th className="pb-2 font-medium text-right">Chi phí AI</th>
+              <tr style={{ borderBottom: "1px solid var(--line)", color: "var(--muted)", fontSize: "0.75rem" }}>
+                <th style={{ padding: "10px 12px", fontWeight: 700 }}>Mã PO</th>
+                <th style={{ padding: "10px 12px", fontWeight: 700 }}>Khách hàng</th>
+                <th style={{ padding: "10px 12px", fontWeight: 700 }}>Ngày tiếp nhận</th>
+                <th style={{ padding: "10px 12px", fontWeight: 700 }}>Trạng thái</th>
+                <th style={{ padding: "10px 12px", fontWeight: 700, textAlign: "right" }}>Giá trị đơn</th>
+                <th style={{ padding: "10px 12px", fontWeight: 700, textAlign: "center" }}>Số dòng</th>
+                <th style={{ padding: "10px 12px", fontWeight: 700, textAlign: "center" }}>Cảnh báo</th>
+                <th style={{ padding: "10px 12px", fontWeight: 700, textAlign: "right" }}>Thời gian xử lý</th>
+                <th style={{ padding: "10px 12px", fontWeight: 700, textAlign: "right" }}>Chi phí AI</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody>
               {report.orders_sample.map((o) => (
-                <tr key={o.po_number} className="hover:bg-[var(--canvas)]">
-                  <td className="py-2.5 font-mono font-medium text-[var(--ink)]">{o.po_number}</td>
-                  <td className="py-2.5 text-[var(--ink)]">{o.customer}</td>
-                  <td className="py-2.5 text-[var(--muted)]">{o.created_at ? o.created_at.slice(0, 10) : "—"}</td>
-                  <td className="py-2.5">
+                <tr
+                  key={o.po_number}
+                  style={{
+                    borderBottom: "1px solid var(--line)",
+                    transition: "background 0.15s ease",
+                  }}
+                >
+                  <td style={{ padding: "12px", fontFamily: "var(--font-geist-mono), monospace", fontWeight: 700, color: "var(--ink)" }}>
+                    {o.po_number}
+                  </td>
+                  <td style={{ padding: "12px", fontWeight: 600, color: "var(--ink)" }}>
+                    {o.customer}
+                  </td>
+                  <td style={{ padding: "12px", color: "var(--muted)" }}>
+                    {o.created_at ? o.created_at.slice(0, 10) : "—"}
+                  </td>
+                  <td style={{ padding: "12px" }}>
                     <span
-                      className={`inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium ${
-                        o.status === "blocked"
-                          ? "bg-[var(--red-soft)] text-[var(--red)]"
-                          : o.status === "review_required"
-                          ? "bg-[var(--amber-soft)] text-[var(--amber)]"
-                          : "bg-[var(--green-soft)] text-[var(--green)]"
-                      }`}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        padding: "3px 8px",
+                        borderRadius: "6px",
+                        fontSize: "0.6875rem",
+                        fontWeight: 700,
+                        background:
+                          o.status === "blocked"
+                            ? "rgba(239,68,68,0.12)"
+                            : o.status === "review_required"
+                            ? "rgba(245,158,11,0.12)"
+                            : "rgba(16,185,129,0.12)",
+                        color:
+                          o.status === "blocked"
+                            ? "#ef4444"
+                            : o.status === "review_required"
+                            ? "#d97706"
+                            : "#059669",
+                      }}
                     >
-                      {o.status}
+                      {o.status === "blocked" ? "Bị chặn (Blocked)" : o.status === "review_required" ? "Cần duyệt (Review)" : "Sẵn sàng (Ready)"}
                     </span>
                   </td>
-                  <td className="py-2.5 text-right font-medium text-[var(--ink)]">
+                  <td style={{ padding: "12px", textAlign: "right", fontWeight: 700, color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>
                     {money(o.total, o.currency)}
                   </td>
-                  <td className="py-2.5 text-center text-[var(--muted)]">{o.lines_count}</td>
-                  <td className="py-2.5 text-center text-[var(--muted)]">{o.findings_count}</td>
-                  <td className="py-2.5 text-right text-[var(--muted)]">
+                  <td style={{ padding: "12px", textAlign: "center", color: "var(--muted)" }}>
+                    {o.lines_count}
+                  </td>
+                  <td style={{ padding: "12px", textAlign: "center" }}>
+                    {o.findings_count > 0 ? (
+                      <span
+                        style={{
+                          padding: "2px 7px",
+                          borderRadius: "9999px",
+                          background: "rgba(245,158,11,0.15)",
+                          color: "#d97706",
+                          fontWeight: 700,
+                          fontSize: "0.6875rem",
+                        }}
+                      >
+                        {o.findings_count}
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--muted)" }}>0</span>
+                    )}
+                  </td>
+                  <td style={{ padding: "12px", textAlign: "right", color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
                     {o.decision_minutes ? `${o.decision_minutes}m` : "—"}
                   </td>
-                  <td className="py-2.5 text-right font-mono text-[var(--muted)]">
+                  <td style={{ padding: "12px", textAlign: "right", color: "var(--muted)", fontFamily: "var(--font-geist-mono), monospace" }}>
                     ${o.cost_usd.toFixed(5)}
                   </td>
                 </tr>

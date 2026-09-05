@@ -163,7 +163,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   })),
                   decisions: mappedDecisions,
                 };
-              } catch {
+              } catch (err) {
+                console.error("[AppStateProvider] Failed to fetch/map detail for order:", sum.id, sum.po_number, err);
                 return {
                   id: sum.po_number,
                   customer: sum.customer,

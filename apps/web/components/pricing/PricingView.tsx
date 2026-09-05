@@ -52,7 +52,7 @@ export function PricingView() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
               <h3 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0 }}>Gói Pilot Trải Nghiệm</h3>
-              <span className="badge-clean badge-clean-neutral">30 ngày miễn phí</span>
+              <span className="badge-clean badge-clean-neutral">14 ngày miễn phí</span>
             </div>
             <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", minHeight: "44px" }}>
               Dành cho doanh nghiệp muốn đánh giá độ chính xác bóc tách, bộ luật B2B và khả năng kết nối ERP trước khi ký hợp đồng.
@@ -61,7 +61,7 @@ export function PricingView() {
             <div style={{ margin: "var(--space-4) 0", padding: "var(--space-3) 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
                 <span style={{ fontSize: "2.5rem", fontWeight: 800, color: "var(--color-primary)" }}>0 đ</span>
-                <span style={{ fontSize: "var(--text-sm)", color: "var(--muted)" }}>/ 30 ngày thử nghiệm</span>
+                <span style={{ fontSize: "var(--text-sm)", color: "var(--muted)" }}>/ 14 ngày thử nghiệm</span>
               </div>
               <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginTop: "4px" }}>
                 Bao gồm 100 đơn hàng thực tế &amp; hỗ trợ kỹ thuật Onboarding 1-1
@@ -93,12 +93,12 @@ export function PricingView() {
           </div>
 
           <Link
-            href="/#contact"
+            href="/#pilot"
             className="secondary-button interactive"
             onClick={createRipple}
             style={{ width: "100%", justifyContent: "center", padding: "12px", textDecoration: "none", fontWeight: 700 }}
           >
-            Đăng Ký Pilot 30 Ngày
+            Đăng Ký Pilot 14 Ngày
           </Link>
         </div>
 
@@ -118,7 +118,7 @@ export function PricingView() {
           }}
         >
           <div style={{ position: "absolute", top: "-12px", right: "24px" }}>
-            <span style={{ background: "var(--color-primary)", color: "#fff", padding: "3px 10px", borderRadius: "var(--radius-sm)", fontSize: "0.75rem", fontWeight: 800 }}>
+            <span style={{ background: "linear-gradient(135deg, #059669 0%, #047857 100%)", color: "#ffffff", padding: "4px 12px", borderRadius: "9999px", fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.04em", boxShadow: "0 2px 8px rgba(5, 150, 105, 0.35)" }}>
               PHỔ BIẾN NHẤT
             </span>
           </div>
@@ -167,7 +167,7 @@ export function PricingView() {
           </div>
 
           <Link
-            href="/#contact"
+            href="/#pilot"
             className="primary-button interactive"
             onClick={createRipple}
             style={{ width: "100%", justifyContent: "center", padding: "12px", textDecoration: "none", fontWeight: 700 }}
@@ -234,7 +234,7 @@ export function PricingView() {
           </div>
 
           <Link
-            href="/#contact"
+            href="/#pilot"
             className="secondary-button interactive"
             onClick={createRipple}
             style={{ width: "100%", justifyContent: "center", padding: "12px", textDecoration: "none", fontWeight: 700 }}
@@ -273,10 +273,10 @@ export function PricingView() {
         <div style={{ maxWidth: "800px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           <div className="content-card">
             <h4 style={{ fontSize: "1.05rem", fontWeight: 700, margin: "0 0 6px", color: "var(--ink)" }}>
-              Chương trình Pilot 30 ngày có phát sinh chi phí ẩn nào không?
+              Chương trình Pilot 14 ngày có phát sinh chi phí ẩn nào không?
             </h4>
             <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>
-              Hoàn toàn không. Chúng tôi cung cấp miễn phí môi trường trải nghiệm trong 30 ngày cho tối đa 100 đơn hàng thực tế của doanh nghiệp. Đội ngũ kỹ sư sẽ hỗ trợ nạp dữ liệu Master SKU, cấu hình bot Telegram/Zalo và đồng hành hướng dẫn Sales Admin mà không yêu cầu thẻ tín dụng hay bất kỳ cam kết trả phí nào trước.
+              Hoàn toàn không. Chúng tôi cung cấp miễn phí môi trường trải nghiệm trong 14 ngày cho tối đa 100 đơn hàng thực tế của doanh nghiệp. Đội ngũ kỹ sư sẽ hỗ trợ nạp dữ liệu Master SKU, cấu hình bot Telegram/Zalo và đồng hành hướng dẫn Sales Admin mà không yêu cầu thẻ tín dụng hay bất kỳ cam kết trả phí nào trước.
             </p>
           </div>
 

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useMounted } from "@/app/lib/useMounted";
 import type { DecisionType, PurchaseOrder } from "@/app/lib/types";
 import {
   MIN_NOTE_LENGTH,
@@ -27,6 +29,7 @@ export function DecisionModal({
   onClose: () => void;
   onConfirm: (action: DecisionType) => void;
 }) {
+  const mounted = useMounted();
   const [action, setAction] = useState<DecisionType>(initialAction);
   const { user } = useAppState();
   const modalRef = useRef<HTMLElement>(null);
@@ -63,10 +66,11 @@ export function DecisionModal({
   const noteError = validateNote(order.status, action, note);
   const noteRequired = isNoteRequired(order.status, action);
   const noteLength = note.trim().length;
-
   const actorName = user?.user ? user.user.replace("_", " ") : "Người duyệt";
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
         ref={modalRef}
@@ -254,6 +258,7 @@ export function DecisionModal({
           </button>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 }

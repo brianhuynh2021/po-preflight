@@ -21,7 +21,7 @@ test("renders the Marketing Landing Page as the index page without sidebar", asy
   const html = await response.text();
   assert.match(html, /PO Preflight/);
   assert.match(html, /Cổng Kiểm Soát An Toàn Tự Động Cho Đơn Đặt Hàng B2B/);
-  assert.match(html, /Đăng Ký Trải Nghiệm Pilot 30 Ngày/);
+  assert.match(html, /Đăng Ký Trải Nghiệm Pilot 14 Ngày/);
   assert.doesNotMatch(html, /class="sidebar"/);
 });
 
@@ -43,7 +43,7 @@ test("renders the Pricing page at /pricing", async () => {
 
   assert.match(html, /BẢNG GIÁ &amp; GÓI DỊCH VỤ LINH HOẠT/);
   assert.match(html, /Gói Pilot Trải Nghiệm/);
-  assert.match(html, /30 ngày miễn phí/);
+  assert.match(html, /14 ngày miễn phí/);
   assert.match(html, /Gói Theo Số Lượng Đơn/);
   assert.match(html, /Gói Doanh Nghiệp On-Premise/);
 });
@@ -177,5 +177,14 @@ test("renders the Pilot Reports view at /reports", async () => {
   assert.match(html, /Báo Cáo Đo Lường Pilot Vận Hành|Pilot Report/);
   assert.match(html, /Thời gian tiết kiệm/);
   assert.match(html, /Xuất CSV Báo cáo/);
+});
+
+test("renders the Rules and Policy Matrix view at /rules", async () => {
+  const response = await render("/rules");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Quản Trị Quy Tắc &amp; Ma Trận Chính Sách Phân Cấp/);
+  assert.match(html, /Chính sách Toàn doanh nghiệp|Policy Scopes/);
+  assert.match(html, /Thêm quy tắc mới/);
 });
 

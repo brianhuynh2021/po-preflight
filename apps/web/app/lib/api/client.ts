@@ -2,6 +2,7 @@ import type {
   AuditEvent,
   AuthUser,
   CatalogItem,
+  ConfigurableRuleItem,
   ConfirmExtractionRequest,
   CreateUserPayload,
   CustomerCreditProfile,
@@ -13,6 +14,7 @@ import type {
   IngestionJobStatus,
   OrderDetail,
   OrderSummary,
+  OrganizationScope,
   OutboxStats,
   PilotReportResponse,
   RuleConfig,
@@ -394,6 +396,35 @@ export function createApiClient(config: ClientConfig = {}) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+      }),
+    getScopes: () => request<OrganizationScope[]>("/api/v1/rules/scopes"),
+    createScope: (payload: { code: string; name: string; description?: string; icon?: string; parent_code?: string }) =>
+      request<OrganizationScope>("/api/v1/rules/scopes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    deleteScope: (code: string) =>
+      request<{ success: boolean; message: string }>(`/api/v1/rules/scopes/${encodeURIComponent(code)}`, {
+        method: "DELETE",
+      }),
+    listDefinitions: (scope: string = "global") =>
+      request<ConfigurableRuleItem[]>(`/api/v1/rules/definitions?scope=${encodeURIComponent(scope)}`),
+    createDefinition: (payload: Partial<ConfigurableRuleItem>) =>
+      request<ConfigurableRuleItem>("/api/v1/rules/definitions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    updateDefinition: (ruleId: string, payload: Partial<ConfigurableRuleItem>) =>
+      request<ConfigurableRuleItem>(`/api/v1/rules/definitions/${encodeURIComponent(ruleId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    deleteDefinition: (ruleId: string) =>
+      request<{ success: boolean; message: string }>(`/api/v1/rules/definitions/${encodeURIComponent(ruleId)}`, {
+        method: "DELETE",
       }),
   };
 

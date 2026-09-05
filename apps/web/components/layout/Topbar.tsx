@@ -19,13 +19,13 @@ export function Topbar() {
       <div className="topbar-actions">
         <button
           className="icon-button interactive"
-          aria-label="Toggle theme"
+          aria-label="Chuyển đổi giao diện sáng/tối"
           title={
             resolved
               ? isDark
-                ? "Switch to light theme"
-                : "Switch to dark theme"
-              : "Toggle theme"
+                ? "Chuyển sang chế độ sáng"
+                : "Chuyển sang chế độ tối"
+              : "Chuyển đổi giao diện"
           }
           onClick={(e) => {
             createRipple(e);
@@ -47,7 +47,8 @@ export function Topbar() {
 
         <button
           className="icon-button interactive"
-          aria-label="Help"
+          aria-label="Trợ giúp & Tài liệu hướng dẫn"
+          title="Trợ giúp & Tài liệu hướng dẫn"
           onClick={createRipple}
           type="button"
           style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
@@ -57,7 +58,8 @@ export function Topbar() {
 
         <button
           className="icon-button notification-button interactive"
-          aria-label="Notifications"
+          aria-label="Thông báo hệ thống"
+          title="Thông báo hệ thống"
           onClick={createRipple}
           type="button"
           style={{ display: "flex", alignItems: "center", justifyContent: "center" }}

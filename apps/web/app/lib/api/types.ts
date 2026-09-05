@@ -191,6 +191,32 @@ export interface RuleConfig {
   auto_approve_ready: boolean;
 }
 
+export interface OrganizationScope {
+  id?: number;
+  code: string;
+  name: string;
+  description: string;
+  icon?: string;
+  parent_code?: string | null;
+  is_active?: boolean;
+  created_at?: string | null;
+}
+
+export interface ConfigurableRuleItem {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  category: "price" | "stock" | "catalog" | "credit" | "document" | string;
+  severity: "block" | "warning" | "disabled";
+  owner: string;
+  enabled: boolean;
+  scope: string;
+  custom_condition?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // RAG & Ingestion Schemas
 // ---------------------------------------------------------------------------

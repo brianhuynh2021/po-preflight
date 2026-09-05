@@ -18,6 +18,8 @@ from preflight.models import (
     CustomerMaster,
     CustomerPriceAgreement,
     InventorySnapshot,
+    OrganizationScope,
+    RuleDefinitionRecord,
     RulePolicy,
     UOMConversion,
     User,
@@ -170,6 +172,35 @@ CREATE TABLE IF NOT EXISTS rule_policies (
     updated_at TEXT NOT NULL,
     updated_by TEXT NOT NULL DEFAULT 'system'
 );
+
+CREATE TABLE IF NOT EXISTS organization_scopes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    icon TEXT NOT NULL DEFAULT '',
+    parent_code TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_organization_scopes_code ON organization_scopes(code);
+
+CREATE TABLE IF NOT EXISTS rule_definitions (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    category TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    scope TEXT NOT NULL DEFAULT 'global',
+    custom_condition TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rule_definitions_scope ON rule_definitions(scope);
+CREATE INDEX IF NOT EXISTS idx_rule_definitions_code ON rule_definitions(code);
 
 CREATE TABLE IF NOT EXISTS customers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -430,6 +461,35 @@ CREATE TABLE IF NOT EXISTS rule_policies (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(255) NOT NULL DEFAULT 'system'
 );
+
+CREATE TABLE IF NOT EXISTS organization_scopes (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    icon VARCHAR(64) NOT NULL DEFAULT '',
+    parent_code VARCHAR(64),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_pg_organization_scopes_code ON organization_scopes(code);
+
+CREATE TABLE IF NOT EXISTS rule_definitions (
+    id VARCHAR(64) PRIMARY KEY,
+    code VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    category VARCHAR(64) NOT NULL,
+    severity VARCHAR(32) NOT NULL,
+    owner VARCHAR(255) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    scope VARCHAR(64) NOT NULL DEFAULT 'global',
+    custom_condition TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_pg_rule_definitions_scope ON rule_definitions(scope);
+CREATE INDEX IF NOT EXISTS idx_pg_rule_definitions_code ON rule_definitions(code);
 
 CREATE TABLE IF NOT EXISTS customers (
     id SERIAL PRIMARY KEY,
@@ -749,6 +809,32 @@ class BaseAuditStore(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def list_organization_scopes(self) -> list[OrganizationScope]:
+        pass
+
+    @abc.abstractmethod
+    def create_organization_scope(
+        self, code: str, name: str, description: str = "", icon: str = "", parent_code: str | None = None
+    ) -> OrganizationScope:
+        pass
+
+    @abc.abstractmethod
+    def delete_organization_scope(self, code: str) -> bool:
+        pass
+
+    @abc.abstractmethod
+    def list_rule_definitions(self, scope: str | None = None) -> list[RuleDefinitionRecord]:
+        pass
+
+    @abc.abstractmethod
+    def upsert_rule_definition(self, rule: RuleDefinitionRecord) -> RuleDefinitionRecord:
+        pass
+
+    @abc.abstractmethod
+    def delete_rule_definition(self, rule_id: str) -> bool:
+        pass
+
+    @abc.abstractmethod
     def get_order_by_po(self, po_number: str) -> dict[str, Any] | None:
         pass
 
@@ -954,6 +1040,10 @@ class AuditStore(BaseAuditStore):
             except Exception:
                 pass
             try:
+                self.connection.execute("ALTER TABLE customers ADD COLUMN contact_emails TEXT DEFAULT '';")
+            except Exception:
+                pass
+            try:
                 self.connection.execute("ALTER TABLE users ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0;")
             except Exception:
                 pass
@@ -1007,6 +1097,10 @@ class AuditStore(BaseAuditStore):
                 pass
             try:
                 self.seed_initial_admin()
+            except Exception:
+                pass
+            try:
+                self._seed_default_scopes_and_rules()
             except Exception:
                 pass
 
@@ -1707,6 +1801,200 @@ class AuditStore(BaseAuditStore):
                 return RulePolicy()
             data = json.loads(row["policy_json"])
             return RulePolicy.from_dict(data)
+
+    def _seed_default_scopes_and_rules(self) -> None:
+        with self._lock:
+            # Check scopes
+            count_row = self.connection.execute("SELECT COUNT(*) AS c FROM organization_scopes").fetchone()
+            now = datetime.now(timezone.utc).isoformat()
+            if count_row and count_row["c"] == 0:
+                default_scopes = [
+                    ("global", "Toàn Doanh Nghiệp (Global)", "Quy tắc nền tảng chung toàn doanh nghiệp", "globe", None, 1, now),
+                    ("north", "Chi Nhánh Miền Bắc", "Kho Hải Phòng & Hà Nội", "mountain", "global", 1, now),
+                    ("south", "Chi Nhánh Miền Nam", "Kho Bình Dương & TP.HCM", "palmtree", "global", 1, now),
+                    ("mt", "Chuỗi Siêu Thị (MT)", "WinMart, AEON, Co.opmart", "shopping-cart", "global", 1, now),
+                    ("gt", "Đại Lý Tỉnh (GT)", "Nhà phân phối truyền thống", "store", "global", 1, now),
+                ]
+                self.connection.executemany(
+                    """
+                    INSERT OR IGNORE INTO organization_scopes (code, name, description, icon, parent_code, is_active, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    default_scopes,
+                )
+                self.connection.commit()
+
+            # Check rule definitions
+            rcount_row = self.connection.execute("SELECT COUNT(*) AS c FROM rule_definitions").fetchone()
+            if rcount_row and rcount_row["c"] == 0:
+                default_rules = [
+                    (
+                        "r1", "PRICE_MISMATCH", "Chênh lệch giá bán so với Catalog hợp đồng",
+                        "Tự động phát hiện khi đơn giá tiếp nhận sai khác so với bảng giá Catalog đang hiệu lực.",
+                        "price", "warning", "Phòng Kinh doanh", 1, "global", None, now, now
+                    ),
+                    (
+                        "r2", "INSUFFICIENT_STOCK", "Không đủ tồn kho khả dụng (ATP)",
+                        "Cảnh báo khi số lượng đặt vượt quá tồn kho khả dụng thực tế sau khi trừ phân bổ giữ chỗ.",
+                        "stock", "warning", "Phòng Vận hành & Kho", 1, "global", None, now, now
+                    ),
+                    (
+                        "r3", "UNKNOWN_SKU", "Mã SKU chưa khai báo trong hệ thống",
+                        "Chặn ngay lập tức các dòng hàng có mã sản phẩm lạ chưa có trong Master Data.",
+                        "catalog", "block", "Quản trị danh mục", 1, "global", None, now, now
+                    ),
+                    (
+                        "r4", "INACTIVE_SKU", "Sản phẩm đã ngừng kinh doanh",
+                        "Chặn các đơn đặt hàng chứa sản phẩm đã vô hiệu hóa hoặc kết thúc vòng đời thương mại.",
+                        "catalog", "block", "Phòng Sản phẩm", 1, "global", None, now, now
+                    ),
+                    (
+                        "r5", "DUPLICATE_PO", "Nghi ngờ trùng lặp mã đơn hàng (PO)",
+                        "Chặn các đơn hàng gửi trùng số hiệu PO từ cùng một khách hàng trong vòng 48 giờ.",
+                        "document", "block", "Phòng Kế toán & Tài chính", 1, "global", None, now, now
+                    ),
+                    (
+                        "r6", "UOM_CONVERSION_MISSING", "Thiếu cấu hình quy đổi đơn vị (UOM)",
+                        "Cảnh báo khi đơn vị đặt hàng khác đơn vị cơ sở kho nhưng chưa khai báo hệ số quy đổi.",
+                        "catalog", "warning", "Phòng Chuỗi cung ứng", 1, "global", None, now, now
+                    ),
+                ]
+                self.connection.executemany(
+                    """
+                    INSERT OR IGNORE INTO rule_definitions (id, code, name, description, category, severity, owner, enabled, scope, custom_condition, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    default_rules,
+                )
+                self.connection.commit()
+
+    def list_organization_scopes(self) -> list[OrganizationScope]:
+        with self._lock:
+            rows = self.connection.execute(
+                "SELECT * FROM organization_scopes ORDER BY id ASC"
+            ).fetchall()
+            return [
+                OrganizationScope(
+                    id=row["id"],
+                    code=row["code"],
+                    name=row["name"],
+                    description=row["description"],
+                    icon=row["icon"],
+                    parent_code=row["parent_code"],
+                    is_active=bool(row["is_active"]),
+                    created_at=row["created_at"],
+                )
+                for row in rows
+            ]
+
+    def create_organization_scope(
+        self, code: str, name: str, description: str = "", icon: str = "", parent_code: str | None = None
+    ) -> OrganizationScope:
+        now = datetime.now(timezone.utc).isoformat()
+        with self._lock:
+            cursor = self.connection.execute(
+                """
+                INSERT INTO organization_scopes (code, name, description, icon, parent_code, is_active, created_at)
+                VALUES (?, ?, ?, ?, ?, 1, ?)
+                """,
+                (code.strip().lower(), name.strip(), description.strip(), icon.strip(), parent_code, now),
+            )
+            self.connection.commit()
+            return OrganizationScope(
+                id=cursor.lastrowid,
+                code=code.strip().lower(),
+                name=name.strip(),
+                description=description.strip(),
+                icon=icon.strip(),
+                parent_code=parent_code,
+                is_active=True,
+                created_at=now,
+            )
+
+    def delete_organization_scope(self, code: str) -> bool:
+        with self._lock:
+            cursor = self.connection.execute(
+                "DELETE FROM organization_scopes WHERE code = ? AND code != 'global'",
+                (code.strip().lower(),),
+            )
+            self.connection.commit()
+            return cursor.rowcount > 0
+
+    def list_rule_definitions(self, scope: str | None = None) -> list[RuleDefinitionRecord]:
+        with self._lock:
+            if scope and scope != "all":
+                rows = self.connection.execute(
+                    "SELECT * FROM rule_definitions WHERE scope = ? OR scope = 'global' ORDER BY id ASC",
+                    (scope.strip().lower(),),
+                ).fetchall()
+            else:
+                rows = self.connection.execute(
+                    "SELECT * FROM rule_definitions ORDER BY id ASC"
+                ).fetchall()
+            return [
+                RuleDefinitionRecord(
+                    id=row["id"],
+                    code=row["code"],
+                    name=row["name"],
+                    description=row["description"],
+                    category=row["category"],
+                    severity=row["severity"],
+                    owner=row["owner"],
+                    enabled=bool(row["enabled"]),
+                    scope=row["scope"],
+                    custom_condition=row["custom_condition"],
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                )
+                for row in rows
+            ]
+
+    def upsert_rule_definition(self, rule: RuleDefinitionRecord) -> RuleDefinitionRecord:
+        now = datetime.now(timezone.utc).isoformat()
+        with self._lock:
+            self.connection.execute(
+                """
+                INSERT INTO rule_definitions (id, code, name, description, category, severity, owner, enabled, scope, custom_condition, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    code = excluded.code,
+                    name = excluded.name,
+                    description = excluded.description,
+                    category = excluded.category,
+                    severity = excluded.severity,
+                    owner = excluded.owner,
+                    enabled = excluded.enabled,
+                    scope = excluded.scope,
+                    custom_condition = excluded.custom_condition,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    rule.id,
+                    rule.code,
+                    rule.name,
+                    rule.description,
+                    rule.category,
+                    rule.severity,
+                    rule.owner,
+                    1 if rule.enabled else 0,
+                    rule.scope,
+                    rule.custom_condition,
+                    rule.created_at or now,
+                    now,
+                ),
+            )
+            self.connection.commit()
+            rule.updated_at = now
+            return rule
+
+    def delete_rule_definition(self, rule_id: str) -> bool:
+        with self._lock:
+            cursor = self.connection.execute(
+                "DELETE FROM rule_definitions WHERE id = ?",
+                (rule_id,),
+            )
+            self.connection.commit()
+            return cursor.rowcount > 0
 
     def get_channel_identity(self, channel: str, external_id: str) -> dict[str, Any] | None:
         with self._lock:
@@ -2650,6 +2938,10 @@ class PostgresAuditStore(BaseAuditStore):
             self.seed_initial_admin()
         except Exception:
             pass
+        try:
+            self._seed_default_scopes_and_rules_pg()
+        except Exception:
+            pass
 
     def close(self) -> None:
         if hasattr(self, "_pool"):
@@ -3248,6 +3540,186 @@ class PostgresAuditStore(BaseAuditStore):
                 val = row["policy_json"]
                 data = json.loads(val) if isinstance(val, str) else val
                 return RulePolicy.from_dict(data)
+
+    def _seed_default_scopes_and_rules_pg(self) -> None:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) AS c FROM organization_scopes")
+                row = cur.fetchone()
+                now = datetime.now(timezone.utc).isoformat()
+                if row and row["c"] == 0:
+                    default_scopes = [
+                        ("global", "Toàn Doanh Nghiệp (Global)", "Quy tắc nền tảng chung toàn doanh nghiệp", "globe", None, True, now),
+                        ("north", "Chi Nhánh Miền Bắc", "Kho Hải Phòng & Hà Nội", "mountain", "global", True, now),
+                        ("south", "Chi Nhánh Miền Nam", "Kho Bình Dương & TP.HCM", "palmtree", "global", True, now),
+                        ("mt", "Chuỗi Siêu Thị (MT)", "WinMart, AEON, Co.opmart", "shopping-cart", "global", True, now),
+                        ("gt", "Đại Lý Tỉnh (GT)", "Nhà phân phối truyền thống", "store", "global", True, now),
+                    ]
+                    for s in default_scopes:
+                        cur.execute(
+                            """
+                            INSERT INTO organization_scopes (code, name, description, icon, parent_code, is_active, created_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (code) DO NOTHING
+                            """,
+                            s,
+                        )
+
+                cur.execute("SELECT COUNT(*) AS c FROM rule_definitions")
+                r_row = cur.fetchone()
+                if r_row and r_row["c"] == 0:
+                    default_rules = [
+                        ("r1", "PRICE_MISMATCH", "Chênh lệch giá bán so với Catalog hợp đồng", "Tự động phát hiện khi đơn giá tiếp nhận sai khác so với bảng giá Catalog đang hiệu lực.", "price", "warning", "Phòng Kinh doanh", True, "global", None, now, now),
+                        ("r2", "INSUFFICIENT_STOCK", "Không đủ tồn kho khả dụng (ATP)", "Cảnh báo khi số lượng đặt vượt quá tồn kho khả dụng thực tế sau khi trừ phân bổ giữ chỗ.", "stock", "warning", "Phòng Vận hành & Kho", True, "global", None, now, now),
+                        ("r3", "UNKNOWN_SKU", "Mã SKU chưa khai báo trong hệ thống", "Chặn ngay lập tức các dòng hàng có mã sản phẩm lạ chưa có trong Master Data.", "catalog", "block", "Quản trị danh mục", True, "global", None, now, now),
+                        ("r4", "INACTIVE_SKU", "Sản phẩm đã ngừng kinh doanh", "Chặn các đơn đặt hàng chứa sản phẩm đã vô hiệu hóa hoặc kết thúc vòng đời thương mại.", "catalog", "block", "Phòng Sản phẩm", True, "global", None, now, now),
+                        ("r5", "DUPLICATE_PO", "Nghi ngờ trùng lặp mã đơn hàng (PO)", "Chặn các đơn hàng gửi trùng số hiệu PO từ cùng một khách hàng trong vòng 48 giờ.", "document", "block", "Phòng Kế toán & Tài chính", True, "global", None, now, now),
+                        ("r6", "UOM_CONVERSION_MISSING", "Thiếu cấu hình quy đổi đơn vị (UOM)", "Cảnh báo khi đơn vị đặt hàng khác đơn vị cơ sở kho nhưng chưa khai báo hệ số quy đổi.", "catalog", "warning", "Phòng Chuỗi cung ứng", True, "global", None, now, now),
+                    ]
+                    for r in default_rules:
+                        cur.execute(
+                            """
+                            INSERT INTO rule_definitions (id, code, name, description, category, severity, owner, enabled, scope, custom_condition, created_at, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (id) DO NOTHING
+                            """,
+                            r,
+                        )
+            conn.commit()
+
+    def list_organization_scopes(self) -> list[OrganizationScope]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM organization_scopes ORDER BY id ASC")
+                rows = cur.fetchall()
+                return [
+                    OrganizationScope(
+                        id=r["id"],
+                        code=r["code"],
+                        name=r["name"],
+                        description=r["description"],
+                        icon=r["icon"],
+                        parent_code=r["parent_code"],
+                        is_active=bool(r["is_active"]),
+                        created_at=str(r["created_at"]),
+                    )
+                    for r in rows
+                ]
+
+    def create_organization_scope(
+        self, code: str, name: str, description: str = "", icon: str = "", parent_code: str | None = None
+    ) -> OrganizationScope:
+        now = datetime.now(timezone.utc).isoformat()
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO organization_scopes (code, name, description, icon, parent_code, is_active, created_at)
+                    VALUES (%s, %s, %s, %s, %s, TRUE, %s)
+                    RETURNING id
+                    """,
+                    (code.strip().lower(), name.strip(), description.strip(), icon.strip(), parent_code, now),
+                )
+                res = cur.fetchone()
+                inserted_id = res["id"] if res else None
+            conn.commit()
+            return OrganizationScope(
+                id=inserted_id,
+                code=code.strip().lower(),
+                name=name.strip(),
+                description=description.strip(),
+                icon=icon.strip(),
+                parent_code=parent_code,
+                is_active=True,
+                created_at=now,
+            )
+
+    def delete_organization_scope(self, code: str) -> bool:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM organization_scopes WHERE code = %s AND code != 'global'",
+                    (code.strip().lower(),),
+                )
+                affected = cur.rowcount
+            conn.commit()
+            return affected > 0
+
+    def list_rule_definitions(self, scope: str | None = None) -> list[RuleDefinitionRecord]:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                if scope and scope != "all":
+                    cur.execute(
+                        "SELECT * FROM rule_definitions WHERE scope = %s OR scope = 'global' ORDER BY id ASC",
+                        (scope.strip().lower(),),
+                    )
+                else:
+                    cur.execute("SELECT * FROM rule_definitions ORDER BY id ASC")
+                rows = cur.fetchall()
+                return [
+                    RuleDefinitionRecord(
+                        id=r["id"],
+                        code=r["code"],
+                        name=r["name"],
+                        description=r["description"],
+                        category=r["category"],
+                        severity=r["severity"],
+                        owner=r["owner"],
+                        enabled=bool(r["enabled"]),
+                        scope=r["scope"],
+                        custom_condition=r["custom_condition"],
+                        created_at=str(r["created_at"]),
+                        updated_at=str(r["updated_at"]),
+                    )
+                    for r in rows
+                ]
+
+    def upsert_rule_definition(self, rule: RuleDefinitionRecord) -> RuleDefinitionRecord:
+        now = datetime.now(timezone.utc).isoformat()
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO rule_definitions (id, code, name, description, category, severity, owner, enabled, scope, custom_condition, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (id) DO UPDATE SET
+                        code = EXCLUDED.code,
+                        name = EXCLUDED.name,
+                        description = EXCLUDED.description,
+                        category = EXCLUDED.category,
+                        severity = EXCLUDED.severity,
+                        owner = EXCLUDED.owner,
+                        enabled = EXCLUDED.enabled,
+                        scope = EXCLUDED.scope,
+                        custom_condition = EXCLUDED.custom_condition,
+                        updated_at = EXCLUDED.updated_at
+                    """,
+                    (
+                        rule.id,
+                        rule.code,
+                        rule.name,
+                        rule.description,
+                        rule.category,
+                        rule.severity,
+                        rule.owner,
+                        rule.enabled,
+                        rule.scope,
+                        rule.custom_condition,
+                        rule.created_at or now,
+                        now,
+                    ),
+                )
+            conn.commit()
+            rule.updated_at = now
+            return rule
+
+    def delete_rule_definition(self, rule_id: str) -> bool:
+        with self._pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM rule_definitions WHERE id = %s", (rule_id,))
+                affected = cur.rowcount
+            conn.commit()
+            return affected > 0
 
     def get_channel_identity(self, channel: str, external_id: str) -> dict[str, Any] | None:
         with self._pool.connection() as conn:

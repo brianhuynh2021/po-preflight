@@ -417,3 +417,60 @@ class InventorySnapshot:
         }
 
 
+@dataclass
+class OrganizationScope:
+    code: str
+    name: str
+    description: str = ""
+    icon: str = ""
+    parent_code: str | None = None
+    is_active: bool = True
+    id: int | None = None
+    created_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "code": self.code,
+            "name": self.name,
+            "description": self.description,
+            "icon": self.icon,
+            "parent_code": self.parent_code,
+            "is_active": self.is_active,
+            "created_at": self.created_at,
+        }
+
+
+@dataclass
+class RuleDefinitionRecord:
+    id: str
+    code: str
+    name: str
+    description: str
+    category: str
+    severity: str
+    owner: str
+    enabled: bool = True
+    scope: str = "global"
+    custom_condition: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "code": self.code,
+            "name": self.name,
+            "description": self.description,
+            "category": self.category,
+            "severity": self.severity,
+            "owner": self.owner,
+            "enabled": self.enabled,
+            "scope": self.scope,
+            "custom_condition": self.custom_condition,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+
+

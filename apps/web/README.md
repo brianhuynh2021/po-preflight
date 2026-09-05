@@ -1,17 +1,20 @@
-# Preflight Web Prototype
+# PO Preflight Enterprise Web Application
 
-This application is the interactive customer-facing prototype for PO Preflight. It is intentionally backed by realistic synthetic data so the complete workflow can be demonstrated without customer credentials or an ERP connection.
+This enterprise application provides the mission-critical operations portal for PO Preflight. It is backed by authenticated RESTful APIs, SQLite/PostgreSQL dynamic rule engines, cryptographic audit blocks, 4-tier RAG SKU waterfall matcher, and bidirectional ERP sync outbox.
 
-## Demonstrated workflows
+## Features & Workflows
 
-- Operations overview and attention queue
-- Searchable purchase-order queue
-- Order header and normalized line-item review
-- Catalog, price, inventory, and unknown-SKU findings
-- Controlled approval with a required exception note
-- Change requests and blocked-order behavior
-- Upload interaction and processing confirmation
-- Catalog, validation-rule, and audit-log views
+- Operations overview and real-time attention queue
+- Searchable purchase-order management & multi-channel ingestion
+- Staging studio with OCR extraction review & line-item correction
+- Catalog, price, inventory (ATP), and unknown-SKU findings
+- Controlled human-in-the-loop approval with required exception audit trails
+- Dynamic hierarchical policy matrix with SQLite/Postgres persistence by scope (Branch/Region/Channel)
+- 4-Tier SKU Waterfall Matcher & interactive RAG Playground
+- Stateful LangGraph workflow visualizer
+- ERP Outbox synchronization center with auto-retry and idempotency
+- Cryptographic Merkle tree audit certificates with SHA-256 tamper-evident verification
+- Multi-channel notification center (Telegram, Zalo OA, Webhooks)
 
 ## Run locally
 
@@ -20,7 +23,7 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by the development server.
+Open the local URL printed by the development server (`http://localhost:3000`).
 
 ## Validate
 
@@ -28,4 +31,4 @@ Open the local URL printed by the development server.
 npm test
 ```
 
-This prototype does not persist browser actions after a reload and does not call the production Preflight API. The production application will replace the synthetic in-memory data with authenticated API calls.
+All browser actions and policy updates communicate with the backend FastAPI services (`http://localhost:8001`) with live database persistence.

@@ -248,6 +248,64 @@ class RuleConfigUpdateRequest(BaseModel):
     auto_approve_ready: bool | None = Field(None, description="Auto-sync orders with zero warnings to ERP")
 
 
+class OrganizationScopeResponse(BaseModel):
+    id: int | None = None
+    code: str
+    name: str
+    description: str = ""
+    icon: str = ""
+    parent_code: str | None = None
+    is_active: bool = True
+    created_at: str | None = None
+
+
+class CreateOrganizationScopeRequest(BaseModel):
+    code: str = Field(..., min_length=2, max_length=64, description="Unique code for the scope, e.g. 'north', 'apac'")
+    name: str = Field(..., min_length=2, max_length=255, description="Display name for the scope")
+    description: str = Field("", description="Optional scope description")
+    icon: str = Field("globe", description="Icon name for UI")
+    parent_code: str | None = Field(None, description="Parent scope code, e.g. 'global'")
+
+
+class RuleDefinitionResponse(BaseModel):
+    id: str
+    code: str
+    name: str
+    description: str
+    category: str
+    severity: str
+    owner: str
+    enabled: bool = True
+    scope: str = "global"
+    custom_condition: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class CreateRuleDefinitionRequest(BaseModel):
+    id: str | None = None
+    code: str = Field(..., min_length=2, max_length=64)
+    name: str = Field(..., min_length=2, max_length=255)
+    description: str = Field(..., min_length=2)
+    category: str = Field("price", description="price, stock, catalog, credit, document")
+    severity: str = Field("warning", description="block, warning, disabled")
+    owner: str = Field("Phòng Nghiệp Vụ", description="Department owner")
+    enabled: bool = Field(True, description="Rule is active")
+    scope: str = Field("global", description="Scope code")
+    custom_condition: str | None = Field(None, description="DSL condition expression")
+
+
+class UpdateRuleDefinitionRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    category: str | None = None
+    severity: str | None = None
+    owner: str | None = None
+    enabled: bool | None = None
+    scope: str | None = None
+    custom_condition: str | None = None
+
+
 
 # ---------------------------------------------------------
 # Extraction Confirmation Schemas (Issue #16)

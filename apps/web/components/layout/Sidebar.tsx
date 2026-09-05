@@ -76,7 +76,7 @@ export function Sidebar() {
       : []),
   ];
 
-  const companyName = systemModes?.company_name || "PO Preflight Enterprise";
+  const companyName = systemModes?.company_name || "Công ty Phân phối Nhật Minh";
   const userInitials = user?.user ? user.user.slice(0, 2).toUpperCase() : "AD";
   const userName = user?.user ? user.user.replace("_", " ") : "Administrator";
   const userRole = user?.role ? `Vai trò: ${user.role}` : "Quản trị viên";
@@ -90,13 +90,13 @@ export function Sidebar() {
         <span>PO Preflight</span>
       </div>
 
-      <div className="workspace-switcher interactive" onClick={createRipple}>
-        <span className="workspace-avatar">{companyName[0] || "P"}</span>
-        <span>
+      <div className="workspace-switcher interactive" onClick={createRipple} title={companyName}>
+        <span className="workspace-avatar">{companyName[0] || "N"}</span>
+        <span className="workspace-info">
           <strong>{companyName}</strong>
           <small>Không gian vận hành</small>
         </span>
-        <ChevronDown size={14} style={{ opacity: 0.7 }} aria-hidden="true" />
+        <ChevronDown size={14} style={{ opacity: 0.7, flexShrink: 0 }} aria-hidden="true" />
       </div>
 
       <nav aria-label="Điều hướng chính" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -153,16 +153,15 @@ export function Sidebar() {
             createRipple(e);
             setShowProfileMenu((prev) => !prev);
           }}
-          style={{ width: "100%", justifyContent: "space-between" }}
+          type="button"
+          aria-label="Tài khoản người dùng"
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-            <span className="profile-avatar">{userInitials}</span>
-            <span style={{ textAlign: "left" }}>
-              <strong style={{ textTransform: "capitalize" }}>{userName}</strong>
-              <small>{userRole}</small>
-            </span>
-          </div>
-          <ChevronDown size={14} style={{ opacity: 0.7 }} aria-hidden="true" />
+          <span className="profile-avatar">{userInitials}</span>
+          <span className="profile-info">
+            <strong style={{ textTransform: "capitalize" }}>{userName}</strong>
+            <small>{userRole}</small>
+          </span>
+          <ChevronDown size={14} style={{ opacity: 0.7, flexShrink: 0 }} aria-hidden="true" />
         </button>
 
         {showProfileMenu && (
