@@ -52,6 +52,7 @@ export function Sidebar() {
       items: [
         { label: "Tổng quan", href: "/overview", icon: LayoutDashboard },
         { label: "Đơn hàng", href: "/orders", icon: FileText },
+        { label: "Hồ sơ giải ngân", href: "/banking", icon: ShieldCheck },
         { label: "Báo cáo Pilot", href: "/reports", icon: BarChart3 },
         { label: "Khách hàng", href: "/customers", icon: Users },
         { label: "Danh mục sản phẩm", href: "/catalog", icon: Package },

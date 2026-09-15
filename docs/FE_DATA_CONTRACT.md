@@ -1,5 +1,25 @@
 # PO Preflight — Data Contract & Schema cho Frontend
 
+## Phần mở rộng Banking pilot
+
+Luồng `/banking` độc lập với `PurchaseOrder`, theo [BANKING_PILOT.md](BANKING_PILOT.md).
+`DisbursementCase`, `BankingInvoice`, `DisbursementAnalysis` trong `app/lib/types.ts`
+phải khớp schema Pydantic `src/preflight/banking.py`.
+
+- `POST /api/v1/banking/analyze` nhận hồ sơ nhập tay VND; các trường tiền là chuỗi
+  số nguyên thập phân, ngày là `YYYY-MM-DD`; yêu cầu xác thực tối thiểu VIEWER.
+- Backend là nguồn duy nhất tính tiền và trạng thái. FE dùng `money()` để hiển thị.
+- Chỉ trả `Ready`, `Review required`, `Blocked`; không có quyết định phê duyệt.
+- Kết quả gồm `case_id`, `evaluated_on`, `policy_version`, `mode: pilot_manual_input`,
+  `available_limit`, `eligible_invoice_amount`, `findings`.
+- Findings có `code`, `severity`, `fields` (đường dẫn dữ liệu), `evidence` (map chuỗi).
+  Code, công thức và giới hạn được mô tả trong tài liệu pilot.
+- FE xóa kết quả khi chỉnh dữ liệu và không thay lỗi API bằng kết quả mẫu.
+- Checklist/nguồn chứng từ đều do người dùng cung cấp, chưa được xác minh độc lập.
+- Không lưu hồ sơ hoặc phát sinh giao dịch. `Ready` không đồng nghĩa được giải ngân.
+
+---
+
 > **Nguồn chân lý (source of truth):** file này. Khi có mâu thuẫn với issue GitHub hoặc
 > `docs/ui-specification.md`, contract này thắng.
 >

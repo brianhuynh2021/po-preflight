@@ -1,0 +1,35 @@
+.page { padding: 32px; max-width: 1600px; margin: 0 auto; color: var(--ink); }
+.page button { display: inline-flex; align-items: center; gap: 8px; }
+.header, .row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.header { margin-bottom: 24px; flex-wrap: wrap; }
+.header h1 { font-size: clamp(24px, 3vw, 32px); margin: 10px 0; letter-spacing: -.7px; }
+.page p { color: var(--muted); line-height: 1.6; font-size: 14px; margin: 10px 0 16px; }
+.eyebrow { display: flex; align-items: center; gap: 8px; color: var(--green); font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+.notice { background: var(--blue-soft); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; }
+.notice p { margin-bottom: 0; color: var(--ink); }
+.layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 24px; align-items: start; }
+.formBody { border: 0; margin: 0; padding: 0; min-width: 0; }
+.card { padding: 24px; margin-bottom: 20px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; }
+.card h2 { font-size: 17px; margin: 0 0 18px; }
+.card h3 { font-size: 14px; margin: 12px 0; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.field { display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 500; }
+.field input { width: 100%; min-width: 0; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--canvas); color: var(--ink); font: inherit; min-height: 42px; }
+.field input:focus-visible, .textButton:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.checklist label { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+.checklist input { accent-color: var(--green); width: 17px; height: 17px; }
+.invoice { border-top: 1px solid var(--line); padding: 12px 0 24px; }
+.textButton { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--green); cursor: pointer; padding: 8px 0; font: inherit; font-size: 13px; }
+.page button:disabled { opacity: .55; cursor: wait; }
+.metrics { display: grid; gap: 16px; padding: 18px 0; margin: 16px 0; border-block: 1px solid var(--line); }
+.metrics dt { color: var(--muted); font-size: 12px; }
+.metrics dd { margin: 6px 0 0; font-size: 22px; font-weight: 650; overflow-wrap: anywhere; }
+.finding { border-top: 1px solid var(--line); padding: 18px 0; }
+.finding details { background: var(--canvas); padding: 12px; border-radius: 8px; font-size: 12px; overflow-wrap: anywhere; }
+.finding summary { cursor: pointer; font-weight: 600; }
+.finding dd { margin: 4px 0 12px; }
+.finding dt { color: var(--muted); }
+.error { padding: 14px; background: var(--red-soft); color: var(--red); border-radius: 8px; overflow-wrap: anywhere; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .page { padding: 16px; } .card { padding: 18px; } .grid, .checklist { grid-template-columns: 1fr; } }

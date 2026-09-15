@@ -8,6 +8,11 @@
 
 ## 📊 Bảng Hiện Trạng Năng Lực Hệ Thống (System Status)
 
+**Mở rộng Banking (pilot):** màn hình `/banking` và API tiền kiểm hồ sơ giải ngân
+doanh nghiệp đã hỗ trợ nhập tay, checklist, đối chiếu hạn mức/hóa đơn và xuất kết quả.
+Phạm vi, giới hạn và cách dùng: [Banking Pilot](docs/BANKING_PILOT.md).
+Đây là bộ luật minh họa, chưa có lưu hồ sơ, phê duyệt giải ngân hoặc kết nối core banking.
+
 | Thành phần kỹ thuật | Công nghệ & Cơ chế | Trạng thái hiện tại |
 |---|---|---|
 | **Bóc tách đa định dạng (Multi-format Intake)** | Parser JSON, CSV, Text bảng + Gemini Flash Vision OCR cho ảnh scan/PDF | **Chạy thật (Production Ready)** |

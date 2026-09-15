@@ -17,6 +17,7 @@ from preflight.api.routes import (
     audit,
     auth,
     b2b,
+    banking,
     bot,
     catalog,
     customers,
@@ -216,6 +217,7 @@ app.include_router(system.router)
 app.include_router(users.router)
 app.include_router(leads.router)
 app.include_router(reports.router)
+app.include_router(banking.router)
 
 
 from fastapi.exceptions import RequestValidationError

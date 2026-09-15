@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+test("renders the banking pilot with explicit scope and manual intake", async () => {
+  const response = await render("/banking");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Tiền kiểm hồ sơ giải ngân/);
+  assert.match(html, /Nạp hồ sơ mẫu/);
+  assert.match(html, /Dữ liệu nhập tay, chỉ hỗ trợ VND/);
+  assert.match(html, /Kiểm tra hồ sơ/);
+  assert.match(html, /name="requested_amount"/);
+  assert.match(html, /name="invoices.0.source_reference"/);
+});
+
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
@@ -187,4 +199,3 @@ test("renders the Rules and Policy Matrix view at /rules", async () => {
   assert.match(html, /Chính sách Toàn doanh nghiệp|Policy Scopes/);
   assert.match(html, /Thêm quy tắc mới/);
 });
-

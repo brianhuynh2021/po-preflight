@@ -51,6 +51,8 @@ export default defineConfig(async () => {
       vinext(),
       sites(),
       cloudflare({
+        // Local verification can disable the debug listener entirely.
+        inspectorPort: process.env.PREFLIGHT_DISABLE_INSPECTOR === "1" ? false : undefined,
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: localBindingConfig,
       }),

@@ -233,3 +233,45 @@ export const ROLE_LABEL_VI: Record<UserRole, string> = {
   director: "Giám đốc phê duyệt",
   admin: "Quản trị hệ thống",
 };
+// Banking pilot contract mirrors preflight.banking; see FE_DATA_CONTRACT.md.
+// Decimal amounts stay strings in transit. money(Number(value)) is display only.
+export type BankingDocumentType = "disbursement_request" | "credit_agreement" | "purchase_contract" | "invoice";
+export interface BankingInvoice {
+  number: string;
+  seller_tax_id: string;
+  buyer_tax_id: string;
+  amount: string;
+  already_financed: string;
+  issued_on: string;
+  source_reference: string;
+}
+export interface DisbursementCase {
+  case_id: string;
+  borrower: string;
+  borrower_tax_id: string;
+  currency: "VND";
+  requested_amount: string;
+  beneficiary_tax_id: string;
+  contract_reference: string;
+  contract_valid_until: string;
+  approved_limit: string;
+  outstanding_amount: string;
+  limit_as_of: string;
+  documents: BankingDocumentType[];
+  invoices: BankingInvoice[];
+}
+export interface DisbursementAnalysis {
+  case_id: string;
+  status: "Ready" | "Review required" | "Blocked";
+  policy_version: string;
+  mode: "pilot_manual_input";
+  evaluated_on: string;
+  available_limit: string;
+  eligible_invoice_amount: string;
+  findings: Array<{
+    code: string;
+    severity: "warning" | "error";
+    fields: string[];
+    evidence: Record<string, string>;
+  }>;
+}

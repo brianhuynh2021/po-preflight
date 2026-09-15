@@ -24,6 +24,7 @@ import type {
   UpdateUserPayload,
   UserAccount,
 } from "./types";
+import type { DisbursementAnalysis, DisbursementCase } from "../types";
 
 export class ApiError extends Error {
   public readonly status: number;
@@ -614,6 +615,13 @@ export function createApiClient(config: ClientConfig = {}) {
   };
 
   return {
+    banking: {
+      analyze: (payload: DisbursementCase) => request<DisbursementAnalysis>("/api/v1/banking/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    },
     auth,
     orders,
     audit,
