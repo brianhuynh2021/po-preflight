@@ -18,7 +18,7 @@
 
 ---
 
-## 2. SYSTEM CAPABILITY STATUS (SYSTEM STATUS)
+## 2. SYSTEM CAPABILITY STATUS
 
 | Technical Component | Mechanism & Technology | Current Status |
 |---|---|---|

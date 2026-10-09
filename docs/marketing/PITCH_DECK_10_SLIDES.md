@@ -13,7 +13,7 @@
 
 ---
 
-## SLIDE 2: THE MARKET PAIN (THE PROBLEM)
+## SLIDE 2: THE MARKET PAIN
 - **Context:** B2B businesses receive hundreds of POs every day but process them entirely by hand.
 - **3 "Invisible Thieves" eroding profit:**
   1. **Wasted labor:** 30 - 45 minutes per order arriving as PDF/Excel/Zalo photos. Sales Admin teams are overloaded during peak season.
@@ -22,7 +22,7 @@
 
 ---
 
-## SLIDE 3: THE BREAKTHROUGH SOLUTION (THE SOLUTION)
+## SLIDE 3: THE BREAKTHROUGH SOLUTION
 - **PO Preflight — An intelligent defense layer in front of the ERP:**
   - It does not replace the ERP — PO Preflight is a **Gatekeeper assistant** that sits between the order intake channels and the ERP system (SAP, Odoo, MISA, Oracle).
   - End-to-end automation: **Multi-format intake $\rightarrow$ Vietnamese SKU matching $\rightarrow$ Price & receivables control $\rightarrow$ Human approval $\rightarrow$ Push the order into the ERP.**
@@ -57,7 +57,7 @@
 
 ---
 
-## SLIDE 6: MEASURED RESULTS & ROI (BUSINESS VALUE & ROI)
+## SLIDE 6: MEASURED RESULTS & ROI
 - **Real-world results at customer businesses:**
   - ⏱️ **95% processing time saved:** From 35 minutes $\rightarrow$ under 2 minutes per order.
   - 🎯 **SKU & price accuracy:** Reaches **99.8%**, completely eliminating typing errors.
@@ -66,7 +66,7 @@
 
 ---
 
-## SLIDE 7: TARGET MARKET & CUSTOMER PROFILE (TARGET MARKET)
+## SLIDE 7: TARGET MARKET & CUSTOMER PROFILE
 - **Focus segments:**
   - IT equipment, consumer electronics, and telecom distribution businesses.
   - Pharmaceutical, Medical Device, and FMCG manufacturing & distribution businesses.
@@ -86,7 +86,7 @@
 
 ---
 
-## SLIDE 9: BUSINESS MODEL & SERVICE PLANS (BUSINESS MODEL)
+## SLIDE 9: BUSINESS MODEL & SERVICE PLANS
 - **Flexible B2B SaaS model:**
   - **Starter Plan (Mid-size businesses):** VND 3,500,000 / month (Up to 500 orders/month, 1 ERP Connector).
   - **Professional Plan (Growing businesses):** VND 7,900,000 / month (Up to 2,000 orders/month, dedicated Vietnamese RAG, Telegram/Zalo Bot).
@@ -94,7 +94,7 @@
 
 ---
 
-## SLIDE 10: PARTNERSHIP PROPOSAL & NEXT STEPS (CALL TO ACTION)
+## SLIDE 10: PARTNERSHIP PROPOSAL & NEXT STEPS
 - **Early Adopter Pilot Program (For the first 10 Businesses):**
   - 100% free initial integration costs (valued at VND 25,000,000).
   - 30-day trial on 1,000 of your business's real orders.

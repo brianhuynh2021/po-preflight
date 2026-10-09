@@ -9,7 +9,7 @@
 
 The Pilot program is designed to validate the commercial value and real-world technical effectiveness of the **PO Preflight** system in the customer's own operating environment, before an expanded deployment contract is signed.
 
-### 1.1. Core measurement metrics (Product Metrics)
+### 1.1. Core measurement metrics
 | Metric | Definition | Unit | Collection method |
 |---|---|---|---|
 | **Preflight Time (Intake to Analyzed)** | Time from receiving the PO file (Excel/PDF/JSON/Email) to completing the rules analysis | Seconds (s) | Recorded automatically by the API Gateway (`created_at`) |
@@ -20,7 +20,7 @@ The Pilot program is designed to validate the commercial value and real-world te
 | **AI Infrastructure Cost per PO (Cost per PO)** | Average LLM token and Vision OCR cost per order | USD / VND | Total API cost / total POs processed |
 | **4-Tier SKU Resolution Rate** | Distribution of SKU match rates by tier: Exact → Fuzzy → Vector → LLM | % | Measured from SKU Matcher Service performance |
 
-### 1.2. Expected committed outcomes after 30 days (Target Outcomes)
+### 1.2. Expected committed outcomes after 30 days
 1. **Reduce manual review time by at least 70%**: From an average of 25 minutes/order to under 2 minutes/order.
 2. **Ensure 100% of approval decisions have audit evidence**: Clearly record the approver's identity (`actor`), rank (`role`), time and the reason for any exception.
 3. **Stop 100% of erroneous orders from reaching the ERP**: No order that has not passed preflight, or that is `Blocked`, may be synchronized to the accounting software (MISA AMIS / Odoo / SAP).
@@ -29,7 +29,7 @@ The Pilot program is designed to validate the commercial value and real-world te
 
 ---
 
-## 2. HOW TO READ AND ANALYZE PILOT REPORTS (HOW TO READ REPORTS)
+## 2. HOW TO READ AND ANALYZE PILOT REPORTS
 
 ### 2.1. Accessing and exporting data
 - **Visual interface**: Log in with `Manager` permission or higher and open **VẬN HÀNH → Báo cáo Pilot** (OPERATIONS → Pilot Reports) (`/reports`).

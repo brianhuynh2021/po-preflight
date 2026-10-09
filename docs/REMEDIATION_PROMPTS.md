@@ -655,7 +655,7 @@ claims are unverified, the contact information has 3 different domains/3 differe
 - apps/web/app/(protected)/landing/page.tsx  lives in the protected route group
 - LandingPageView.tsx:102 handleLeadSubmit only does setState; :1415 mailto huynh2102@gmail.com
 - app/layout.tsx JSON-LD: personal Facebook, personal email, home address
-- docs/PITCH_DECK_VN.md contact@popreflight.com; docs/marketing/ONE_PAGER.md pilot@po-preflight.vn, "09xx-xxx-xxx"
+- docs/PITCH_DECK.md contact@popreflight.com; docs/marketing/ONE_PAGER.md pilot@po-preflight.vn, "09xx-xxx-xxx"
 - LandingPageView: "99,4%", "100%", "Zero-Hallucination", "SOX 404", "<15ms", "SAP S/4HANA" logo
 
 ## Requirements
@@ -679,7 +679,7 @@ claims are unverified, the contact information has 3 different domains/3 differe
      with a button "Tính cho doanh nghiệp bạn" (Calculate for your business) (a simple form, calculated client-side).
 4. Contact: one domain (choose popreflight.vn), one company email (env NEXT_PUBLIC_CONTACT_EMAIL),
    one hotline (env). JSON-LD: remove the founder's personal Facebook, remove the home address; keep a minimal
-   Organization. Synchronize docs/PITCH_DECK_VN.md, docs/marketing/ONE_PAGER.md, README.
+   Organization. Synchronize docs/PITCH_DECK.md, docs/marketing/ONE_PAGER.md, README.
 5. Lead form: POST /api/v1/leads (no auth, rate limit 5/minute/IP, honeypot field) → save to the table
    leads (name, company, phone, email, erp, volume, note, created_at, ip_hash) + send an email via
    SMTP if configured (env SMTP_*), otherwise → log + still save to the DB. Return 201, the FE shows "Đã nhận, chúng
@@ -1320,7 +1320,7 @@ If not → STOP, do not write code that "guesses" the API. Record in docs/erp/MI
 
 ```
 ## Requirements
-1. README, docs/MO_TA_DU_AN.md (project description), docs/architecture.md: update them to the true current state (a table "Component |
+1. README, docs/PROJECT_OVERVIEW.md (project description), docs/architecture.md: update them to the true current state (a table "Component |
    Status: live / dry-run / planned"). Remove "MIT Outer System / Stanford Inner Loop",
    "Merkle", "ChromaDB", "WeChat" from the description of the current state (they may be kept in a "Vision" section if desired).
 2. Pitch deck & one-pager: replace the fake ROI table with "Kết quả pilot {khách}: … " (Pilot results for {customer}: …) once available; until then use

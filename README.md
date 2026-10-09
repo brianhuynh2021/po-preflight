@@ -1,6 +1,6 @@
 # PO Preflight — Automated B2B Order Preflight System
 
-> 🇻🇳 **Full documentation:** See the detailed architecture and business analysis in the [PO Preflight Project Description](docs/MO_TA_DU_AN.md) and the [Pilot Playbook](docs/PILOT_PLAYBOOK.md).
+> 📚 **Full documentation:** See the detailed architecture and business analysis in the [PO Preflight Project Description](docs/PROJECT_OVERVIEW.md) and the [Pilot Playbook](docs/PILOT_PLAYBOOK.md).
 
 **PO Preflight** is a pre-control and standardization gateway for Purchase Orders, built for B2B businesses and distributors in Vietnam. The system automatically extracts orders from multiple formats, checks business rules in real time (contract price, credit limit, ATP available stock, packaging specifications), and triggers instant one-tap approval via **Telegram, Zalo Official Account, or the Web Portal** before safely syncing to the ERP system (MISA AMIS, Bravo, Fast, Odoo, SAP B1).
 
@@ -98,7 +98,7 @@ Visit `http://localhost:5173/` to view the operations Portal interface.
 
 ## 📚 Technical & Business Documentation
 - [30-Day Pilot Deployment Handbook (Pilot Playbook)](docs/PILOT_PLAYBOOK.md)
-- [Detailed System Architecture Description](docs/MO_TA_DU_AN.md)
+- [Detailed System Architecture Description](docs/PROJECT_OVERVIEW.md)
 - [Security Q&A Handbook for Accounting & IT](docs/SECURITY_QA.md)
 - [Customer Deployment Case Study Template](docs/marketing/CASE_STUDY_TEMPLATE.md)
 - [Frontend Data Contract (FE Data Contract)](docs/FE_DATA_CONTRACT.md)

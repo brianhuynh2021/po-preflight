@@ -74,7 +74,7 @@ At any time, the accountant can:
 
 ---
 
-## ⚙️ GROUP 3: ERP INTEGRATION & OPERATIONAL RELIABILITY (INTEGRATION & RELIABILITY)
+## ⚙️ GROUP 3: ERP INTEGRATION & OPERATIONAL RELIABILITY
 
 ### Question 11: If the Internet connection or the ERP server (MISA/Odoo/SAP) drops suddenly, will orders be lost?
 **Honest answer:**  

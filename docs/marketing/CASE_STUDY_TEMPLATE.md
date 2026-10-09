@@ -5,7 +5,7 @@
 
 ---
 
-## 🏢 PILOT CLIENT OVERVIEW (CLIENT PROFILE)
+## 🏢 PILOT CLIENT OVERVIEW
 
 - **Business name:** Công ty Cổ phần Phân phối Thiết bị & Vật tư Kỹ thuật Miền Bắc (Northern Technical Equipment & Supplies Distribution Joint Stock Company) (sample pilot customer).
 - **Industry:** Master distribution warehouse for networking equipment, telecom cabling, and IT infrastructure solutions, serving 180 tier-2 dealers and construction projects.
@@ -14,7 +14,7 @@
 
 ---
 
-## 🚨 BACKGROUND & CHALLENGES BEFORE DEPLOYMENT (THE CHALLENGE)
+## 🚨 BACKGROUND & CHALLENGES BEFORE DEPLOYMENT
 
 Before adopting **PO Preflight**, the company's order processing relied 100% on people, with serious bottlenecks:
 
@@ -29,7 +29,7 @@ Before adopting **PO Preflight**, the company's order processing relied 100% on 
 
 ---
 
-## 💡 THE PO PREFLIGHT SOLUTION (THE SOLUTION)
+## 💡 THE PO PREFLIGHT SOLUTION
 
 The company deployed **PO Preflight** for 30 days as an independent intermediary pre-control gateway placed in front of MISA AMIS:
 
@@ -41,7 +41,7 @@ The company deployed **PO Preflight** for 30 days as an independent intermediary
 
 ---
 
-## 📊 MEASURED RESULTS AFTER THE 30-DAY PILOT (MEASURABLE RESULTS)
+## 📊 MEASURED RESULTS AFTER THE 30-DAY PILOT
 
 *(Figures extracted directly from the `/reports` Telemetry Operations Report and the reconciliation file `po_preflight_pilot_report.csv`)*
 
@@ -56,7 +56,7 @@ The company deployed **PO Preflight** for 30 days as an independent intermediary
 
 ---
 
-## 🗣️ TESTIMONIALS FROM THE TEAM ON THE GROUND (CUSTOMER TESTIMONIALS)
+## 🗣️ TESTIMONIALS FROM THE TEAM ON THE GROUND
 
 > *"In the past, the accounting department's biggest fear was a dealer disputing a unit price after the e-invoice had been issued and the goods delivered. Preparing adjustment records and explaining them to the tax authorities was exhausting. Since PO Preflight became our gatekeeper, 100% of orders entering MISA AMIS match the contract price list to the last dong, and we are assured that customers no longer carry bad debt. The SHA-256 hash chain gives us complete confidence during internal audits."*  
 > **— Ms. Nguyễn Thị Mai, Chief Accountant**
@@ -69,7 +69,7 @@ The company deployed **PO Preflight** for 30 days as an independent intermediary
 
 ---
 
-## 🎯 LESSONS LEARNED & SCALE-UP PLAN (NEXT STEPS)
+## 🎯 LESSONS LEARNED & SCALE-UP PLAN
 
 1. **Master Data standardization is the key factor:** Preparing a clean SKU catalog and updating contract price lists from Week 1 let the automatic match rate exceed 95% from the very first day of operation.
 2. **Signing the formal commercial contract:** After successfully accepting the 30-day Pilot program, the company formally signed an annual service contract for the **Growth ERP** package and is planning to extend connectivity to its southern branch.

@@ -36,7 +36,7 @@
 
 ---
 
-## 🚨 SLIDE 2: MARKET PAIN POINTS & HIDDEN COSTS (THE PROBLEM)
+## 🚨 SLIDE 2: MARKET PAIN POINTS & HIDDEN COSTS
 
 ### 3 Critical "Gaps" in B2B Order Processing:
 
@@ -56,7 +56,7 @@
 
 ---
 
-## 💡 SLIDE 3: THE PO PREFLIGHT SOLUTION (THE SOLUTION)
+## 💡 SLIDE 3: THE PO PREFLIGHT SOLUTION
 
 ### The 1-Tap Order Pre-check Gateway — From Raw File to Completed ERP Entry
 
@@ -75,7 +75,7 @@
 
 ---
 
-## ⚡ SLIDE 4: TECHNOLOGY BREAKTHROUGH THAT GUARANTEES ZERO HALLUCINATION (CORE TECH)
+## ⚡ SLIDE 4: TECHNOLOGY BREAKTHROUGH THAT GUARANTEES ZERO HALLUCINATION
 
 ### 1. 4-Tier SKU Matching Algorithm (4-Tier Waterfall Hybrid RAG)
 Completely solves the problem where customers write colloquial names or Vietnamese slang, yet the system must map to the correct internal SKU 100% of the time **without ever letting the AI make things up (Zero-Hallucination)**.
@@ -89,7 +89,7 @@ The system automatically recalculates every line: $\text{Quantity} \times \text{
 
 ---
 
-## 🚀 SLIDE 5: THE 6-STAGE LIVE OPERATING WORKFLOW (LIVE PRODUCT WORKFLOW)
+## 🚀 SLIDE 5: THE 6-STAGE LIVE OPERATING WORKFLOW
 
 ```
 [Stage 1] PO Intake ──► [Stage 2] OCR Extraction ──► [Stage 3] SKU Matching ──► [Stage 4] Rule Checks ──► [Stage 5] Mobile Approval ──► [Stage 6] ERP Outbox Push
@@ -101,11 +101,11 @@ The system automatically recalculates every line: $\text{Quantity} \times \text{
 
 ---
 
-## 📈 SLIDE 6: MEASUREMENT METHODOLOGY & PILOT RESULTS (MEASUREMENT & PILOT DATA)
+## 📈 SLIDE 6: MEASUREMENT METHODOLOGY & PILOT RESULTS
 
 Instead of presenting assumed figures, PO Preflight applies **transparent measurement formulas** based on actual operating data:
 
-### 1. How We Measure (Measurement Methodology)
+### 1. How We Measure
 - **Actual time saved (hours)**:  
   $$\text{Hours Saved} = \text{Orders Processed} \times \frac{25\text{ min (manual entry)} - 2\text{ min (pre-check)}}{60}$$
 - **Human intervention rate (%)**:  
@@ -113,7 +113,7 @@ Instead of presenting assumed figures, PO Preflight applies **transparent measur
 - **Average AI inference cost per order**:  
   $$\text{Cost per PO} = \frac{\text{Total LLM \& OCR Token Cost}}{\text{Total POs Received}}$$
 
-### 2. Benchmark & Pilot Test Results (Benchmark & Pilot Telemetry)
+### 2. Benchmark & Pilot Test Results
 - **Average analysis time**: **2.1 seconds / order** (a > 90% reduction in waiting time).
 - **Pre-ERP violation detection rate**: **100%** (stops every order with a wrong contract price, out-of-stock items or overdue debt).
 - **Automatic SKU resolution rate (Tier 1-3)**: **> 96%** (only < 4% of orders need the LLM fallback).
@@ -163,7 +163,7 @@ Instead of presenting assumed figures, PO Preflight applies **transparent measur
 
 ---
 
-## 🚀 SLIDE 10: 30-DAY PILOT ROLLOUT PLAN (PILOT PLAYBOOK)
+## 🚀 SLIDE 10: 30-DAY PILOT ROLLOUT PLAN
 
 ### 4-Week Pilot Rollout Roadmap for New Customers:
 * **Week 1 — Master Data Setup**: Sync the SKU catalog and contract price lists, and assign user permissions (`/users`).

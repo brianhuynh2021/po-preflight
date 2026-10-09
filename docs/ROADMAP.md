@@ -1,4 +1,4 @@
-# PO PREFLIGHT PROJECT IMPLEMENTATION ROADMAP (AGENTIC AI ROADMAP)
+# PO PREFLIGHT PROJECT IMPLEMENTATION ROADMAP
 
 > **Objective:** Build an Agentic AI system for automated purchase order (PO) reconciliation, combining RAG and LangGraph (Stanford Inner Loop + MIT Outer System), optimizing LLM cost, and enabling multi-channel approval via Telegram, Zalo, Slack, WeChat and the Web Portal.
 

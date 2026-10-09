@@ -1,6 +1,6 @@
 # 60-SECOND DEMO VIDEO SCRIPT — PO PREFLIGHT (REAL DATA)
 
-> **Format:** A real screen recording (Screencast) on a live system + standard Vietnamese voice-over narration + sound effects  
+> **Format:** A real screen recording (Screencast) on a live system + voice-over narration + sound effects (the narration column below is the English script; the Vietnamese cut is `apps/web/public/demo/po_preflight_demo_60s_vi.mp4` with `subtitles_vi.vtt`)  
 > **Script basis:** The real integration-tested business flow A7 / C6 / C7 (Real file extraction → Staging inline edit → SoD authorization → Telegram/Zalo mobile approval → Transactional ERP Outbox → Pilot report).
 
 ---
@@ -17,7 +17,7 @@
 
 ---
 
-## 🛠 SCREEN RECORDING GUIDE ON REAL DATA (RECORDING GUIDE)
+## 🛠 SCREEN RECORDING GUIDE ON REAL DATA
 
 1. **Prepare the environment:**
    - Run the backend server: `PYTHONPATH=src ./.venv/bin/python -m preflight.cli run`
