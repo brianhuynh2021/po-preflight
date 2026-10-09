@@ -1,104 +1,104 @@
 # PITCH DECK 10 SLIDES — PO PREFLIGHT
-**Tên sản phẩm:** PO Preflight  
-**Định vị:** Cổng Kiểm Soát & Tự Động Hóa Đơn Hàng B2B Thông Minh Trước ERP (Pre-ERP Intelligent Order Control Gateway)  
-**Đối tượng thuyết trình:** Giám đốc Vận hành (COO), Giám đốc Công nghệ (CIO/CTO), Giám đốc Tài chính (CFO), Tổng Giám đốc (CEO) Doanh nghiệp Phân phối / Sản xuất / Bán sỉ.
+**Product name:** PO Preflight  
+**Positioning:** An Intelligent Pre-ERP B2B Order Control & Automation Gateway (Pre-ERP Intelligent Order Control Gateway)  
+**Presentation audience:** Chief Operating Officers (COO), Chief Information/Technology Officers (CIO/CTO), Chief Financial Officers (CFO), and Chief Executive Officers (CEO) of Distribution / Manufacturing / Wholesale Businesses.
 
 ---
 
-## SLIDE 1: TRANG TIÊU ĐỀ (COVER)
-- **Tiêu đề lớn:** PO PREFLIGHT
-- **Tiêu đề phụ:** Chấm dứt ác mộng nhập liệu thủ công — Tự động hóa bóc tách đơn hàng B2B và bảo vệ dữ liệu ERP sạch 100%.
-- **Thông điệp cốt lõi:** *"Kiểm soát đơn hàng tốc độ mili-giây, duyệt trên điện thoại, đồng bộ ERP không sai sót."*
-- **Người thuyết trình / Đội ngũ:** PO Preflight Team
+## SLIDE 1: COVER
+- **Main title:** PO PREFLIGHT
+- **Subtitle:** End the manual data-entry nightmare — Automate B2B order extraction and keep your ERP data 100% clean.
+- **Core message:** *"Order control at millisecond speed, approval on your phone, error-free ERP sync."*
+- **Presenter / Team:** PO Preflight Team
 
 ---
 
-## SLIDE 2: NỖI ĐAU THỊ TRƯỜNG (THE PROBLEM)
-- **Bối cảnh:** Doanh nghiệp B2B nhận hàng trăm đơn PO mỗi ngày nhưng xử lý hoàn toàn thủ công.
-- **3 "Kẻ cắp vô hình" đang bào mòn lợi nhuận:**
-  1. **Lãng phí nhân lực:** Mất 30 - 45 phút cho 1 đơn hàng qua PDF/Excel/ảnh Zalo. Đội Sales Admin quá tải vào mùa cao điểm.
-  2. **Sai lệch mã & Lệch giá:** Khách viết tiếng lóng, mã viết tắt $\rightarrow$ Nhập nhầm SKU, bán sai giá hợp đồng, gây thất thoát công nợ.
-  3. **ERP bị ô nhiễm dữ liệu:** Đơn sai nhập vào ERP tạo ra hàng loạt bút toán sửa đổi, tranh chấp giao hàng và chậm trễ thanh toán.
+## SLIDE 2: THE MARKET PAIN (THE PROBLEM)
+- **Context:** B2B businesses receive hundreds of POs every day but process them entirely by hand.
+- **3 "Invisible Thieves" eroding profit:**
+  1. **Wasted labor:** 30 - 45 minutes per order arriving as PDF/Excel/Zalo photos. Sales Admin teams are overloaded during peak season.
+  2. **Code mismatches & price deviations:** Customers use slang and abbreviated codes $\rightarrow$ SKUs are mistyped, goods are sold at the wrong contract price, and receivables leak.
+  3. **ERP data pollution:** Wrong orders entered into the ERP create waves of correcting journal entries, delivery disputes, and payment delays.
 
 ---
 
-## SLIDE 3: GIẢI PHÁP ĐỘT PHÁ (THE SOLUTION)
-- **PO Preflight — Lớp phòng vệ thông minh trước ERP:**
-  - Không thay thế ERP — PO Preflight là **trợ lý gác cổng (Gatekeeper)** đứng giữa kênh nhận đơn và hệ thống ERP (SAP, Odoo, MISA, Oracle).
-  - Tự động hóa toàn trình: **Tiếp nhận đa định dạng $\rightarrow$ So khớp SKU tiếng Việt $\rightarrow$ Kiểm soát giá & công nợ $\rightarrow$ Phê duyệt con người $\rightarrow$ Đẩy đơn vào ERP.**
+## SLIDE 3: THE BREAKTHROUGH SOLUTION (THE SOLUTION)
+- **PO Preflight — An intelligent defense layer in front of the ERP:**
+  - It does not replace the ERP — PO Preflight is a **Gatekeeper assistant** that sits between the order intake channels and the ERP system (SAP, Odoo, MISA, Oracle).
+  - End-to-end automation: **Multi-format intake $\rightarrow$ Vietnamese SKU matching $\rightarrow$ Price & receivables control $\rightarrow$ Human approval $\rightarrow$ Push the order into the ERP.**
 
 ---
 
-## SLIDE 4: TÍNH NĂNG CỐT LÕI (CORE CAPABILITIES)
+## SLIDE 4: CORE CAPABILITIES
 - **1. Multimodal OCR & Zero-Hallucination Math Verifier:**
-  Bóc tách chính xác PDF scan, ảnh, Excel form và bảng phẳng; đối soát số học 100% dòng hàng.
+  Accurately extracts scanned PDFs, images, Excel forms, and flat tables; reconciles the arithmetic of 100% of line items.
 - **2. 4-Tier Hybrid RAG SKU Resolution:**
-  Giải mã tiếng lóng, tiếng Việt viết tắt trong 15ms qua 4 tầng: Exact $\rightarrow$ Fuzzy $\rightarrow$ Vector $\rightarrow$ LLM Context.
+  Decodes slang and abbreviated Vietnamese in 15ms across 4 tiers: Exact $\rightarrow$ Fuzzy $\rightarrow$ Vector $\rightarrow$ LLM Context.
 - **3. Real-time B2B Master Policy Rules:**
-  Tự động kiểm tra giá theo hợp đồng khung, hạn mức tín dụng khách hàng và tồn kho khả dụng.
+  Automatically checks prices against the master agreement, customer credit limits, and available stock.
 - **4. Mobile Approval Bot (Telegram & Zalo OA):**
-  Quản lý duyệt đơn 1 chạm ngay trên điện thoại khi đi công tác.
+  Managers approve orders with one tap right on their phones while traveling.
 - **5. Transactional Outbox & SHA-256 Audit Certificate:**
-  Đồng bộ ERP chuẩn ACID, cấp chứng thư điện tử chứng minh quy trình tuân thủ.
+  ACID-compliant ERP sync, issuing an electronic certificate proving the process was compliant.
 
 ---
 
-## SLIDE 5: CÁCH HOẠT ĐỘNG (HOW IT WORKS)
-- **Quy trình 4 bước chuẩn mực:**
+## SLIDE 5: HOW IT WORKS
+- **The standard 4-step process:**
   ```
   1. INPUT (PDF / Excel / Zalo)
         ↓
-  2. PREFLIGHT ENGINE (Trích xuất OCR + RAG 4 Tầng + Luật Nghiệp vụ)
+  2. PREFLIGHT ENGINE (OCR Extraction + 4-Tier RAG + Business Rules)
         ↓
-  3. HUMAN-IN-THE-LOOP (Xem Side-by-Side + Duyệt Web / Telegram)
+  3. HUMAN-IN-THE-LOOP (Side-by-Side View + Web / Telegram Approval)
         ↓
-  4. ERP INTEGRATION (Tạo Sales Order SAP S/4HANA / Odoo / MISA)
+  4. ERP INTEGRATION (Create Sales Order in SAP S/4HANA / Odoo / MISA)
   ```
 
 ---
 
-## SLIDE 6: KẾT QUẢ ĐO LƯỜNG & ROI (BUSINESS VALUE & ROI)
-- **Hiệu quả thực tế tại doanh nghiệp:**
-  - ⏱️ **Tiết kiệm 95% thời gian xử lý:** Từ 35 phút $\rightarrow$ dưới 2 phút mỗi đơn.
-  - 🎯 **Tỷ lệ chính xác SKU & Giá:** Đạt **99.8%**, loại bỏ hoàn toàn lỗi gõ nhầm.
-  - 💰 **Tiết kiệm chi phí vận hành:** Giảm áp lực tuyển dụng Sales Admin mùa cao điểm, tiết kiệm từ **250 - 500 triệu VNĐ/năm**.
-  - 🚀 **Thời gian triển khai:** Cắm chạy (Plug & Play) trong **3 ngày**, không làm gián đoạn hệ thống ERP hiện tại.
+## SLIDE 6: MEASURED RESULTS & ROI (BUSINESS VALUE & ROI)
+- **Real-world results at customer businesses:**
+  - ⏱️ **95% processing time saved:** From 35 minutes $\rightarrow$ under 2 minutes per order.
+  - 🎯 **SKU & price accuracy:** Reaches **99.8%**, completely eliminating typing errors.
+  - 💰 **Operating cost savings:** Eases the pressure of hiring Sales Admins in peak season, saving **VND 250 - 500 million/year**.
+  - 🚀 **Deployment time:** Plug & Play in **3 days**, without disrupting the existing ERP system.
 
 ---
 
-## SLIDE 7: THỊ TRƯỜNG MỤC TIÊU & CHÂN DUNG KHÁCH HÀNG (TARGET MARKET)
-- **Phân khúc trọng tâm:**
-  - Doanh nghiệp Phân phối thiết bị CNTT, điện máy, viễn thông.
-  - Doanh nghiệp Sản xuất & Phân phối Dược phẩm, Thiết bị Y tế, FMCG.
-  - Doanh nghiệp Bán buôn Vật liệu Xây dựng, Hóa chất, Phụ tùng Công nghiệp.
-- **Quy mô:** Các doanh nghiệp nhận từ 50 - 1.000 đơn đặt hàng B2B mỗi ngày.
+## SLIDE 7: TARGET MARKET & CUSTOMER PROFILE (TARGET MARKET)
+- **Focus segments:**
+  - IT equipment, consumer electronics, and telecom distribution businesses.
+  - Pharmaceutical, Medical Device, and FMCG manufacturing & distribution businesses.
+  - Wholesale businesses in Construction Materials, Chemicals, and Industrial Spare Parts.
+- **Scale:** Businesses that receive 50 - 1,000 B2B purchase orders per day.
 
 ---
 
-## SLIDE 8: LỢI THẾ CẠNH TRANH (COMPETITIVE ADVANTAGES)
+## SLIDE 8: COMPETITIVE ADVANTAGES
 
-| Tiêu chí | OCR truyền thống | Custom ERP Module | PO Preflight |
+| Criteria | Traditional OCR | Custom ERP Module | PO Preflight |
 | :--- | :--- | :--- | :--- |
-| **Nhận diện tiếng lóng B2B VN** | ❌ Kém | ❌ Không có | ✅ **RAG 4 tầng siêu tốc (<15ms)** |
-| **Kiểm soát rủi ro hợp đồng & nợ**| ❌ Không có | ⚠️ Phức tạp | ✅ **Tự động đối chiếu 3 chiều** |
-| **Phê duyệt di động Zalo/Telegram**| ❌ Không có | ❌ Đòi hỏi VPN/App riêng | ✅ **1 chạm tiện lợi, an toàn** |
-| **Chi phí & Thời gian triển khai** | ⚠️ Rời rạc | ❌ Đắt đỏ (3-6 tháng) | ✅ **Chỉ 3 ngày, chi phí linh hoạt** |
+| **Recognition of Vietnamese B2B slang** | ❌ Poor | ❌ None | ✅ **Ultra-fast 4-tier RAG (<15ms)** |
+| **Contract & debt risk control**| ❌ None | ⚠️ Complex | ✅ **Automatic 3-way cross-check** |
+| **Zalo/Telegram mobile approval**| ❌ None | ❌ Requires VPN / a dedicated app | ✅ **Convenient, secure 1-tap** |
+| **Cost & deployment time** | ⚠️ Fragmented | ❌ Expensive (3-6 months) | ✅ **Only 3 days, flexible pricing** |
 
 ---
 
-## SLIDE 9: MÔ HÌNH KINH DOANH & GÓI DỊCH VỤ (BUSINESS MODEL)
-- **Mô hình SaaS B2B linh hoạt:**
-  - **Gói Starter (Doanh nghiệp vừa):** 3.500.000 VNĐ / tháng (Tối đa 500 đơn/tháng, 1 ERP Connector).
-  - **Gói Professional (Doanh nghiệp tăng trưởng):** 7.900.000 VNĐ / tháng (Tối đa 2.000 đơn/tháng, RAG Tiếng Việt riêng, Bot Telegram/Zalo).
-  - **Gói Enterprise (Tập đoàn phân phối):** Tùy biến (Không giới hạn đơn, On-premise / Private Cloud, SAP S/4HANA / Oracle Connector chuyên sâu).
+## SLIDE 9: BUSINESS MODEL & SERVICE PLANS (BUSINESS MODEL)
+- **Flexible B2B SaaS model:**
+  - **Starter Plan (Mid-size businesses):** VND 3,500,000 / month (Up to 500 orders/month, 1 ERP Connector).
+  - **Professional Plan (Growing businesses):** VND 7,900,000 / month (Up to 2,000 orders/month, dedicated Vietnamese RAG, Telegram/Zalo Bot).
+  - **Enterprise Plan (Distribution conglomerates):** Custom (Unlimited orders, On-premise / Private Cloud, in-depth SAP S/4HANA / Oracle Connector).
 
 ---
 
-## SLIDE 10: ĐỀ XUẤT HỢP TÁC & BƯỚC TIẾP THEO (CALL TO ACTION)
-- **Chương trình Early Adopter Pilot (Dành cho 10 Doanh nghiệp đầu tiên):**
-  - Miễn phí 100% chi phí tích hợp ban đầu (Trị giá 25.000.000 VNĐ).
-  - 30 ngày dùng thử trên 1.000 đơn hàng thực tế của doanh nghiệp.
-  - Huấn luyện mô hình RAG riêng trên danh mục mã hàng của doanh nghiệp.
-- **Hành động ngay:**
-  - Đặt lịch Demo 1-1 và gửi 3 mẫu đơn PO thực tế để xem hệ thống xử lý trực tiếp.
+## SLIDE 10: PARTNERSHIP PROPOSAL & NEXT STEPS (CALL TO ACTION)
+- **Early Adopter Pilot Program (For the first 10 Businesses):**
+  - 100% free initial integration costs (valued at VND 25,000,000).
+  - 30-day trial on 1,000 of your business's real orders.
+  - Training a dedicated RAG model on your business's product code catalog.
+- **Take action now:**
+  - Book a 1-on-1 Demo and send 3 real PO samples to see the system process them live.
   - **Hotline / Zalo:** 09xx-xxx-xxx | **Email:** contact@po-preflight.vn | **Website:** `po-preflight.vn`

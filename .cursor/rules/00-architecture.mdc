@@ -9,17 +9,17 @@ globs: **/*
 PO Preflight is the intelligent, controlled intake layer between customer Purchase Orders (files/messages) and downstream ERP systems (SAP, Odoo).
 
 ## 2. The AI-Native Philosophy (Adapted from the Cursor Mindset)
-1. **High-Trust Grounding (Minh bạch tuyệt đối):**
+1. **High-Trust Grounding (Absolute Transparency):**
    - AI is NEVER a black box. Every validation finding must cite precise grounding evidence (e.g. *PO price 75k vs Contract Appendix 02 price 72k*).
    - All math, stock checks, and duplicate PO lookups MUST be deterministic (0 tokens).
-2. **Proactive Background Processing (Xử lý ngầm chủ động - Zero Wait):**
+2. **Proactive Background Processing (Zero Wait):**
    - Ingestion, parsing, SKU matching, and rules validation happen asynchronously in background workers as soon as an order arrives via email/Zalo.
    - When users open the app or chat notification, results and findings are instantly ready without waiting.
-3. **Frictionless Correction (Sửa lỗi không tốn sức):**
+3. **Frictionless Correction (Effortless Error Fixing):**
    - 98% clean data is pre-populated. For the 2% of ambiguous lines, AI provides 1-click suggested resolutions rather than forcing manual retyping.
-4. **Context-Centric Reasoning (Hiểu sâu ngữ cảnh khách hàng):**
+4. **Context-Centric Reasoning (Deep Understanding of Customer Context):**
    - Orders are evaluated within the full context of that customer's relationship: order history, credit limits, custom contract terms, and habitual naming conventions.
-5. **Human in Full Control (Con người làm chủ):**
+5. **Human in Full Control (Humans in Command):**
    - AI proposes, audits, and flags issues. ONLY an authenticated human reviewer can approve and trigger official ERP synchronization.
 
 ## 3. Stanford Inner Loop + MIT Outer System

@@ -95,7 +95,7 @@ class TestDecisionServiceHTTP(unittest.TestCase):
 
 
     def test_criterion_a_viewer_role_forbidden_403(self):
-        """(a) /orders/{id}/decide với user VIEWER -> 403 Forbidden."""
+        """(a) /orders/{id}/decide as a VIEWER user -> 403 Forbidden."""
         order_id = self._seed_order("PO-VIEWER-TEST", status="ready_for_approval")
         headers = {"X-API-Key": "pf_dev_view_6604"}
 
@@ -108,7 +108,7 @@ class TestDecisionServiceHTTP(unittest.TestCase):
         self.assertIn("MANAGER", res.json().get("detail", ""))
 
     def test_criterion_b_actor_ignored_and_deprecated_header(self):
-        """(b) /orders/{id}/decide với user MANAGER, gửi actor: 'fake_admin' -> DB ghi actor từ auth, header X-Deprecated-Field."""
+        """(b) /orders/{id}/decide as a MANAGER user, sending actor: 'fake_admin' -> DB records the actor from auth, X-Deprecated-Field header."""
         order_id = self._seed_order("PO-ACTOR-TEST", status="ready_for_approval")
         headers = {"X-API-Key": "pf_dev_mgr_8802", "X-Client": "web"}
 
@@ -131,7 +131,7 @@ class TestDecisionServiceHTTP(unittest.TestCase):
         self.assertEqual(history["decisions"][0]["actor"], "web:operations_manager")
 
     def test_criterion_c_blocked_order_cannot_be_approved_409(self):
-        """(c) /orders/{id}/decide với PO Blocked, decision='approved' -> 409 Conflict."""
+        """(c) /orders/{id}/decide on a Blocked PO, decision='approved' -> 409 Conflict."""
         order_id = self._seed_order("PO-BLOCKED-TEST", status="blocked", error_count=1)
         headers = {"X-API-Key": "pf_dev_mgr_8802"}
 
@@ -144,7 +144,7 @@ class TestDecisionServiceHTTP(unittest.TestCase):
         self.assertIn("cannot be approved", res.json().get("detail", "").lower())
 
     def test_criterion_d_telegram_webhook_secret_enforcement(self):
-        """(d) Telegram webhook thiếu header secret -> 403; server thiếu TELEGRAM_WEBHOOK_SECRET -> 503."""
+        """(d) Telegram webhook missing the secret header -> 403; server missing TELEGRAM_WEBHOOK_SECRET -> 503."""
         # 1. Server missing secret -> 503
         with patch.dict(os.environ, {"TELEGRAM_WEBHOOK_SECRET": "", "TELEGRAM_SECRET_TOKEN": ""}, clear=False):
             res_no_secret = self.client.post(
@@ -163,7 +163,7 @@ class TestDecisionServiceHTTP(unittest.TestCase):
             self.assertEqual(res_bad_token.status_code, 403)
 
     def test_criterion_e_zalo_webhook_signature_and_role_enforcement(self):
-        """(e) Zalo webhook không chữ ký -> 401; có chữ ký đúng + identity VIEWER -> 403."""
+        """(e) Zalo webhook without a signature -> 401; valid signature + VIEWER identity -> 403."""
         app_id = "zalo_test_app"
         secret_key = "zalo_test_secret_key"
 
@@ -207,7 +207,7 @@ class TestDecisionServiceHTTP(unittest.TestCase):
             self.assertIn("MANAGER", res_viewer.json().get("detail", ""))
 
     def test_criterion_f_unlinked_account_rejected_without_db_write(self):
-        """(f) Telegram/Zalo callback từ user chưa link identity -> thông báo chưa liên kết, KHÔNG ghi DB."""
+        """(f) Telegram/Zalo callback from a user with no linked identity -> "not linked" message, NO DB write."""
         order_id = self._seed_order("PO-UNLINKED-TEST", status="ready_for_approval")
 
         # 1. Telegram unlinked
@@ -240,7 +240,7 @@ class TestDecisionServiceHTTP(unittest.TestCase):
         self.assertEqual(len(history["decisions"]), 0)
 
     def test_criterion_g_agent_workflow_blocked_po_approval_rejected(self):
-        """(g) Agent workflow với PO Blocked -> human_approval_node không cho approve -> status='decision_rejected', không sang erp_sync."""
+        """(g) Agent workflow with a Blocked PO -> human_approval_node refuses to approve -> status='decision_rejected', does not proceed to erp_sync."""
         self._seed_order("PO-AGENT-BLOCKED", status="blocked", error_count=1)
 
         graph = build_preflight_graph(self.catalog, self.store, with_interrupt=True)
@@ -274,7 +274,7 @@ class TestDecisionServiceHTTP(unittest.TestCase):
         self.assertFalse(resumed.get("erp_synced", False))
 
     def test_criterion_h_static_grep_record_decision_single_gate(self):
-        """(h) Static check: grep -rn 'record_decision(' src/ CHỈ xuất hiện trong store.py và services/decisions.py."""
+        """(h) Static check: grep -rn 'record_decision(' src/ appears ONLY in store.py and services/decisions.py."""
         cmd = ["grep", "-rn", "record_decision(", "src/"]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, text=True)
         lines = [line.strip() for line in res.stdout.strip().split("\n") if line.strip()]

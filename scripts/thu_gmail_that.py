@@ -1,14 +1,14 @@
-"""Kiểm tra kết nối Gmail thật cho luồng tiếp nhận PO.
+"""Test the real Gmail connection for the PO intake flow.
 
-MẶC ĐỊNH LÀ CHẾ ĐỘ AN TOÀN: chỉ đọc, KHÔNG gửi mail cho ai, KHÔNG đánh dấu
-thư đã đọc. Hộp thư của bạn được giữ nguyên hiện trạng.
+SAFE MODE IS THE DEFAULT: read-only, does NOT send mail to anyone, does NOT
+mark mail as read. Your mailbox is left exactly as it was.
 
     export IMAP_USER="ban@gmail.com"
-    export IMAP_PASSWORD="app password 16 ky tu"
+    export IMAP_PASSWORD="16-character app password"
     python scripts/thu_gmail_that.py
 
-Chỉ xử lý thư từ những địa chỉ được liệt kê (nếu có), rất nên dùng khi hộp thư
-còn chứa thư cá nhân:
+Only processes mail from the listed addresses (if any); strongly recommended
+when the mailbox still holds personal mail:
 
     export EMAIL_ALLOWED_SENDERS="khach1@congty.vn,khach2@congty.vn"
 """
@@ -47,7 +47,7 @@ def main() -> int:
         imap_password=password,
         imap_folder=os.getenv("IMAP_FOLDER", "INBOX"),
         imap_ssl=True,
-        dry_run=True,          # không gửi mail, không đánh dấu đã đọc
+        dry_run=True,          # do not send mail, do not mark as read
         allowed_senders=allowed,
     )
 

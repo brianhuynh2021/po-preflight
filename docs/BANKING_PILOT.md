@@ -1,91 +1,92 @@
-# Banking Preflight — Pilot tiền kiểm giải ngân doanh nghiệp
+# Banking Preflight — Corporate disbursement pre-check pilot
 
-## Phạm vi đã triển khai
+## Implemented scope
 
-Mở `/banking` từ mục **Hồ sơ giải ngân**. Module nhận dữ liệu nhập tay, chạy luật
-xác định trên backend và hiển thị lỗi kèm căn cứ đối chiếu. Bộ luật `BANK-PILOT-1`
-là giả định minh họa; chưa phải chính sách cấp tín dụng của ngân hàng nào.
+Open `/banking` from the **Hồ sơ giải ngân** (disbursement cases) menu item. The module accepts
+manually entered data, runs deterministic rules on the backend and displays errors together with
+the evidence used for cross-checking. The `BANK-PILOT-1` rule set is an illustrative assumption;
+it is not the credit policy of any bank.
 
-### Dùng thử
+### Try it out
 
-1. Chạy backend với cấu hình đăng nhập hiện có:
+1. Run the backend with the existing login configuration:
    `.venv/bin/python -m uvicorn preflight.api.app:app --app-dir src --host 127.0.0.1 --port 8001`.
-2. Từ `apps/web`, chạy `npm run dev`, đăng nhập portal và mở `/banking`.
-   Để tắt cổng debug khi kiểm tra cục bộ:
+2. From `apps/web`, run `npm run dev`, log in to the portal and open `/banking`.
+   To disable the debug inspector when testing locally:
    `PREFLIGHT_DISABLE_INSPECTOR=1 npm run dev -- --hostname 127.0.0.1 --port 5187`.
-3. Chọn **Nạp hồ sơ mẫu**, rồi **Kiểm tra hồ sơ**.
-4. Mẫu đề nghị 850 triệu; hạn mức còn lại và hóa đơn còn lại đều 800 triệu.
-   Kết quả phải là `Blocked`, với hai lỗi vượt giá trị.
-5. Sửa đề nghị thành 800 triệu và kiểm tra lại: `Ready`.
-6. Bỏ chọn Hợp đồng mua bán: `Blocked`. Với đủ chứng từ và đề nghị 800 triệu,
-   đổi ngày hạn mức về hôm qua: `Review required`.
-7. Mở **Xem căn cứ đối chiếu**, hoặc tải hồ sơ và kết quả JSON.
+3. Select **Nạp hồ sơ mẫu** (load sample case), then **Kiểm tra hồ sơ** (check case).
+4. The sample requests VND 850 million; the remaining limit and the remaining invoice value are both
+   VND 800 million. The result must be `Blocked`, with two over-value errors.
+5. Change the request to VND 800 million and check again: `Ready`.
+6. Untick **Hợp đồng mua bán** (purchase contract): `Blocked`. With all documents present and a
+   request of VND 800 million, set the limit date back to yesterday: `Review required`.
+7. Open **Xem căn cứ đối chiếu** (view cross-check evidence), or download the case and result as JSON.
 
-Ngày hạn mức và hóa đơn mẫu lấy theo ngày hiện tại tại Việt Nam. Hồ sơ nằm trong
-bộ nhớ trang và mất khi tải lại. Sửa dữ liệu sẽ xóa kết quả cũ. Lỗi API được hiển
-thị, không giả lập thành công. Module không gọi AI, lưu hồ sơ, gửi bot hay ghi core banking.
+The sample limit and invoice dates use the current date in Vietnam. The case lives in page memory
+and is lost on reload. Editing the data clears the previous result. API errors are displayed, not
+simulated as success. The module does not call AI, store cases, send bot messages or write to core banking.
 
-## Quy tắc BANK-PILOT-1
+## BANK-PILOT-1 rules
 
-| Mã | Điều kiện | Mức độ |
+| Code | Condition | Severity |
 |---|---|---|
-| DOCUMENTS_MISSING | Thiếu đề nghị giải ngân, HĐ tín dụng, HĐ mua bán hoặc hóa đơn trong checklist | Chặn |
-| CONTRACT_EXPIRED | Ngày cuối hiệu lực HĐ tín dụng trước ngày kiểm tra | Chặn |
-| LIMIT_SNAPSHOT_STALE | Ngày chốt hạn mức trước ngày kiểm tra | Cần xem xét |
-| LIMIT_SNAPSHOT_FUTURE | Ngày chốt hạn mức sau ngày kiểm tra | Chặn |
-| LIMIT_EXCEEDED | Đề nghị vượt max(0, hạn mức − dư nợ) | Chặn |
-| INVOICES_MISSING | Không có dòng dữ liệu hóa đơn | Chặn |
-| DUPLICATE_INVOICE | Trùng MST bên bán và số hóa đơn trong cùng hồ sơ | Chặn |
-| BENEFICIARY_MISMATCH | MST bên bán khác MST bên thụ hưởng | Chặn |
-| BORROWER_MISMATCH | MST bên mua khác MST khách hàng vay | Chặn |
-| INVOICE_FUTURE | Ngày hóa đơn sau ngày kiểm tra | Chặn |
-| INVOICE_BALANCE_EXCEEDED | Đề nghị vượt tổng giá trị còn lại của hóa đơn qua kiểm tra | Chặn |
+| DOCUMENTS_MISSING | The disbursement request, credit agreement, purchase contract or invoice is missing from the checklist | Error (blocks) |
+| CONTRACT_EXPIRED | The credit agreement's last valid date is before the check date | Error (blocks) |
+| LIMIT_SNAPSHOT_STALE | The limit snapshot date is before the check date | Warning (review needed) |
+| LIMIT_SNAPSHOT_FUTURE | The limit snapshot date is after the check date | Error (blocks) |
+| LIMIT_EXCEEDED | The request exceeds max(0, limit − outstanding balance) | Error (blocks) |
+| INVOICES_MISSING | There are no invoice data rows | Error (blocks) |
+| DUPLICATE_INVOICE | The same seller tax ID (MST) and invoice number appear more than once in the same case | Error (blocks) |
+| BENEFICIARY_MISMATCH | The seller's tax ID differs from the beneficiary's tax ID | Error (blocks) |
+| BORROWER_MISMATCH | The buyer's tax ID differs from the borrower's tax ID | Error (blocks) |
+| INVOICE_FUTURE | The invoice date is after the check date | Error (blocks) |
+| INVOICE_BALANCE_EXCEEDED | The request exceeds the total remaining value of the invoices that passed validation | Error (blocks) |
 
-Hóa đơn sai bên mua/bán, nằm trong tương lai hoặc bản trùng không được cộng vào
-giá trị còn lại. Mỗi hóa đơn còn lại = giá trị hóa đơn − phần đã tài trợ.
-Phần đã tài trợ lớn hơn hóa đơn, số âm, NaN, vô cực, phần lẻ VND, trường lạ và
-ngoại tệ đều bị từ chối với HTTP 422. Giới hạn 100 hóa đơn/hồ sơ,
-200 ký tự/trường văn bản, 15 chữ số cho mỗi giá trị tiền đầu vào và tổng giá trị
-hóa đơn để giữ độ chính xác khi hiển thị trên frontend.
+Invoices with the wrong buyer or seller, dated in the future, or duplicated are not counted toward
+the remaining value. Each invoice's remaining value = invoice value − amount already financed.
+A financed amount greater than the invoice, negative numbers, NaN, infinity, fractional VND amounts,
+unknown fields and foreign currencies are all rejected with HTTP 422. Limits: 100 invoices per case,
+200 characters per text field, and 15 digits for each input monetary value and for the total invoice
+value, to preserve precision when displayed on the frontend.
 
-Ngày kiểm tra lấy từ server theo `Asia/Ho_Chi_Minh`; HĐ còn hiệu lực trong ngày
-hết hạn. Tiền được so sánh chính xác bằng Decimal; bằng ngưỡng được chấp nhận.
-Không lỗi = `Ready`; chỉ warning = `Review required`; có error = `Blocked`.
+The check date is taken from the server in the `Asia/Ho_Chi_Minh` time zone; a credit agreement is
+still valid on its expiry date. Money is compared exactly using Decimal; a value equal to the
+threshold is accepted. No findings = `Ready`; warnings only = `Review required`; any error = `Blocked`.
 
-## API và dữ liệu
+## API and data
 
-- `POST /api/v1/banking/analyze`, yêu cầu session/API key hiện có, tối thiểu VIEWER.
+- `POST /api/v1/banking/analyze`, requires the existing session/API key, minimum VIEWER.
 - Schema: `src/preflight/banking.py`; TypeScript: `apps/web/app/lib/types.ts`.
-- Tiền truyền JSON dạng chuỗi; frontend chỉ chuyển số để hiển thị.
-- `findings[].fields` chỉ vị trí dữ liệu; `evidence` chứa giá trị đối chiếu và nguồn
-  tài liệu do người nhập cung cấp. Đây không phải bằng chứng đã xác thực bằng OCR.
-- Kết quả tải về chứa hồ sơ, kết quả, ngày kiểm tra và phiên bản luật;
-  không phải chứng thư kiểm toán và không có chữ ký số.
+- Money is sent in JSON as strings; the frontend converts to numbers only for display.
+- `findings[].fields` indicates only where the data is located; `evidence` holds the cross-check values
+  and the document source supplied by the person entering the data. This is not evidence verified by OCR.
+- The downloaded result contains the case, the result, the check date and the rule version;
+  it is not an audit certificate and carries no digital signature.
 
-## Giới hạn và bước tiếp theo
+## Limitations and next steps
 
-`Ready` chỉ xác nhận dữ liệu cung cấp qua được bộ kiểm tra mẫu. Chưa kiểm tra
-tính thật của chứng từ, số tài khoản thụ hưởng, điều kiện giải ngân chi tiết,
-KYC/AML, tài sản bảo đảm, phần giữ chỗ hạn mức hay khoản tài trợ ở hồ sơ/ngân hàng khác.
-Kiểm tra trùng chỉ thực hiện trong payload hiện tại.
+`Ready` only confirms that the supplied data passed the sample set of checks. It does not check the
+authenticity of the documents, the beneficiary account number, detailed disbursement conditions,
+KYC/AML, collateral, limit reservations, or financing in other cases or at other banks.
+Duplicate checking is performed only within the current payload.
 
-Để triển khai pilot có lưu trữ và xử lý hồ sơ thực tế, cần chốt với ngân hàng:
+To deploy a pilot with real case storage and processing, the following must be agreed with the bank:
 
-1. Sản phẩm vay, checklist, nguồn dữ liệu, chính sách ngoại lệ có phiên bản.
-2. Hồ sơ nhiều chứng từ; OCR được chấp thuận và vị trí bằng chứng gốc.
-3. Lưu trữ theo đơn vị, lịch sử phiên bản và phân quyền truy cập từng hồ sơ.
-4. Người lập/người duyệt độc lập, kể cả admin; phê duyệt gắn với phiên bản hồ sơ.
-5. Audit lưu giữ độc lập, SSO/MFA và các kiểm soát triển khai của ngân hàng.
-6. Đọc dữ liệu hạn mức trước; đối soát/idempotency trước khi ghi hệ thống đích.
+1. Loan products, checklist, data sources, and a versioned exception policy.
+2. Multi-document cases; approved OCR and the location of the original evidence.
+3. Storage segregated by organizational unit, version history and per-case access control.
+4. An independent preparer and approver, including for admins; approval tied to the case version.
+5. Independently retained audit, SSO/MFA and the bank's own deployment controls.
+6. Read limit data first; reconciliation/idempotency before writing to the target system.
 
-Đo thời gian kiểm tra, tỷ lệ bỏ sót lỗi, cảnh báo sai và số lượt bổ sung chứng từ
-trên tập hồ sơ được cán bộ nghiệp vụ gán nhãn.
+Measure check time, missed-error rate, false-alarm rate and the number of document resubmission
+rounds on a set of cases labeled by business officers.
 
-## Kiểm tra
+## Testing
 
 ```bash
 PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -p 'test_banking*.py'
 ./scripts/test.sh
-# Tu apps/web: kiem tra tuong tac UI voi API gia lap, desktop va mobile.
+# From apps/web: UI interaction tests against a mocked API, desktop and mobile.
 npx playwright test --config playwright.banking.config.ts
 ```

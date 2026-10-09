@@ -1,59 +1,59 @@
-# PO Preflight — Hệ Thống Tiền Kiểm Đơn Hàng B2B Tự Động
+# PO Preflight — Automated B2B Order Preflight System
 
-> 🇻🇳 **Tài liệu tiếng Việt đầy đủ:** Xem chi tiết kiến trúc và phân tích nghiệp vụ tại [Mô tả dự án PO Preflight (Tiếng Việt)](docs/MO_TA_DU_AN.md) và [Cẩm nang Pilot](docs/PILOT_PLAYBOOK.md).
+> 🇻🇳 **Full documentation:** See the detailed architecture and business analysis in the [PO Preflight Project Description](docs/MO_TA_DU_AN.md) and the [Pilot Playbook](docs/PILOT_PLAYBOOK.md).
 
-**PO Preflight** là cổng tiền kiểm soát và chuẩn hóa đơn đặt hàng (Purchase Orders) dành cho các doanh nghiệp B2B và nhà phân phối tại Việt Nam. Hệ thống tự động bóc tách đơn hàng từ nhiều định dạng, đối soát quy tắc nghiệp vụ theo thời gian thực (giá hợp đồng, hạn mức công nợ, tồn kho khả dụng ATP, quy cách đóng gói), và kích hoạt phê duyệt 1 chạm tức thì qua **Telegram, Zalo Official Account hoặc Web Portal** trước khi đồng bộ an toàn sang hệ thống ERP (MISA AMIS, Bravo, Fast, Odoo, SAP B1).
+**PO Preflight** is a pre-control and standardization gateway for Purchase Orders, built for B2B businesses and distributors in Vietnam. The system automatically extracts orders from multiple formats, checks business rules in real time (contract price, credit limit, ATP available stock, packaging specifications), and triggers instant one-tap approval via **Telegram, Zalo Official Account, or the Web Portal** before safely syncing to the ERP system (MISA AMIS, Bravo, Fast, Odoo, SAP B1).
 
 ---
 
-## 📊 Bảng Hiện Trạng Năng Lực Hệ Thống (System Status)
+## 📊 System Capability Status
 
-**Mở rộng Banking (pilot):** màn hình `/banking` và API tiền kiểm hồ sơ giải ngân
-doanh nghiệp đã hỗ trợ nhập tay, checklist, đối chiếu hạn mức/hóa đơn và xuất kết quả.
-Phạm vi, giới hạn và cách dùng: [Banking Pilot](docs/BANKING_PILOT.md).
-Đây là bộ luật minh họa, chưa có lưu hồ sơ, phê duyệt giải ngân hoặc kết nối core banking.
+**Banking extension (pilot):** the `/banking` screen and the API for preflight checks on corporate
+disbursement dossiers already support manual entry, checklists, limit/invoice reconciliation, and result export.
+Scope, limitations, and usage: [Banking Pilot](docs/BANKING_PILOT.md).
+This is an illustrative rule set; it does not yet include dossier storage, disbursement approval, or core banking connectivity.
 
-| Thành phần kỹ thuật | Công nghệ & Cơ chế | Trạng thái hiện tại |
+| Technical Component | Technology & Mechanism | Current Status |
 |---|---|---|
-| **Bóc tách đa định dạng (Multi-format Intake)** | Parser JSON, CSV, Text bảng + Gemini Flash Vision OCR cho ảnh scan/PDF | **Chạy thật (Production Ready)** |
-| **Bảo đảm số học (Math Grounding)** | Self-Reflection Math Verifier (đối soát tổng tiền, thuế VAT, chiết khấu dòng) | **Chạy thật (Production Ready)** |
-| **Bộ so khớp SKU 4-Tier Hybrid** | Tier 1 Exact Hash → Tier 2 Fuzzy → Tier 3 FastEmbed Vector → Tier 4 LLM | **Chạy thật (Production Ready)** |
-| **Đồ thị điều phối luồng (Stateful Workflow)** | LangGraph StateGraph với SQLite/Postgres Checkpointer & ngắt chờ duyệt HITL | **Chạy thật (Production Ready)** |
-| **Động cơ luật B2B (Rules Engine)** | Kiểm tra giá hợp đồng, hạn mức công nợ, tồn kho ATP, MOQ, quy cách đóng gói UOM | **Chạy thật (Production Ready)** |
-| **Phê duyệt đa kênh di động (Mobile Approval)** | Telegram Bot Webhook + Zalo OA Rich Interactive Cards + Web `/m/orders/:id` | **Chạy thật (Production Ready)** |
-| **Cổng kết nối ERP (ERP Outbox)** | Transactional Outbox Pattern với MISA AMIS Live, Odoo, SAP S/4HANA (Hỗ trợ Dry-run) | **Chạy thật (Production Ready)** |
-| **Cơ sở dữ liệu kép (Dual-backend Storage)** | SQLite (WAL mode) cho Edge/On-premise và PostgreSQL cho Cloud với Alembic | **Chạy thật (Production Ready)** |
-| **Nhật ký mật mã học (Audit Hash Chain)** | Chuỗi băm SHA-256 tuần tự chống sửa đổi (Tamper-evident Cryptographic Hash Chain) | **Chạy thật (Production Ready)** |
-| **Email Intake Worker** | IMAP Poller với khóa phân tán chống xử lý trùng lặp và idempotency | **Chạy thật (Production Ready)** |
-| **Kênh phụ trợ Slack & WeChat** | Slack App Block Kit & WeChat Work Webhook | **Kế hoạch mở rộng (Roadmap)** |
+| **Multi-format Intake** | JSON, CSV, and text-table parsers + Gemini Flash Vision OCR for scanned images/PDFs | **Live (Production Ready)** |
+| **Math Grounding** | Self-Reflection Math Verifier (reconciles totals, VAT, and line discounts) | **Live (Production Ready)** |
+| **4-Tier Hybrid SKU Matcher** | Tier 1 Exact Hash → Tier 2 Fuzzy → Tier 3 FastEmbed Vector → Tier 4 LLM | **Live (Production Ready)** |
+| **Stateful Workflow Orchestration Graph** | LangGraph StateGraph with SQLite/Postgres Checkpointer & HITL approval-wait interrupt | **Live (Production Ready)** |
+| **B2B Rules Engine** | Checks contract price, credit limit, ATP stock, MOQ, and UOM packaging specifications | **Live (Production Ready)** |
+| **Multi-channel Mobile Approval** | Telegram Bot Webhook + Zalo OA Rich Interactive Cards + Web `/m/orders/:id` | **Live (Production Ready)** |
+| **ERP Connectivity Gateway (ERP Outbox)** | Transactional Outbox Pattern with MISA AMIS Live, Odoo, SAP S/4HANA (Dry-run supported) | **Live (Production Ready)** |
+| **Dual-backend Storage** | SQLite (WAL mode) for Edge/On-premise and PostgreSQL for Cloud with Alembic | **Live (Production Ready)** |
+| **Cryptographic Audit Log (Audit Hash Chain)** | Sequential SHA-256 hash chain against tampering (Tamper-evident Cryptographic Hash Chain) | **Live (Production Ready)** |
+| **Email Intake Worker** | IMAP Poller with a distributed lock preventing duplicate processing, plus idempotency | **Live (Production Ready)** |
+| **Auxiliary Slack & WeChat Channels** | Slack App Block Kit & WeChat Work Webhook | **Planned expansion (Roadmap)** |
 
 ---
 
-## 🚀 Hướng Dẫn Chạy Nhanh (Quick Start)
+## 🚀 Quick Start Guide
 
-### 1. Khởi động Backend API & Chạy Kiểm Thử Đầy Đủ
+### 1. Start the Backend API & Run the Full Test Suite
 ```bash
-# Kích hoạt môi trường Python (>= 3.12)
+# Activate the Python environment (>= 3.12)
 source .venv/bin/activate
 
-# Chạy toàn bộ bộ kiểm thử tự động (270+ tests)
+# Run the full automated test suite (270+ tests)
 ./scripts/test.sh
 
-# Chạy kịch bản E2E Demo 6 giai đoạn
+# Run the 6-stage E2E Demo scenario
 PYTHONPATH=src python3 -m preflight.cli demo
 ```
 
-### 2. Khởi động Web Dashboard Khách Hàng (Next.js 16 + React 19 trên Vite)
+### 2. Start the Customer Web Dashboard (Next.js 16 + React 19 on Vite)
 ```bash
 cd apps/web
 npm install
 npm run dev
 ```
-Truy cập `http://localhost:5173/` để xem giao diện Portal vận hành.
+Visit `http://localhost:5173/` to view the operations Portal interface.
 
 ---
 
-## 🏗 Kiến Trúc Kỹ Thuật (Architecture)
+## 🏗 Technical Architecture
 
 ```text
 [ Email (IMAP) / Excel / PDF / JSON ]
@@ -88,18 +88,18 @@ Truy cập `http://localhost:5173/` để xem giao diện Portal vận hành.
 
 ---
 
-## 🔒 Bảo Mật & Tuân Thủ (Security & Compliance)
+## 🔒 Security & Compliance
 
-- **Nghị định 13/2023/NĐ-CP**: Toàn bộ dữ liệu khách hàng được ẩn danh, mã hóa lưu trữ và hỗ trợ cài đặt hoàn toàn On-Premise hoặc Private Cloud tại Việt Nam.
-- **Phân tách trách nhiệm (SoD)**: Ngăn chặn triệt để xung đột lợi ích — nhân viên Sales Admin không được tự duyệt đơn mình nộp; đơn hàng vượt hạn mức bắt buộc có xác nhận của Giám đốc (Director).
-- **Tính toàn vẹn dữ liệu**: Chuỗi băm SHA-256 gắn chặt với từng hành động, tự động phát hiện nếu dữ liệu trong cơ sở dữ liệu bị chỉnh sửa trực tiếp.
+- **Decree 13/2023/ND-CP**: All customer data is anonymized, stored encrypted, and supports fully On-Premise or Private Cloud installation in Vietnam.
+- **Segregation of Duties (SoD)**: Thoroughly prevents conflicts of interest — Sales Admin staff cannot approve orders they submitted themselves; orders exceeding the limit require confirmation from a Director.
+- **Data integrity**: The SHA-256 hash chain is tightly bound to every action and automatically detects if data in the database has been modified directly.
 
 ---
 
-## 📚 Tài Liệu Kỹ Thuật & Nghiệp Vụ
-- [Cẩm nang Triển khai Pilot 30 Ngày (Pilot Playbook)](docs/PILOT_PLAYBOOK.md)
-- [Mô tả chi tiết kiến trúc hệ thống (Tiếng Việt)](docs/MO_TA_DU_AN.md)
-- [Sổ tay giải đáp An ninh & Bảo mật cho Kế toán & IT](docs/SECURITY_QA.md)
-- [Mẫu Case Study Triển khai Khách hàng](docs/marketing/CASE_STUDY_TEMPLATE.md)
-- [Hợp đồng dữ liệu Frontend (FE Data Contract)](docs/FE_DATA_CONTRACT.md)
-- [Hướng dẫn Vận hành & Khôi phục sự cố (Runbook)](docs/RUNBOOK.md)
+## 📚 Technical & Business Documentation
+- [30-Day Pilot Deployment Handbook (Pilot Playbook)](docs/PILOT_PLAYBOOK.md)
+- [Detailed System Architecture Description](docs/MO_TA_DU_AN.md)
+- [Security Q&A Handbook for Accounting & IT](docs/SECURITY_QA.md)
+- [Customer Deployment Case Study Template](docs/marketing/CASE_STUDY_TEMPLATE.md)
+- [Frontend Data Contract (FE Data Contract)](docs/FE_DATA_CONTRACT.md)
+- [Operations & Incident Recovery Guide (Runbook)](docs/RUNBOOK.md)

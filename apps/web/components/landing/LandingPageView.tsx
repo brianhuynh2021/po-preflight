@@ -100,7 +100,7 @@ export function LandingPageView() {
 
   // ROI Calculator State
   const [dailyPOs, setDailyPOs] = useState(60);
-  const [adminHourlyWage, setAdminHourlyWage] = useState(45000); // 45k VND/hr (~8-10tr/month)
+  const [adminHourlyWage, setAdminHourlyWage] = useState(45000); // 45k VND/hr (~8-10M VND/month)
 
   // Lead Form State
   const [leadName, setLeadName] = useState("");

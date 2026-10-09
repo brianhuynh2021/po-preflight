@@ -16,7 +16,7 @@ Every HTTP request to PO Preflight is assigned a unique `request_id` (propagated
 
 2. **Querying Admin Health & Server Error Log**:
    - Navigate to `/admin/health` in the frontend (or call `GET /api/v1/admin/health` as an Admin).
-   - Locate the matching `request_id` under **10 Lỗi Server 5xx Gần Nhất**. Click **Chi tiết** to view the full traceback without needing SSH access.
+   - Locate the matching `request_id` under **10 Lỗi Server 5xx Gần Nhất** (10 Most Recent 5xx Server Errors). Click **Chi tiết** (Details) to view the full traceback without needing SSH access.
 
 3. **Searching Centralized Logs (ELK / CloudWatch / Datadog)**:
    - If structured JSON logging is enabled (`PREFLIGHT_LOG_FORMAT=json`), query:
@@ -119,54 +119,55 @@ PO Preflight signs session tokens using HMAC-SHA256 with `PREFLIGHT_SECRET_KEY` 
 
 ---
 
-## 6. Email Intake (Tiếp nhận PO qua Email)
+## 6. Email Intake (Receiving POs via Email)
 
-Khách hàng gửi PO tới một hộp thư; hệ thống đọc tệp đính kèm, khớp khách hàng
-theo địa chỉ người gửi, chạy bộ quy tắc preflight và trả lời tự động bằng
-tiếng Việt.
+Customers send POs to a mailbox; the system reads the attachments, matches the
+customer by sender address, runs the preflight rule set and replies
+automatically in Vietnamese.
 
-### 6.1 Biến môi trường
+### 6.1 Environment variables
 
-| Biến | Bắt buộc | Mặc định | Ghi chú |
+| Variable | Required | Default | Notes |
 |---|---|---|---|
-| `EMAIL_INTAKE_ENABLED` | | `false` | Bật/tắt tính năng |
-| `IMAP_HOST` | ✅ | — | Không đặt ⇒ bỏ qua việc quét hộp thư |
+| `EMAIL_INTAKE_ENABLED` | | `false` | Enables/disables the feature |
+| `IMAP_HOST` | ✅ | — | If unset ⇒ mailbox polling is skipped |
 | `IMAP_PORT` | | `993` | |
-| `IMAP_USER` / `IMAP_PASSWORD` | ✅ | — | Gmail/Workspace phải dùng **App Password** |
+| `IMAP_USER` / `IMAP_PASSWORD` | ✅ | — | Gmail/Workspace must use an **App Password** |
 | `IMAP_FOLDER` | | `INBOX` | |
 | `IMAP_SSL` | | `true` | |
-| `SMTP_HOST` | ✅ | — | Không đặt ⇒ chỉ ghi log, **không gửi mail thật** |
+| `SMTP_HOST` | ✅ | — | If unset ⇒ log only, **no real email is sent** |
 | `SMTP_PORT` | | `587` | |
 | `SMTP_USER` / `SMTP_PASSWORD` | | — | |
-| `SMTP_FROM` | | `noreply@preflight.vn` | Nên là địa chỉ có thật của công ty |
-| `SMTP_SSL` | | `false` | `false` ⇒ dùng STARTTLS |
-| `EMAIL_POLL_INTERVAL` | | `120` | Giây, chỉ dùng cho chế độ `--loop` |
-| `EMAIL_DRY_RUN` | | `false` | `true` ⇒ chỉ đọc: **không gửi mail, không đánh dấu đã đọc** |
-| `EMAIL_ALLOWED_SENDERS` | | — | Danh sách email (phân cách bằng dấu phẩy). Chỉ xử lý thư từ các địa chỉ này, thư khác bỏ qua hoàn toàn |
+| `SMTP_FROM` | | `noreply@preflight.vn` | Should be a real company address |
+| `SMTP_SSL` | | `false` | `false` ⇒ use STARTTLS |
+| `EMAIL_POLL_INTERVAL` | | `120` | Seconds, used only in `--loop` mode |
+| `EMAIL_DRY_RUN` | | `false` | `true` ⇒ read-only: **no email is sent, nothing is marked as read** |
+| `EMAIL_ALLOWED_SENDERS` | | — | Comma-separated list of email addresses. Only emails from these addresses are processed; all other emails are ignored completely |
 
-> **Chạy thử với hộp thư có sẵn:** luôn đặt `EMAIL_DRY_RUN=true` và
-> `EMAIL_ALLOWED_SENDERS` trước. Hệ thống coi **mọi thư chưa đọc** là PO cần
-> xử lý, nên nếu trỏ vào hộp thư cá nhân mà không giới hạn, bạn bè và đối tác
-> của bạn sẽ nhận được mail tự động "vui lòng gửi lại đơn hàng".
+> **Trial runs with an existing mailbox:** always set `EMAIL_DRY_RUN=true` and
+> `EMAIL_ALLOWED_SENDERS` first. The system treats **every unread email** as a
+> PO to be processed, so if you point it at a personal mailbox without
+> restrictions, your friends and partners will receive automatic emails saying
+> "please resend your order".
 
-> **Lưu ý:** hộp thư dùng cho intake nên là hộp thư **riêng** (vd
-> `po@congty.vn`), không dùng chung với hộp thư cá nhân — mọi thư chưa đọc
-> trong đó đều bị coi là PO cần xử lý.
+> **Note:** the mailbox used for intake should be a **dedicated** mailbox (e.g.
+> `po@company.vn`), not shared with a personal mailbox — every unread email in
+> it is treated as a PO to be processed.
 
-### 6.2 Vận hành
+### 6.2 Operations
 
 ```bash
-# Quét một lần (dùng cho cron)
+# Run a single poll (for use with cron)
 preflight intake email --once
 
-# Chạy liên tục, tự quét theo EMAIL_POLL_INTERVAL
+# Run continuously, polling every EMAIL_POLL_INTERVAL
 preflight intake email --loop
 
-# Giới hạn số thư mỗi lần quét (mặc định 20)
+# Limit the number of emails per poll (default 20)
 preflight intake email --once --max-messages 50
 ```
 
-Qua API (cần quyền `sales_admin`):
+Via the API (requires the `sales_admin` permission):
 
 ```bash
 curl -X POST "$API/api/v1/intake/email/poll?max_messages=20" -H "X-API-Key: $KEY"
@@ -174,36 +175,38 @@ curl "$API/api/v1/intake/email/status" -H "X-API-Key: $KEY"
 curl "$API/api/v1/intake/email/logs?limit=50" -H "X-API-Key: $KEY"
 ```
 
-### 6.3 Trạng thái thư trong `email_inbox_logs`
+### 6.3 Email statuses in `email_inbox_logs`
 
-| Trạng thái | Ý nghĩa | Đánh dấu đã đọc? | Có trả lời khách? |
+| Status | Meaning | Marked as read? | Reply to customer? |
 |---|---|---|---|
-| `PROCESSED` | Tất cả tệp đính kèm đã tạo đơn | ✅ | ✅ Xác nhận |
-| `PARTIAL` | Một phần tệp lỗi, phần còn lại đã tạo đơn | ✅ | ✅ Nêu rõ tệp lỗi |
-| `IGNORED` | Không có tệp hợp lệ, **hoặc** là thư tự động | ✅ | Chỉ khi không phải thư tự động |
-| `ERROR` | Không bóc tách được tệp nào | ❌ (để thử lại) | ✅ Báo không nhận được |
-| `GAVE_UP` | Đã thử `MAX_PROCESSING_ATTEMPTS` (3) lần | ✅ | ❌ |
-| `DUPLICATE` | Đã xử lý trước đó (theo `Message-ID`) | ✅ | ❌ |
-| `SKIPPED` | Người gửi ngoài `EMAIL_ALLOWED_SENDERS` | ❌ | ❌ |
+| `PROCESSED` | All attachments created orders | ✅ | ✅ Confirmation |
+| `PARTIAL` | Some attachments failed, the rest created orders | ✅ | ✅ Lists the failed files |
+| `IGNORED` | No valid attachments, **or** it is an automated email | ✅ | Only if it is not an automated email |
+| `ERROR` | No attachment could be extracted | ❌ (left for retry) | ✅ Tells the customer the order could not be received |
+| `GAVE_UP` | `MAX_PROCESSING_ATTEMPTS` (3) attempts were made | ✅ | ❌ |
+| `DUPLICATE` | Already processed before (by `Message-ID`) | ✅ | ❌ |
+| `SKIPPED` | Sender is not in `EMAIL_ALLOWED_SENDERS` | ❌ | ❌ |
 
-### 6.4 Cơ chế an toàn
+### 6.4 Safety mechanisms
 
-- **Chống vòng lặp thư:** không bao giờ trả lời thư từ `MAILER-DAEMON`,
-  `noreply`, thư có `Auto-Submitted`/`Precedence: bulk` hoặc `List-Id`. Thư
-  gửi đi mang `Auto-Submitted: auto-replied` để phía đối tác không trả lời lại.
-- **Chống nghẽn hàng đợi:** mỗi lần quét dành phần lớn hạn ngạch cho thư
-  **chưa từng xử lý**, phần còn lại để thử lại thư cũ. Nhờ đó một đống thư
-  hỏng tồn đọng không làm đơn hàng mới bị kẹt.
-- **Giới hạn tài nguyên:** tệp > 25 MB bị bỏ qua; tối đa 20 tệp/thư; IMAP và
-  SMTP đều có timeout 30 giây.
-- **Idempotency:** khóa theo `Message-ID`, nên quét lại không tạo đơn trùng.
+- **Mail-loop prevention:** never replies to emails from `MAILER-DAEMON`,
+  `noreply`, emails with `Auto-Submitted`/`Precedence: bulk`, or `List-Id`.
+  Outgoing emails carry `Auto-Submitted: auto-replied` so the counterparty does
+  not reply back.
+- **Queue-starvation prevention:** each poll reserves most of its quota for
+  emails that have **never been processed** and uses the remainder to retry old
+  emails. This way a backlog of broken emails does not leave new orders stuck.
+- **Resource limits:** files > 25 MB are skipped; at most 20 files per email;
+  IMAP and SMTP both have a 30-second timeout.
+- **Idempotency:** keyed by `Message-ID`, so re-polling does not create
+  duplicate orders.
 
-### 6.5 Xử lý sự cố
+### 6.5 Troubleshooting
 
-| Hiện tượng | Nguyên nhân thường gặp | Cách xử lý |
+| Symptom | Common cause | Resolution |
 |---|---|---|
-| `imap_configured: false` | Thiếu `IMAP_HOST`/`IMAP_USER` | Đặt biến môi trường rồi khởi động lại |
-| Quét ra 0 thư dù hộp thư có mail | Thư đã ở trạng thái đã đọc | Chỉ thư **chưa đọc** mới được lấy; đánh dấu chưa đọc để xử lý lại |
-| Khách báo không nhận được mail | `SMTP_HOST` chưa đặt | Khi thiếu, hệ thống chỉ ghi log chứ không gửi thật |
-| Nhiều thư `GAVE_UP` | Khách gửi sai định dạng | Xem `error_message` trong `/logs`, liên hệ khách, gửi lại `PO_MAU.xlsx` |
-| Đơn có cảnh báo `CUSTOMER_UNRESOLVED` | Email người gửi chưa khai báo | Thêm địa chỉ vào `contact_emails` của khách hàng tương ứng |
+| `imap_configured: false` | `IMAP_HOST`/`IMAP_USER` missing | Set the environment variables, then restart |
+| Poll returns 0 emails even though the mailbox has mail | The emails are already marked as read | Only **unread** emails are fetched; mark them as unread to process them again |
+| Customer reports not receiving the email | `SMTP_HOST` is not set | When it is missing, the system only logs and does not actually send |
+| Many `GAVE_UP` emails | Customer sent the wrong format | Check `error_message` in `/logs`, contact the customer, resend the `PO_MAU.xlsx` template |
+| Order has the warning `CUSTOMER_UNRESOLVED` | Sender's email is not registered | Add the address to `contact_emails` of the corresponding customer |

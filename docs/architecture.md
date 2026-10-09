@@ -91,18 +91,18 @@ flowchart TB
 
 ### Component status & implementation reality
 
-| Thành phần | Trách nhiệm | Trạng thái hiện tại |
+| Component | Responsibility | Current status |
 |---|---|---|
-| **FastAPI Gateway** | Xác thực session/API-Key, RBAC, phân tích luật B2B, quản lý đơn hàng | **Chạy thật (Production Ready)** |
-| **Next.js Web Portal** | Giao diện React 19 / Next 16 trên Vite: Bóc tách, inline edit, audit log | **Chạy thật (Production Ready)** |
-| **Telegram & Zalo OA Bots** | Đẩy tin nhắn cảnh báo rich card, webhook callback phê duyệt 1 chạm từ di động | **Chạy thật (Production Ready)** |
-| **LangGraph Stateful Graph** | Đồ thị luồng ngắt chờ duyệt Human-In-The-Loop với SQLite/Postgres checkpointing | **Chạy thật (Production Ready)** |
-| **Bộ so khớp SKU 4-Tier** | Tier 1 Exact → Tier 2 Fuzzy → Tier 3 Vector (FastEmbed) → Tier 4 LLM fallback | **Chạy thật (Production Ready)** |
-| **Động cơ luật B2B** | Đối soát giá niêm yết, hợp đồng, tồn kho ATP, nợ quá hạn, quy cách UOM | **Chạy thật (Production Ready)** |
-| **ERP Transactional Outbox** | Hàng đợi xuất ERP idempotent hỗ trợ MISA AMIS, Odoo, SAP S/4HANA | **Chạy thật (Production Ready)** |
-| **Chuỗi băm SHA-256** | Nhật ký mật mã học tamper-evident chứng thực tính bất biến của quyết định | **Chạy thật (Production Ready)** |
-| **Email Intake Worker** | IMAP worker định kỳ tiếp nhận PO đính kèm với lock chống xử lý trùng lặp | **Chạy thật (Production Ready)** |
-| **Kênh phụ trợ Slack & WeChat** | Tích hợp mở rộng Slack Block Kit và WeChat Work | **Kế hoạch mở rộng (Roadmap)** |
+| **FastAPI Gateway** | Session/API-Key authentication, RBAC, B2B rule analysis, order management | **Live (Production Ready)** |
+| **Next.js Web Portal** | React 19 / Next 16 interface on Vite: extraction, inline edit, audit log | **Live (Production Ready)** |
+| **Telegram & Zalo OA Bots** | Push rich-card alert messages, webhook callbacks for 1-tap approval from mobile | **Live (Production Ready)** |
+| **LangGraph Stateful Graph** | Workflow graph that interrupts to wait for Human-In-The-Loop approval, with SQLite/Postgres checkpointing | **Live (Production Ready)** |
+| **4-Tier SKU Matcher** | Tier 1 Exact → Tier 2 Fuzzy → Tier 3 Vector (FastEmbed) → Tier 4 LLM fallback | **Live (Production Ready)** |
+| **B2B Rule Engine** | Reconciliation of list price, contract, ATP stock, overdue receivables, and UOM specifications | **Live (Production Ready)** |
+| **ERP Transactional Outbox** | Idempotent ERP export queue supporting MISA AMIS, Odoo, SAP S/4HANA | **Live (Production Ready)** |
+| **SHA-256 Hash Chain** | Tamper-evident cryptographic log attesting to the immutability of decisions | **Live (Production Ready)** |
+| **Email Intake Worker** | Periodic IMAP worker that ingests PO attachments, with a lock to prevent duplicate processing | **Live (Production Ready)** |
+| **Slack & WeChat Auxiliary Channels** | Extended integrations for Slack Block Kit and WeChat Work | **Planned expansion (Roadmap)** |
 
 ## 3. Order processing sequence
 

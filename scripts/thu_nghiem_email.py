@@ -1,7 +1,7 @@
-"""Chạy thử luồng tiếp nhận PO qua email ngay trên máy local.
+"""Try out the email PO intake flow right on your local machine.
 
-Không cần IMAP/SMTP thật: script dựng một hộp thư giả trong bộ nhớ, mô phỏng
-đúng các tình huống gặp ngoài đời, rồi in ra kết quả từng bước.
+No real IMAP/SMTP needed: the script builds a fake in-memory mailbox, simulates
+the situations met in real life, then prints the result of each step.
 
     python scripts/thu_nghiem_email.py
 """
@@ -24,13 +24,13 @@ from preflight.intake.email import (
 from preflight.models import CustomerMaster
 from preflight.store import AuditStore
 
-logging.disable(logging.CRITICAL)  # giữ output gọn, chỉ in phần diễn giải
+logging.disable(logging.CRITICAL)  # keep output concise, only print the explanatory text
 
 DB_PATH = Path("runtime/thu_nghiem_email.db")
 
 
 def tao_file_po(po: str, khach: str, sku: str, so_luong: int, don_gia: int) -> bytes:
-    """Tạo file Excel PO giống khách hàng thật gửi."""
+    """Create an Excel PO file that looks like one a real customer would send."""
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "DonHang"
@@ -50,7 +50,7 @@ def tao_file_po(po: str, khach: str, sku: str, so_luong: int, don_gia: int) -> b
 
 
 class HopThuGia:
-    """Hộp thư giả: hành xử như IMAP thật, có nhớ trạng thái đã đọc."""
+    """Fake mailbox: behaves like a real IMAP server, remembering read state."""
 
     def __init__(self, messages):
         self.messages = list(messages)
@@ -65,7 +65,7 @@ class HopThuGia:
 
 
 class HopThuGuiDi:
-    """Ghi lại mail hệ thống gửi cho khách, thay cho SMTP thật."""
+    """Records mail the system sends to customers, standing in for real SMTP."""
 
     def __init__(self):
         self.sent = []
@@ -91,7 +91,7 @@ def main() -> int:
     store = AuditStore(DB_PATH)
     store.seed_default_customers()
 
-    # Khai báo email của khách hàng để hệ thống tự nhận diện người gửi.
+    # Register the customer's email so the system can identify the sender automatically.
     store.create_customer(
         CustomerMaster(
             code="CUST-TEST",
@@ -104,7 +104,7 @@ def main() -> int:
 
     now = datetime.now(UTC)
     thu = [
-        # 1. Khách quen gửi PO hợp lệ
+        # 1. Known customer sends a valid PO
         EmailMessageItem(
             message_id="thu-01@khachhang.vn",
             sender_name="Phòng Mua Hàng",
@@ -119,7 +119,7 @@ def main() -> int:
                 )
             ],
         ),
-        # 2. Khách gửi file Word - hệ thống không đọc được
+        # 2. Customer sends a Word file - the system cannot read it
         EmailMessageItem(
             message_id="thu-02@khachhang.vn",
             sender_name="Phòng Mua Hàng",
@@ -129,7 +129,7 @@ def main() -> int:
             raw_uid="2",
             attachments=[EmailAttachment(filename="DonHang.docx", content_bytes=b"WORD")],
         ),
-        # 3. Người gửi lạ, chưa khai báo trong danh mục khách hàng
+        # 3. Unknown sender, not registered in the customer master
         EmailMessageItem(
             message_id="thu-03@lachoac.vn",
             sender_name="Khách Lạ",
@@ -144,7 +144,7 @@ def main() -> int:
                 )
             ],
         ),
-        # 4. Thư báo lỗi tự động - TUYỆT ĐỐI không được trả lời
+        # 4. Automated bounce notice - must NEVER be replied to
         EmailMessageItem(
             message_id="thu-04@mailer",
             sender_name="Mail Delivery System",

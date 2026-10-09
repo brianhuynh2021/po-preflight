@@ -1,66 +1,66 @@
-# PO PREFLIGHT — ONE-PAGER GIẢI PHÁP TỰ ĐỘNG HÓA & KIỂM SOÁT ĐƠN HÀNG B2B
+# PO PREFLIGHT — ONE-PAGER: B2B ORDER AUTOMATION & CONTROL SOLUTION
 
 ---
 
-## 1. NỖI ĐAU THỰC TẾ CỦA DOANH NGHIỆP PHÂN PHỐI & BÁN BUÔN B2B
+## 1. THE REAL PAIN POINTS OF B2B DISTRIBUTION & WHOLESALE BUSINESSES
 
-Tại các doanh nghiệp phân phối, sản xuất và bán sỉ tại Việt Nam, đội ngũ Sales Admin (CS/Nhập liệu) đang mất **30 - 45 phút cho mỗi đơn hàng** và doanh nghiệp đối mặt với 4 rủi ro lớn:
+At distribution, manufacturing, and wholesale companies in Vietnam, Sales Admin teams (CS/data entry) spend **30 - 45 minutes on every order**, and the business faces 4 major risks:
 
-1. **Đa định dạng, xử lý thủ công mệt mỏi:** Đơn PO gửi qua Zalo, Email bằng đủ loại: PDF scan mờ, Excel form tùy chỉnh, bảng phẳng CSV, ảnh chụp từ điện thoại. Nhập tay vừa chậm vừa dễ sót dòng.
-2. **Sai sót SKU & Tên gọi địa phương:** Khách viết tắt (*"dây mạng 3m bấm sẵn"*, *"màn 27 inch 4k"*, mã cũ đã đổi). Tra cứu bảng giá mất hàng chục phút, nhập nhầm mã gây giao sai hàng, bị phạt vi phạm hợp đồng.
-3. **Lệch giá hợp đồng & Thất thoát công nợ:** Không kịp đối chiếu giá theo hợp đồng khung và hạn mức tín dụng khách hàng, dẫn đến bán dưới giá sàn hoặc cho nợ vượt trần.
-4. **ERP rác (Garbage-In, Garbage-Out):** Nhập trực tiếp đơn sai vào SAP / Odoo / MISA tạo ra hàng loạt chứng từ điều chỉnh (Credit/Debit Note), kế toán và kho bãi xung đột liên tục.
-
----
-
-## 2. GIẢI PHÁP: PO PREFLIGHT — TRỢ LÝ KIỂM SOÁT ĐƠN HÀNG TỰ ĐỘNG B2B
-
-**PO Preflight** là cổng kiểm soát trung gian thông minh (B2B Pre-ERP Control Gateway) tự động hóa 100% quy trình từ lúc nhận file PO đến khi đẩy đơn sạch vào ERP:
-
-- 📑 **Trích xuất đa định dạng siêu chuẩn:** Đọc tức thì PDF scan, ảnh, file Excel form hoặc bảng phẳng với cơ chế tự kiểm toán số học (Self-Reflection Math Verifier) chống ảo giác 100%.
-- 🧠 **RAG 4 tầng giải mã SKU thuần Việt:** Tìm đúng mã ERP trong 15ms qua 4 tầng (Chính xác $\rightarrow$ Fuzzy $\rightarrow$ Vector ngữ nghĩa tiếng Việt $\rightarrow$ LLM Context), tự động nhận diện tiếng lóng ngành.
-- 🛡️ **Bộ quy tắc nghiệp vụ thời gian thực:** Kiểm tra tự động 3 chiều: Bảng giá theo khách (B2B Price Agreement), Hạn mức công nợ & nợ quá hạn (Credit Profile), Tồn kho an toàn & Quy đổi ĐVT (Thùng $\leftrightarrow$ Cái).
-- 📱 **Phê duyệt 1 chạm trên Telegram & Zalo:** Trưởng phòng duyệt ngoại lệ ngay trên điện thoại khi đi công tác mà không cần mở máy tính hay đăng nhập ERP cồng kềnh.
-- ⚡ **Đồng bộ ERP chuẩn ACID với Transactional Outbox:** Đơn duyệt xong tự động tạo Sales Order trên SAP S/4HANA, Odoo, MISA AMIS kèm mã băm chứng thực (SHA-256 Audit Certificate).
+1. **Many formats, exhausting manual processing:** POs arrive via Zalo and Email in every form: blurry scanned PDFs, custom Excel forms, flat CSV tables, photos taken on a phone. Manual entry is both slow and prone to missed lines.
+2. **SKU errors & local product names:** Customers use abbreviations (*"dây mạng 3m bấm sẵn"* (3m pre-terminated network cable), *"màn 27 inch 4k"* (27-inch 4K monitor), outdated codes that have since been replaced). Looking up price lists takes tens of minutes, and a mistyped code leads to the wrong goods being shipped and contract penalties.
+3. **Contract price deviations & receivables leakage:** There is no time to cross-check prices against the master agreement and the customer's credit limit, leading to selling below the floor price or extending credit beyond the ceiling.
+4. **Garbage-In, Garbage-Out ERP:** Entering wrong orders directly into SAP / Odoo / MISA creates waves of adjustment documents (Credit/Debit Notes), and accounting and the warehouse are in constant conflict.
 
 ---
 
-## 3. CÁCH HOẠT ĐỘNG (WORKFLOW 4 BƯỚC KHÉP KÍN)
+## 2. THE SOLUTION: PO PREFLIGHT — AN AUTOMATED B2B ORDER CONTROL ASSISTANT
+
+**PO Preflight** is an intelligent intermediary control gateway (B2B Pre-ERP Control Gateway) that automates 100% of the process from receiving the PO file to pushing a clean order into the ERP:
+
+- 📑 **Ultra-accurate multi-format extraction:** Instantly reads scanned PDFs, images, Excel forms, or flat tables, with a self-auditing arithmetic mechanism (Self-Reflection Math Verifier) that eliminates hallucination 100%.
+- 🧠 **4-tier RAG that decodes Vietnamese-native SKUs:** Finds the right ERP code in 15ms across 4 tiers (Exact $\rightarrow$ Fuzzy $\rightarrow$ Vietnamese semantic Vector $\rightarrow$ LLM Context), automatically recognizing industry slang.
+- 🛡️ **Real-time business rules engine:** Automatic 3-way checks: per-customer price list (B2B Price Agreement), credit limit & overdue debt (Credit Profile), and safety stock & UoM conversion (Case $\leftrightarrow$ Piece).
+- 📱 **One-tap approval on Telegram & Zalo:** Department heads approve exceptions right on their phones while traveling, without opening a computer or logging into a cumbersome ERP.
+- ⚡ **ACID-compliant ERP sync with Transactional Outbox:** Once approved, a Sales Order is created automatically in SAP S/4HANA, Odoo, or MISA AMIS, with a hash-based attestation (SHA-256 Audit Certificate).
+
+---
+
+## 3. HOW IT WORKS (A CLOSED-LOOP 4-STEP WORKFLOW)
 
 ```
-[1. Nhận PO] ──▶ [2. Phân tích & So khớp] ──▶ [3. Kiểm soát & Duyệt] ──▶ [4. Đồng bộ ERP]
-(PDF, Excel,      (OCR + RAG 4 Tầng          (Kiểm tra Giá, Tồn,      (Tạo Sales Order SAP/
- Zalo/Email)       chống ảo giác)             Công nợ + Mobile HITL)   Odoo/MISA + Audit Log)
+[1. Receive PO] ──▶ [2. Analyze & Match] ──▶ [3. Control & Approve] ──▶ [4. ERP Sync]
+(PDF, Excel,        (OCR + 4-Tier RAG        (Check Price, Stock,      (Create Sales Order SAP/
+ Zalo/Email)         hallucination-proof)     Receivables + Mobile HITL) Odoo/MISA + Audit Log)
 ```
 
-1. **Tiếp nhận & Bóc tách (3s):** Nhân viên kéo thả PO hoặc nhận tự động qua Webhook Zalo/Email. Hệ thống chuẩn hóa thông tin ngay lập tức.
-2. **So khớp & Đánh giá Rủi ro (5s):** Phân loại rủi ro theo 3 mức `Ready` (Đủ chuẩn), `Review required` (Cần xem xét), `Blocked` (Bị chặn do nợ xấu / hết hàng).
-3. **Phê duyệt con người kiểm soát (Human-In-The-Loop):** Quản lý xem đối chiếu song song (Side-by-Side) giữa file gốc và dữ liệu trích xuất; duyệt nhanh qua Telegram/Zalo.
-4. **Đẩy đơn sạch vào ERP (2s):** Transactional Outbox tự động tạo đơn trên ERP, ghi sổ nhật ký tuân thủ không thể sửa xóa.
+1. **Intake & Extraction (3s):** Staff drag and drop a PO or receive it automatically via Zalo/Email Webhook. The system standardizes the information immediately.
+2. **Matching & Risk Assessment (5s):** Risk is classified into 3 levels: `Ready` (Meets standards), `Review required` (Needs review), `Blocked` (Blocked due to bad debt / out of stock).
+3. **Human-controlled approval (Human-In-The-Loop):** Managers review the original file and the extracted data side by side (Side-by-Side) and approve quickly via Telegram/Zalo.
+4. **Pushing clean orders into the ERP (2s):** The Transactional Outbox automatically creates the order in the ERP and writes to a tamper-proof compliance journal that cannot be edited or deleted.
 
 ---
 
-## 4. HIỆU QUẢ ĐO LƯỜNG NGAY (ROI)
+## 4. MEASURABLE RESULTS RIGHT AWAY (ROI)
 
-| Chỉ số | Trước khi dùng PO Preflight | Sau khi dùng PO Preflight | Mức cải thiện |
+| Metric | Before PO Preflight | After PO Preflight | Improvement |
 | :--- | :--- | :--- | :--- |
-| **Thời gian xử lý đơn** | 30 - 45 phút / đơn | **1 - 2 phút / đơn** | **Giảm 95%** |
-| **Tỷ lệ sai sót SKU/Giá** | 3 - 5% tổng số đơn | **< 0.1%** | **Giảm 98%** |
-| **Chi phí nhân sự Admin** | 3 - 5 nhân sự CS/nhập liệu | 1 nhân sự phụ trách ngoại lệ | **Tiết kiệm ~300tr/năm** |
-| **Thời gian Go-Live** | Tùy biến ERP mất 3 - 6 tháng | **Cắm chạy trong 3 ngày** | **Nhanh gấp 30 lần** |
+| **Order processing time** | 30 - 45 minutes / order | **1 - 2 minutes / order** | **95% reduction** |
+| **SKU/Price error rate** | 3 - 5% of total orders | **< 0.1%** | **98% reduction** |
+| **Admin staffing cost** | 3 - 5 CS/data-entry staff | 1 staff member handling exceptions | **Saves ~VND 300 million/year** |
+| **Go-Live time** | ERP customization takes 3 - 6 months | **Plug-and-play in 3 days** | **30x faster** |
 
 ---
 
-## 5. CHƯƠNG TRÌNH PILOT & ƯU ĐÃI ĐẶC QUYỀN CHO 10 DOANH NGHIỆP ĐẦU TIÊN
+## 5. PILOT PROGRAM & EXCLUSIVE OFFERS FOR THE FIRST 10 BUSINESSES
 
-Dành riêng cho **10 Doanh nghiệp Phân phối / Bán buôn B2B đầu tiên**:
+Reserved exclusively for the **first 10 B2B Distribution / Wholesale Businesses**:
 
-- 🎁 **Miễn phí 100% chi phí khảo sát & tích hợp kết nối ban đầu** (Trị giá 25.000.000 VNĐ).
-- 🎁 **30 ngày dùng thử toàn diện (Full-feature Pilot)** với 1.000 đơn hàng thực tế của doanh nghiệp.
-- 🎁 **Huấn luyện RAG nhận diện bộ từ khóa / SKU riêng** của doanh nghiệp với độ chính xác >98%.
-- 🛡️ **Cam kết không rủi ro:** Không can thiệp sửa đổi Core ERP, dữ liệu lưu trữ hoàn toàn tại máy chủ doanh nghiệp (On-premise / Private Cloud).
+- 🎁 **100% free initial survey & integration costs** (valued at VND 25,000,000).
+- 🎁 **30 days of full-feature trial (Full-feature Pilot)** with 1,000 of your business's real orders.
+- 🎁 **RAG training to recognize your business's own keyword set / SKUs** with accuracy >98%.
+- 🛡️ **Risk-free commitment:** No modification of the Core ERP, and data is stored entirely on the business's own servers (On-premise / Private Cloud).
 
-**Liên hệ đăng ký Pilot ngay:**  
+**Contact us to register for the Pilot today:**  
 - **Website:** https://po-preflight.vn  
 - **Hotline / Zalo:** 09xx-xxx-xxx  
 - **Email:** pilot@po-preflight.vn

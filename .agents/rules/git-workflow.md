@@ -1,9 +1,9 @@
-# QUY TẮC BẮT BUỘC: KỶ LUẬT GIT & QUY TRÌNH KIỂM THỬ LOCAL
+# MANDATORY RULE: GIT DISCIPLINE & LOCAL TESTING PROCESS
 
-> **NGUYÊN TẮC BẤT DI BẤT DỊCH (CRITICAL RULE):**
-> 1. **TUYỆT ĐỐI KHÔNG commit và push trực tiếp lên nhánh `dev` hoặc `main`.**
-> 2. Mọi thay đổi mã nguồn, tính năng hoặc sửa lỗi PHẢI được thực hiện trên **nhánh riêng (feature branch / bugfix branch)**: `feat/<ten-tinh-nang>` hoặc `fix/<ten-loi>`.
-> 3. **BẮT BUỘC KIỂM THỬ LOCAL THÀNH CÔNG 100%:**
->    - Chạy unit test (`PYTHONPATH=src python3 -m unittest discover -s tests`).
->    - Chạy build frontend (`npm run build` hoặc check linter) nếu có thay đổi giao diện.
->    - Chỉ khi nào toàn bộ test local thành công mới được commit trên feature branch và tạo PR.
+> **UNCHANGING PRINCIPLE (CRITICAL RULE):**
+> 1. **ABSOLUTELY DO NOT commit and push directly to the `dev` or `main` branch.**
+> 2. Every source code change, feature, or bug fix MUST be made on a **dedicated branch (feature branch / bugfix branch)**: `feat/<feature-name>` or `fix/<bug-name>`.
+> 3. **LOCAL TESTING MUST SUCCEED 100%:**
+>    - Run unit tests (`PYTHONPATH=src python3 -m unittest discover -s tests`).
+>    - Run the frontend build (`npm run build` or check the linter) if the UI has changed.
+>    - Only when all local tests pass may you commit on the feature branch and create a PR.

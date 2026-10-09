@@ -1,78 +1,78 @@
-# MẪU CASE STUDY TRIỂN KHAI THỰC TẾ — PO PREFLIGHT (CASE STUDY TEMPLATE)
+# REAL-WORLD DEPLOYMENT CASE STUDY TEMPLATE — PO PREFLIGHT
 
-> **Tài liệu nghiên cứu tình huống điển hình dành cho đội ngũ Kinh doanh & Tiếp thị (B2B Sales & Marketing).**  
-> Dữ liệu và chỉ số đo lường được chuẩn hóa từ kết quả triển khai chương trình Pilot 30 ngày (Telemetry KPIs theo Prompt C7).
-
----
-
-## 🏢 TỔNG QUAN DOANH NGHIỆP THÍ ĐIỂM (CLIENT PROFILE)
-
-- **Tên doanh nghiệp:** Công ty Cổ phần Phân phối Thiết bị & Vật tư Kỹ thuật Miền Bắc (Khách hàng thí điểm mẫu).
-- **Lĩnh vực hoạt động:** Tổng kho phân phối thiết bị mạng, cáp viễn thông và giải pháp hạ tầng CNTT cho 180 đại lý cấp 2 và dự án công trình.
-- **Quy mô xử lý:** Trung bình 1.200 - 1.600 đơn đặt hàng (PO)/tháng từ nhiều kênh: Email (PDF, Excel hóa đơn), ảnh chụp Zalo từ đại lý tỉnh.
-- **Hệ thống phần mềm đang dùng:** Kế toán MISA AMIS và phần mềm quản lý kho nội bộ.
+> **A representative case study document for the B2B Sales & Marketing team.**  
+> Data and metrics are standardized from the results of the 30-day Pilot program (Telemetry KPIs per Prompt C7).
 
 ---
 
-## 🚨 BỐI CẢNH & THÁCH THỨC TRƯỚC KHI TRIỂN KHAI (THE CHALLENGE)
+## 🏢 PILOT CLIENT OVERVIEW (CLIENT PROFILE)
 
-Trước khi ứng dụng **PO Preflight**, quy trình xử lý đơn hàng của doanh nghiệp phụ thuộc 100% vào con người với các nút thắt cổ chai nghiêm trọng:
-
-1. **Thời gian xử lý kéo dài gây quá tải:**
-   - Mỗi đơn hàng PO có từ 5 đến 35 dòng hàng. Sales Admin mất trung bình **25 phút/đơn** để mở file, tra cứu mã SKU trong catalog, mở hợp đồng xem chính sách giá riêng của từng đại lý, kiểm tra tồn kho và gõ tay vào MISA AMIS.
-   - Vào các đợt cao điểm cuối tuần hoặc ngày lễ, hộp thư tiếp nhận dồn ứ hàng trăm PO khiến thời gian giao hàng bị chậm trễ từ 1 - 2 ngày.
-2. **Sai sót giá bán và khiếu nại công nợ:**
-   - Đại lý thường dùng các tên gọi dân dã, viết tắt (ví dụ: ghi *"dây mạng 3m bấm sẵn"* thay vì mã chuẩn `CAB-CAT6-3M`). Nhân viên mới thường xuyên chọn nhầm chủng loại hoặc áp nhầm đơn giá bán buôn.
-   - Mỗi tháng doanh nghiệp ghi nhận từ 12 - 18 trường hợp phải làm thủ tục hủy hoặc điều chỉnh hóa đơn điện tử do sai giá hoặc sai chiết khấu bậc thang.
-3. **Thoát kiểm soát hạn mức nợ:**
-   - Nhiều đại lý có nợ quá hạn trên 30 ngày hoặc đã chạm trần tín dụng nhưng đơn hàng vẫn vô tình được nhân viên tạo và chuyển lệnh xuất kho, gây rủi ro đọng vốn lớn.
+- **Business name:** Công ty Cổ phần Phân phối Thiết bị & Vật tư Kỹ thuật Miền Bắc (Northern Technical Equipment & Supplies Distribution Joint Stock Company) (sample pilot customer).
+- **Industry:** Master distribution warehouse for networking equipment, telecom cabling, and IT infrastructure solutions, serving 180 tier-2 dealers and construction projects.
+- **Processing volume:** An average of 1,200 - 1,600 purchase orders (POs) per month from multiple channels: Email (PDF, Excel invoices) and Zalo photos from provincial dealers.
+- **Software in use:** MISA AMIS accounting and an in-house warehouse management system.
 
 ---
 
-## 💡 GIẢI PHÁP ỨNG DỤNG PO PREFLIGHT (THE SOLUTION)
+## 🚨 BACKGROUND & CHALLENGES BEFORE DEPLOYMENT (THE CHALLENGE)
 
-Doanh nghiệp đã triển khai **PO Preflight** làm cổng tiền kiểm soát trung gian độc lập đứng trước MISA AMIS trong 30 ngày:
+Before adopting **PO Preflight**, the company's order processing relied 100% on people, with serious bottlenecks:
 
-- **Bóc tách đa kênh không phụ thuộc mẫu:** Tự động tiếp nhận file đính kèm từ Email và thư mục tải lên, bóc tách chính xác từng dòng hàng với tính năng **tự đối soát số học (Math Verifier)**.
-- **Bộ so khớp SKU 4 tầng (4-Tier RAG):** Tự động nhận diện tên gọi địa phương, từ viết tắt và map chính xác về mã kho nội bộ mà không cần sửa bảng catalog.
-- **Động cơ luật B2B thời gian thực:** Kiểm tra tức thì 3 yếu tố: Giá hợp đồng đã ký, tồn kho khả dụng ATP và trạng thái công nợ của đại lý.
-- **Phê duyệt 1 chạm trên Telegram & Zalo OA:** Các đơn hàng phát hiện vi phạm được gửi trực tiếp thẻ cảnh báo đến Giám đốc Vận hành để bấm duyệt hoặc từ chối ngay trên điện thoại di động.
-- **Transactional ERP Outbox:** Đơn hàng được phê duyệt hợp lệ mới được ghi nhận an toàn vào MISA AMIS kèm mã giao dịch duy nhất.
+1. **Long processing times causing overload:**
+   - Each PO has between 5 and 35 line items. A Sales Admin spent an average of **25 minutes per order** opening the file, looking up SKU codes in the catalog, opening contracts to check each dealer's individual pricing policy, checking inventory, and keying the order into MISA AMIS by hand.
+   - During weekend or holiday peaks, the intake mailbox piled up with hundreds of POs, delaying deliveries by 1 - 2 days.
+2. **Pricing errors and receivables disputes:**
+   - Dealers often use colloquial names and abbreviations (for example, writing *"dây mạng 3m bấm sẵn"* (3m pre-terminated network cable) instead of the standard code `CAB-CAT6-3M`). New staff frequently picked the wrong product type or applied the wrong wholesale unit price.
+   - Every month the company recorded 12 - 18 cases requiring the cancellation or adjustment of e-invoices because of wrong prices or wrong tiered discounts.
+3. **Loss of control over credit limits:**
+   - Many dealers had debts overdue by more than 30 days or had already hit their credit ceiling, yet their orders were still inadvertently created by staff and sent on for warehouse release, creating a major risk of tied-up capital.
 
 ---
 
-## 📊 KẾT QUẢ ĐO LƯỜNG SAU 30 NGÀY PILOT (MEASURABLE RESULTS)
+## 💡 THE PO PREFLIGHT SOLUTION (THE SOLUTION)
 
-*(Số liệu trích xuất trực tiếp từ Báo cáo Vận hành Telemetry `/reports` và tệp đối soát `po_preflight_pilot_report.csv`)*
+The company deployed **PO Preflight** for 30 days as an independent intermediary pre-control gateway placed in front of MISA AMIS:
 
-| Chỉ số đo lường (KPI) | Trước khi dùng Preflight | Sau khi dùng Preflight | Mức độ cải thiện |
+- **Template-independent multi-channel extraction:** Automatically ingests attachments from Email and the upload folder and accurately extracts every line item, with **automatic arithmetic reconciliation (Math Verifier)**.
+- **4-Tier SKU Matcher (4-Tier RAG):** Automatically recognizes local names and abbreviations and maps them precisely to internal warehouse codes without editing the catalog table.
+- **Real-time B2B rules engine:** Instantly checks 3 factors: the signed contract price, available-to-promise (ATP) stock, and the dealer's receivables status.
+- **One-tap approval on Telegram & Zalo OA:** Orders found in violation are sent as alert cards directly to the Chief Operating Officer, who can approve or reject right on a mobile phone.
+- **Transactional ERP Outbox:** Only validly approved orders are safely recorded into MISA AMIS, each with a unique transaction ID.
+
+---
+
+## 📊 MEASURED RESULTS AFTER THE 30-DAY PILOT (MEASURABLE RESULTS)
+
+*(Figures extracted directly from the `/reports` Telemetry Operations Report and the reconciliation file `po_preflight_pilot_report.csv`)*
+
+| Metric (KPI) | Before Preflight | After Preflight | Improvement |
 |---|---|---|---|
-| **Thời gian tiền kiểm 1 đơn hàng** | 25 phút / đơn | **2.1 giây (Bóc tách)** + < 2 phút (Duyệt) | ⚡ **Nhanh hơn 92%** |
-| **Tổng số giờ làm việc tiết kiệm** | 0 giờ | **575 giờ làm việc / tháng** | ⏱️ **Tương đương 3 nhân sự full-time** |
-| **Tỷ lệ chuẩn hóa tự động** | 0% (nhập tay 100%) | **96.4%** đơn hàng sạch | 🎯 **Triệt tiêu lỗi gõ phím** |
-| **Sự cố sai giá & nợ xấu chặn trước ERP** | 15 sự cố lọt vào kho/tháng | **48 đơn hàng có rủi ro được chặn đứng** | 🛡️ **Bảo vệ 140+ triệu VNĐ** |
-| **Tỷ lệ đơn hàng trùng lặp** | 3 - 5 đơn bị xuất kho trùng/quý | **Phát hiện & ngăn chặn 100%** | 🚫 **0 đơn xuất trùng** |
-| **Chi phí vận hành công nghệ AI** | — | **$0.27 USD / 1.500 đơn** (~6.800 VNĐ) | 💰 **Chi phí gần như bằng 0** |
+| **Preflight time per order** | 25 minutes / order | **2.1 seconds (Extraction)** + < 2 minutes (Approval) | ⚡ **92% faster** |
+| **Total working hours saved** | 0 hours | **575 working hours / month** | ⏱️ **Equivalent to 3 full-time staff** |
+| **Automatic standardization rate** | 0% (100% manual entry) | **96.4%** clean orders | 🎯 **Eliminates typing errors** |
+| **Pricing errors & bad debts blocked before the ERP** | 15 incidents slipping into the warehouse/month | **48 risky orders stopped** | 🛡️ **Protects VND 140+ million** |
+| **Duplicate order rate** | 3 - 5 orders shipped in duplicate/quarter | **100% detected & prevented** | 🚫 **0 duplicate shipments** |
+| **AI technology operating cost** | — | **$0.27 USD / 1,500 orders** (~6,800 VND) | 💰 **Near-zero cost** |
 
 ---
 
-## 🗣️ TRÍCH DẪN ĐÁNH GIÁ TỪ ĐỘI NGŨ THỰC TẾ (CUSTOMER TESTIMONIALS)
+## 🗣️ TESTIMONIALS FROM THE TEAM ON THE GROUND (CUSTOMER TESTIMONIALS)
 
-> *"Trước đây, nỗi sợ lớn nhất của phòng kế toán là đại lý khiếu nại sai đơn giá sau khi đã xuất hóa đơn điện tử và giao hàng. Việc lập biên bản điều chỉnh và giải trình thuế rất mệt mỏi. Từ khi có PO Preflight làm người gác cổng, 100% đơn hàng vào MISA AMIS đều khớp từng đồng với bảng giá hợp đồng và đảm bảo khách không còn nợ xấu. Chuỗi băm SHA-256 giúp chúng tôi tự tin tuyệt đối khi kiểm toán nội bộ."*  
-> **— Bà Nguyễn Thị Mai, Kế toán trưởng**
+> *"In the past, the accounting department's biggest fear was a dealer disputing a unit price after the e-invoice had been issued and the goods delivered. Preparing adjustment records and explaining them to the tax authorities was exhausting. Since PO Preflight became our gatekeeper, 100% of orders entering MISA AMIS match the contract price list to the last dong, and we are assured that customers no longer carry bad debt. The SHA-256 hash chain gives us complete confidence during internal audits."*  
+> **— Ms. Nguyễn Thị Mai, Chief Accountant**
 
-> *"Công việc của đội Sales Admin giảm tải rõ rệt. Chúng tôi không còn phải mở 4 màn hình cùng lúc để dò từng mã cáp hay bấm máy tính cộng tay tiền thuế VAT. Giao diện tiếng Việt rất dễ dùng, những dòng hàng khách viết tắt lạ lẫm thì hệ thống đã tự động gợi ý mã chuẩn kèm mức độ tin cậy. Chúng tôi có thêm thời gian chăm sóc khách hàng thay vì chỉ cắm mặt nhập liệu."*  
-> **— Chị Lê Thu Trang, Trưởng nhóm Sales Admin**
+> *"The Sales Admin team's workload has dropped noticeably. We no longer have to keep 4 screens open at once to track down each cable code or add up VAT on a calculator. The Vietnamese-language interface is very easy to use, and when a customer writes an unfamiliar abbreviation, the system automatically suggests the standard code along with a confidence level. We now have more time to look after customers instead of just keeping our heads down entering data."*  
+> **— Ms. Lê Thu Trang, Sales Admin Team Lead**
 
-> *"Là người điều hành, tôi thường xuyên phải đi công tác ở các tỉnh. Trước đây mỗi lần muốn duyệt đơn gấp cho khách quen là nhân viên phải gọi điện hoặc chụp màn hình gửi Zalo rất manh mún. Giờ đây tôi chỉ cần mở Telegram hoặc màn hình duyệt di động trên điện thoại, thấy rõ cảnh báo sai ở đâu và bấm duyệt 1 chạm kèm ghi chú giải trình. Mọi quyết định đều minh bạch và tức thì."*  
-> **— Ông Trần Đình Khang, Giám đốc Vận hành (COO)**
-
----
-
-## 🎯 BÀI HỌC KINH NGHIỆM & KẾ HOẠCH NHÂN RỘNG (NEXT STEPS)
-
-1. **Chuẩn hóa Master Data là yếu tố then chốt:** Việc chuẩn bị danh mục SKU sạch và cập nhật bảng giá hợp đồng ngay từ Tuần 1 giúp tỷ lệ khớp tự động đạt trên 95% ngay từ ngày chạy đầu tiên.
-2. **Ký kết hợp đồng thương mại chính thức:** Sau khi nghiệm thu thành công chương trình Pilot 30 ngày, doanh nghiệp đã chính thức ký kết hợp đồng dịch vụ thường niên gói **Growth ERP** và lên kế hoạch mở rộng kết nối thêm cho chi nhánh miền Nam.
+> *"As an executive, I often travel to the provinces. In the past, every time I wanted to urgently approve an order for a regular customer, staff had to call me or send screenshots over Zalo, which was very fragmented. Now I just open Telegram or the mobile approval screen on my phone, see clearly where the warning is, and approve with one tap along with an explanatory note. Every decision is transparent and instant."*  
+> **— Mr. Trần Đình Khang, Chief Operating Officer (COO)**
 
 ---
-*Bản quyền tài liệu thuộc về Bộ phận Khách hàng Doanh nghiệp — Nhật Minh Technology.*
+
+## 🎯 LESSONS LEARNED & SCALE-UP PLAN (NEXT STEPS)
+
+1. **Master Data standardization is the key factor:** Preparing a clean SKU catalog and updating contract price lists from Week 1 let the automatic match rate exceed 95% from the very first day of operation.
+2. **Signing the formal commercial contract:** After successfully accepting the 30-day Pilot program, the company formally signed an annual service contract for the **Growth ERP** package and is planning to extend connectivity to its southern branch.
+
+---
+*Document copyright belongs to the Enterprise Customer Division — Nhật Minh Technology.*

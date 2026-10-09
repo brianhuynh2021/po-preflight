@@ -1,182 +1,182 @@
-# 📊 PO PREFLIGHT — EXECUTIVE PITCH DECK & BẢN THUYẾT TRÌNH DỰ ÁN
-> **Giải Pháp Cổng Kiểm Soát An Toàn Tự Động Cho Đơn Đặt Hàng B2B Trước Khi Đẩy Vào ERP**  
-> *Dành Cho Ban Lãnh Đạo, Kế Toán Trưởng & Giám Đốc Vận Hành Doanh Nghiệp Phân Phối*
+# 📊 PO PREFLIGHT — EXECUTIVE PITCH DECK & PROJECT PRESENTATION
+> **An Automated Safety Control Gateway for B2B Purchase Orders Before They Enter the ERP**  
+> *For Executive Leadership, Chief Accountants & Operations Directors of Distribution Businesses*
 
 ---
 
 ```
 ═══════════════════════════════════════════════════════════════════════════════
-                           MỤC LỤC BẢN THUYẾT TRÌNH (10 SLIDES)
+                         PRESENTATION CONTENTS (10 SLIDES)
 ═══════════════════════════════════════════════════════════════════════════════
-  [SLIDE 1] TỔNG QUAN & TUYÊN NGÔN SỨ MỆNH (THE HOOK)
-  [SLIDE 2] VẤN ĐỀ THỰC TẾ & CHI PHÍ ẨN DOANH NGHIỆP (THE PROBLEM & HIDDEN COSTS)
-  [SLIDE 3] GIẢI PHÁP: CỔNG TIỀN KIỂM TỰ ĐỘNG PO PREFLIGHT (THE SOLUTION)
-  [SLIDE 4] ĐỘT PHÁ CÔNG NGHỆ: 4-TIER RAG & BẢO ĐẢM SỐ HỌC (CORE TECH)
-  [SLIDE 5] QUY TRÌNH VẬN HÀNH THỰC TẾ 6 CHẶNG (LIVE PRODUCT WORKFLOW)
-  [SLIDE 6] PHƯƠNG PHÁP ĐO LƯỜNG & KẾT QUẢ ĐO KIỂM PILOT (MEASUREMENT & PILOT DATA)
-  [SLIDE 7] TUÂN THỦ NGHỊ ĐỊNH 13, ON-PREMISE & CHUỖI BĂM SHA-256 (SECURITY & AUDIT)
-  [SLIDE 8] CHÂN DUNG KHÁCH HÀNG & HỆ SINH THÁI ERP (ICP & ERP ECOSYSTEM)
-  [SLIDE 9] LỢI THẾ CẠNH TRANH ĐỘC BẢN (MOAT & COMPETITIVE ADVANTAGE)
-  [SLIDE 10] LỘ TRÌNH TRIỂN KHAI & KẾ HOẠCH PILOT 30 NGÀY (PILOT PLAYBOOK & NEXT STEPS)
+  [SLIDE 1] PROJECT OVERVIEW & MISSION STATEMENT (THE HOOK)
+  [SLIDE 2] REAL-WORLD PROBLEMS & HIDDEN BUSINESS COSTS (THE PROBLEM & HIDDEN COSTS)
+  [SLIDE 3] THE SOLUTION: THE PO PREFLIGHT AUTOMATED PRE-CHECK GATEWAY (THE SOLUTION)
+  [SLIDE 4] TECHNOLOGY BREAKTHROUGH: 4-TIER RAG & ARITHMETIC ASSURANCE (CORE TECH)
+  [SLIDE 5] THE 6-STAGE LIVE OPERATING WORKFLOW (LIVE PRODUCT WORKFLOW)
+  [SLIDE 6] MEASUREMENT METHODOLOGY & PILOT BENCHMARK RESULTS (MEASUREMENT & PILOT DATA)
+  [SLIDE 7] DECREE 13 COMPLIANCE, ON-PREMISE & SHA-256 HASH CHAIN (SECURITY & AUDIT)
+  [SLIDE 8] CUSTOMER PROFILE & ERP ECOSYSTEM (ICP & ERP ECOSYSTEM)
+  [SLIDE 9] UNIQUE COMPETITIVE ADVANTAGE (MOAT & COMPETITIVE ADVANTAGE)
+  [SLIDE 10] ROLLOUT ROADMAP & 30-DAY PILOT PLAN (PILOT PLAYBOOK & NEXT STEPS)
 ═══════════════════════════════════════════════════════════════════════════════
 ```
 
 ---
 
-## 🎯 SLIDE 1: TỔNG QUAN DỰ ÁN (THE HOOK)
+## 🎯 SLIDE 1: PROJECT OVERVIEW (THE HOOK)
 
-### 📌 Tựa đề: **PO PREFLIGHT — Cổng Kiểm Soát & Đối Soát Đơn Hàng B2B Tự Động**
+### 📌 Title: **PO PREFLIGHT — The Automated B2B Order Control & Reconciliation Gateway**
 
-* **Khẩu hiệu (Tagline)**: *"Không bao giờ để một đơn hàng sai giá hợp đồng, hết tồn kho hoặc nợ quá hạn lọt vào hệ thống ERP."*
-* **Tuyên ngôn giá trị (Value Proposition)**:
-  Cổng tiền kiểm thông minh giúp doanh nghiệp B2B và nhà phân phối tự động hóa khâu tiếp nhận, bóc tách đơn hàng (PDF, Excel, ảnh chụp scan), đối soát toàn diện với bảng giá hợp đồng, tồn kho ATP, hạn mức công nợ và kích hoạt duyệt 1 chạm trên Telegram/Zalo trước khi đồng bộ sang ERP (MISA AMIS, Bravo, Fast, Odoo, SAP B1).
-* **Đơn vị phát triển**: Nhật Minh Technology.
+* **Tagline**: *"Never let an order with the wrong contract price, out-of-stock items or overdue debt slip into your ERP system."*
+* **Value Proposition**:
+  A smart pre-check gateway that helps B2B businesses and distributors automate order intake and extraction (PDF, Excel, scanned photos), thoroughly reconcile each order against contract price lists, ATP inventory and credit limits, and trigger 1-tap approval on Telegram/Zalo before syncing to the ERP (MISA AMIS, Bravo, Fast, Odoo, SAP B1).
+* **Developed by**: Nhật Minh Technology.
 
-> 🎙️ **Speaker Notes**: *"Kính thưa quý vị, trong ngành hàng không, không một chiếc máy bay nào được cất cánh nếu chưa hoàn tất quy trình Pre-flight Check. Trong doanh nghiệp phân phối B2B, hàng trăm đơn đặt hàng mỗi ngày với trị giá hàng trăm triệu đồng đang được nhân viên nhập tay vào phần mềm kế toán mà không qua bất kỳ màng lọc tự động nào. PO Preflight chính là người gác cổng tin cậy đó."*
+> 🎙️ **Speaker Notes**: *"Ladies and gentlemen, in aviation, no aircraft takes off until it has completed the Pre-flight Check procedure. In B2B distribution businesses, hundreds of purchase orders every day, worth hundreds of millions of VND, are being keyed by hand into accounting software without passing through any automated filter. PO Preflight is that trusted gatekeeper."*
 
 ---
 
-## 🚨 SLIDE 2: NỖI ĐAU THỊ TRƯỜNG & CHI PHÍ ẨN (THE PROBLEM)
+## 🚨 SLIDE 2: MARKET PAIN POINTS & HIDDEN COSTS (THE PROBLEM)
 
-### 3 "Lỗ Hổng" Chí Mạng Trong Xử Lý Đơn Hàng B2B:
+### 3 Critical "Gaps" in B2B Order Processing:
 
 ```
   ┌───────────────────────────┐      ┌───────────────────────────┐      ┌───────────────────────────┐
-  │   1. Nhập Tay Chậm Chạp   │      │    2. Sai Mã & Lệch Giá   │      │   3. Thất Thoát Tồn Kho   │
+  │   1. Slow Manual Entry    │      │ 2. Wrong SKU & Price Gaps │      │   3. Inventory Leakage    │
   │                           │      │                           │      │                           │
-  │ • Mất 15-30 phút/đơn      │      │ • Khách dùng tên gọi lóng │      │ • Duyệt khi kho đã hết hàng│
-  │ • Sales Admin quá tải     │      │ • Áp sai giá hợp đồng     │      │ • Nhập trùng 2 lần đơn    │
-  │ • Chậm xuất hóa đơn VAT   │      │ • Khiếu nại công nợ kéo dài│     │ • Giao thiếu, bị phạt tiền │
+  │ • Takes 15-30 min/order   │      │ • Slang product names     │      │ • Approved with no stock  │
+  │ • Sales Admins overloaded │      │ • Wrong contract prices   │      │ • Orders entered twice    │
+  │ • Delayed VAT invoicing   │      │ • Drawn-out debt disputes │      │ • Short shipments, fines  │
   └───────────────────────────┘      └───────────────────────────┘      └───────────────────────────┘
 ```
 
-* **Hệ lụy trực tiếp**:
-  - Hủy hóa đơn điện tử và điều chỉnh chứng từ kế toán tốn gấp 10 lần thời gian so với tiền kiểm.
-  - Đơn hàng bị nghẽn ở khâu đối soát thủ công khiến hàng hóa giao chậm trễ, giảm uy tín với đối tác đại lý.
+* **Direct Consequences**:
+  - Cancelling e-invoices and adjusting accounting documents takes 10 times longer than pre-checking.
+  - Orders get stuck at the manual reconciliation step, so goods are delivered late, hurting credibility with dealer partners.
 
 ---
 
-## 💡 SLIDE 3: GIẢI PHÁP PO PREFLIGHT (THE SOLUTION)
+## 💡 SLIDE 3: THE PO PREFLIGHT SOLUTION (THE SOLUTION)
 
-### Cổng Tiền Kiểm Đơn Hàng 1 Chạm — Từ Tệp Thô Đến ERP Hoàn Tất
+### The 1-Tap Order Pre-check Gateway — From Raw File to Completed ERP Entry
 
 ```
  ┌───────────────┐     ┌──────────────────────────────────────────────┐     ┌───────────────┐
- │ KHÁCH HÀNG    │     │                 PO PREFLIGHT                 │     │ HỆ THỐNG ERP  │
- │ Gửi PO (Excel,│ ──► │  1. Cascading Intake (Bóc tách đa định dạng) │ ──► │  MISA AMIS    │
- │ PDF hóa đơn,  │     │  2. 4-Tier RAG Matcher (Khớp SKU đa ngữ)     │     │  Bravo / Fast │
- │ Ảnh scan)     │     │  3. Deterministic Rules (Giá, kho, công nợ)  │     │  Odoo / SAP B1│
- └───────────────┘     │  4. Mobile 1-Tap HITL (Duyệt Zalo/Telegram)  │     └───────────────┘
+ │ CUSTOMER      │     │                 PO PREFLIGHT                 │     │ ERP SYSTEMS   │
+ │ Sends POs:    │ ──► │ 1. Cascading Intake (multi-format parsing)   │ ──► │  MISA AMIS    │
+ │ Excel, PDF,   │     │ 2. 4-Tier RAG Matcher (multilingual SKUs)    │     │  Bravo / Fast │
+ │ scanned images│     │ 3. Deterministic Rules (price, stock, credit)│     │  Odoo / SAP B1│
+ └───────────────┘     │ 4. Mobile 1-Tap HITL (Zalo/Telegram approval)│     └───────────────┘
                        └──────────────────────────────────────────────┘
 ```
 
-* **Tự Động 100% Khâu Nhàm Chán**: Trích xuất dữ liệu, kiểm toán số học $\sum(\text{Qty} \times \text{Price})$, đối chiếu hạn mức nợ và tồn kho khả dụng.
-* **Người Dùng Giữ Quyền Phê Duyệt (Human-In-The-Loop)**: Chỉ khi người quản lý có thẩm quyền bấm duyệt trên Telegram, Zalo hoặc Web thì đơn hàng mới được đẩy sang ERP qua Transactional Outbox.
+* **100% Automation of the Tedious Steps**: Data extraction, arithmetic auditing $\sum(\text{Qty} \times \text{Price})$, and cross-checking credit limits and available stock.
+* **Users Keep Approval Authority (Human-In-The-Loop)**: The order is pushed to the ERP through the Transactional Outbox only after an authorized manager taps approve on Telegram, Zalo or the Web.
 
 ---
 
-## ⚡ SLIDE 4: ĐỘT PHÁ CÔNG NGHỆ BẢO ĐẢM KHÔNG ẢO GIÁC (CORE TECH)
+## ⚡ SLIDE 4: TECHNOLOGY BREAKTHROUGH THAT GUARANTEES ZERO HALLUCINATION (CORE TECH)
 
-### 1. Thuật Toán So Khớp SKU 4 Tầng (4-Tier Waterfall Hybrid RAG)
-Giải quyết triệt để vấn đề: Khách viết tên thông tục hoặc tiếng lóng Việt Nam nhưng hệ thống phải map đúng 100% mã SKU nội bộ mà **không bao giờ bị AI bịa đặt (Zero-Hallucination)**.
-- **Tier 1 — Exact Hash Match (<1ms, $0)**: Băm chính xác O(1) mã SKU và Barcode niêm yết.
-- **Tier 2 — Lexical Fuzzy (<5ms, $0)**: Khoảng cách chuỗi Levenshtein (RapidFuzz) xử lý gõ sai chính tả nhẹ.
-- **Tier 3 — Multilingual Dense Vector (<25ms, $0)**: Nhúng vector đa ngữ FastEmbed chạy nội bộ trên CPU máy chủ, hiểu ngôn ngữ dân dã (ví dụ: *"dây mạng 3m bấm sẵn"* $\rightarrow$ `CAB-CAT6-3M`).
-- **Tier 4 — LLM Context Reasoner (Fallback)**: Kích hoạt khi độ tương đồng < 70%, bắt buộc định dạng JSON nghiêm ngặt.
+### 1. 4-Tier SKU Matching Algorithm (4-Tier Waterfall Hybrid RAG)
+Completely solves the problem where customers write colloquial names or Vietnamese slang, yet the system must map to the correct internal SKU 100% of the time **without ever letting the AI make things up (Zero-Hallucination)**.
+- **Tier 1 — Exact Hash Match (<1ms, $0)**: Exact O(1) hash lookup of listed SKU codes and barcodes.
+- **Tier 2 — Lexical Fuzzy (<5ms, $0)**: Levenshtein string distance (RapidFuzz) handles minor spelling mistakes.
+- **Tier 3 — Multilingual Dense Vector (<25ms, $0)**: FastEmbed multilingual vector embeddings run locally on the server CPU and understand everyday language (e.g., *"dây mạng 3m bấm sẵn"* (pre-crimped 3 m network cable) $\rightarrow$ `CAB-CAT6-3M`).
+- **Tier 4 — LLM Context Reasoner (Fallback)**: Triggered when similarity is < 70%, with a strict JSON output format enforced.
 
-### 2. Tự Động Đối Soát Số Học (Self-Reflection Math Verifier)
-Hệ thống tự động tính lại từng dòng: $\text{Số lượng} \times \text{Đơn giá} - \text{Chiết khấu} + \text{Thuế VAT}$ và so khớp với tổng tiền trên đơn. Bất kỳ sự chênh lệch số học nào cũng lập tức được gắn cờ cảnh báo `MATH_CALCULATION_DISCREPANCY`.
+### 2. Automatic Arithmetic Verification (Self-Reflection Math Verifier)
+The system automatically recalculates every line: $\text{Quantity} \times \text{Unit Price} - \text{Discount} + \text{VAT}$ and compares it with the total stated on the order. Any arithmetic discrepancy is immediately flagged with the `MATH_CALCULATION_DISCREPANCY` warning.
 
 ---
 
-## 🚀 SLIDE 5: QUY TRÌNH VẬN HÀNH THỰC TẾ (LIVE PRODUCT WORKFLOW)
+## 🚀 SLIDE 5: THE 6-STAGE LIVE OPERATING WORKFLOW (LIVE PRODUCT WORKFLOW)
 
 ```
-[Chặng 1] Tiếp Nhận PO ──► [Chặng 2] Bóc Tách OCR ──► [Chặng 3] Khớp Mã SKU ──► [Chặng 4] Kiểm Tra Luật ──► [Chặng 5] Duyệt Di Động ──► [Chặng 6] Đẩy ERP Outbox
-  (Email / Excel / PDF)       (Gemini Flash OCR)        (4-Tier Hybrid)          (Giá, Kho, Công nợ)      (Zalo / Telegram)        (MISA / Odoo / SAP)
+[Stage 1] PO Intake ──► [Stage 2] OCR Extraction ──► [Stage 3] SKU Matching ──► [Stage 4] Rule Checks ──► [Stage 5] Mobile Approval ──► [Stage 6] ERP Outbox Push
+  (Email / Excel / PDF)       (Gemini Flash OCR)        (4-Tier Hybrid)          (Price, Stock, Credit)      (Zalo / Telegram)        (MISA / Odoo / SAP)
 ```
 
-* **Giao diện hiện đại**: Thiết kế tối giản theo chuẩn công nghiệp, bảng biểu tương tác cao, hỗ trợ chỉnh sửa trực tiếp trên bảng (Inline Edit).
-* **Màn hình di động tối giản (`/m/orders/:id`)**: Cho phép Ban Giám Đốc xử lý và phê duyệt đơn hàng khẩn cấp ngay trên điện thoại khi đang công tác.
+* **Modern interface**: Minimalist, industry-standard design with highly interactive tables that support editing directly in the table (Inline Edit).
+* **Minimal mobile screen (`/m/orders/:id`)**: Lets senior management handle and approve urgent orders right from their phones while on business trips.
 
 ---
 
-## 📈 SLIDE 6: PHƯƠNG PHÁP ĐO LƯỜNG & KẾT QUẢ PILOT (MEASUREMENT & PILOT DATA)
+## 📈 SLIDE 6: MEASUREMENT METHODOLOGY & PILOT RESULTS (MEASUREMENT & PILOT DATA)
 
-Thay vì đưa ra các con số giả định, PO Preflight áp dụng **công thức đo lường minh bạch** dựa trên dữ liệu vận hành thực tế:
+Instead of presenting assumed figures, PO Preflight applies **transparent measurement formulas** based on actual operating data:
 
-### 1. Cách Chúng Tôi Đo Lường (Measurement Methodology)
-- **Thời gian tiết kiệm thực tế (Giờ)**:  
-  $$\text{Hours Saved} = \text{Tổng số đơn xử lý} \times \frac{25\text{ phút (nhập tay)} - 2\text{ phút (tiền kiểm)}}{60}$$
-- **Tỉ lệ can thiệp của con người (%)**:  
-  $$\text{Human Intervention Rate} = \frac{\text{Số dòng hàng sửa qua Staging}}{\text{Tổng số dòng hàng}} \times 100\%$$
-- **Chi phí suy luận AI trung bình / đơn**:  
-  $$\text{Cost per PO} = \frac{\text{Tổng chi phí token LLM & OCR}}{\text{Tổng số PO tiếp nhận}}$$
+### 1. How We Measure (Measurement Methodology)
+- **Actual time saved (hours)**:  
+  $$\text{Hours Saved} = \text{Orders Processed} \times \frac{25\text{ min (manual entry)} - 2\text{ min (pre-check)}}{60}$$
+- **Human intervention rate (%)**:  
+  $$\text{Human Intervention Rate} = \frac{\text{Line Items Edited via Staging}}{\text{Total Line Items}} \times 100\%$$
+- **Average AI inference cost per order**:  
+  $$\text{Cost per PO} = \frac{\text{Total LLM \& OCR Token Cost}}{\text{Total POs Received}}$$
 
-### 2. Kết Quả Đo Kiểm Thử Nghiệm (Benchmark & Pilot Telemetry)
-- **Thời gian phân tích trung bình**: **2.1 giây / đơn hàng** (giảm > 90% thời gian chờ đợi).
-- **Tỷ lệ phát hiện vi phạm trước ERP**: **100%** (ngăn chặn mọi đơn sai giá hợp đồng, hết tồn kho hoặc nợ quá hạn).
-- **Tỷ lệ giải quyết SKU tự động (Tier 1-3)**: **> 96%** (chỉ < 4% đơn hàng cần fallback qua LLM).
-- **Chi phí vận hành AI**: Chỉ **$0.00018 USD / đơn hàng** (~4.5 VNĐ / đơn), tối ưu tuyệt đối cho quy mô lớn.
-
----
-
-## 🔒 SLIDE 7: TUÂN THỦ NGHỊ ĐỊNH 13, ON-PREMISE & CHUỖI BĂM SHA-256
-
-* **Tuân thủ triệt để Nghị định 13/2023/NĐ-CP (Bảo vệ dữ liệu cá nhân tại Việt Nam)**:
-  - Toàn bộ dữ liệu khách hàng, hóa đơn và giá cả thương mại được mã hóa khi lưu trữ và truyền tải.
-  - Hỗ trợ triển khai hoàn toàn **On-Premises** hoặc trên **Private Cloud nội địa** của khách hàng. Không có bất kỳ dữ liệu nhạy cảm nào bị gửi ra máy chủ nước ngoài.
-* **Chuỗi Băm Mật Mã Học SHA-256 (Tamper-evident Hash Chain)**:
-  Mỗi sự kiện phân tích, sửa đổi dòng hàng và quyết định duyệt của con người được liên kết toán học thành chuỗi băm bất biến. Ngăn chặn triệt để hành vi can thiệp cơ sở dữ liệu ngầm.
-* **Phân Tách Trách Nhiệm (Separation of Duties - SoD)**:
-  Quy tắc kiểm soát nội bộ nghiêm ngặt: Nhân viên tạo đơn không được tự duyệt; đơn hàng vượt thẩm quyền giá trị bắt buộc phải có chữ ký số của Giám đốc (Director).
+### 2. Benchmark & Pilot Test Results (Benchmark & Pilot Telemetry)
+- **Average analysis time**: **2.1 seconds / order** (a > 90% reduction in waiting time).
+- **Pre-ERP violation detection rate**: **100%** (stops every order with a wrong contract price, out-of-stock items or overdue debt).
+- **Automatic SKU resolution rate (Tier 1-3)**: **> 96%** (only < 4% of orders need the LLM fallback).
+- **AI operating cost**: Only **$0.00018 USD / order** (~4.5 VND / order), ideal for large-scale operations.
 
 ---
 
-## 🏢 SLIDE 8: CHÂN DUNG KHÁCH HÀNG & HỆ SINH THÁI ERP
+## 🔒 SLIDE 7: DECREE 13 COMPLIANCE, ON-PREMISE & SHA-256 HASH CHAIN
 
-### Khách Hàng Lý Tưởng (Ideal Customer Profile - ICP):
-1. **Nhà Phân Phối / Tổng Đại Lý FMCG & Tiêu Dùng Nhanh**: Tiếp nhận 50 - 500 đơn hàng đại lý mỗi ngày qua file Excel và email.
-2. **Doanh Nghiệp Phân Phối Dược Phẩm & Thiết Bị Y Tế**: Đơn hàng có danh mục phức tạp, kiểm soát chặt chẽ đơn vị tính (vỉ, hộp, thùng) và hạn mức công nợ.
-3. **Nhà Cung Ứng Vật Tư Công Nghiệp & Xây Dựng**: Khách hàng đặt hàng với quy cách kỹ thuật đặc thù và bảng giá hợp đồng riêng biệt.
-
-### Hệ Sinh Thái Kết Nối ERP Sẵn Sàng:
-- **ERP Nội Địa Phổ Biến**: **MISA AMIS**, **Bravo ERP**, **Fast Business Online**.
-- **ERP Quốc Tế / Mã Nguồn Mở**: **Odoo ERP**, **SAP Business One**, **SAP S/4HANA**.
+* **Full compliance with Decree No. 13/2023/ND-CP (Personal Data Protection in Vietnam)**:
+  - All customer data, invoices and commercial pricing are encrypted at rest and in transit.
+  - Supports fully **On-Premises** deployment or deployment on the customer's own **domestic Private Cloud**. No sensitive data is ever sent to foreign servers.
+* **SHA-256 Cryptographic Hash Chain (Tamper-evident Hash Chain)**:
+  Every analysis event, line-item edit and human approval decision is mathematically linked into an immutable hash chain, completely preventing covert database tampering.
+* **Separation of Duties (SoD)**:
+  Strict internal control rule: the employee who creates an order cannot approve it themselves; orders exceeding the value authority limit must carry the digital signature of a Director.
 
 ---
 
-## 🏆 SLIDE 9: LỢI THẾ CẠNH TRANH ĐỘC BẢN (THE MOAT)
+## 🏢 SLIDE 8: CUSTOMER PROFILE & ERP ECOSYSTEM
+
+### Ideal Customer Profile (ICP):
+1. **FMCG (Fast-Moving Consumer Goods) Distributors & General Agents**: Receive 50 - 500 dealer orders per day via Excel files and email.
+2. **Pharmaceutical & Medical Equipment Distributors**: Orders with complex catalogs, tight control over units of measure (blister pack, box, carton) and credit limits.
+3. **Industrial & Construction Materials Suppliers**: Customers order with specific technical specifications and individual contract price lists.
+
+### Ready-to-Connect ERP Ecosystem:
+- **Popular Domestic ERPs**: **MISA AMIS**, **Bravo ERP**, **Fast Business Online**.
+- **International / Open-Source ERPs**: **Odoo ERP**, **SAP Business One**, **SAP S/4HANA**.
+
+---
+
+## 🏆 SLIDE 9: UNIQUE COMPETITIVE ADVANTAGE (THE MOAT)
 
 ```
 ┌──────────────────────────────────────┬──────────────────────────────────────┐
-│       PHẦN MỀM OCR THÔNG THƯỜNG       │             PO PREFLIGHT             │
+│      CONVENTIONAL OCR SOFTWARE       │             PO PREFLIGHT             │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ ❌ Chỉ đọc text thô, không hiểu kho  │ ✔ Khớp mã kho 4 tầng (4-Tier RAG)    │
-│ ❌ Dễ bị AI ảo giác (Hallucination)  │ ✔ Quy tắc xác định (Zero-Token Rules)│
-│ ❌ Không có quy trình duyệt di động   │ ✔ Duyệt 1 chạm qua Telegram & Zalo OA│
-│ ❌ Đẩy dữ liệu thô gây lỗi ERP       │ ✔ Transactional Outbox Idempotency   │
-│ ❌ Không có chứng thực kiểm toán     │ ✔ Chuỗi băm SHA-256 chống sửa đổi    │
-│ ❌ Phụ thuộc đám mây nước ngoài      │ ✔ Sẵn sàng On-Premise & Nghị định 13 │
+│ ❌ Reads raw text, ignores inventory │ ✔ 4-tier SKU matching (4-Tier RAG)   │
+│ ❌ Prone to AI hallucination         │ ✔ Deterministic rules (Zero-Token)   │
+│ ❌ No mobile approval workflow       │ ✔ 1-tap Telegram & Zalo OA approval  │
+│ ❌ Pushing raw data causes ERP errors│ ✔ Transactional Outbox Idempotency   │
+│ ❌ No audit attestation              │ ✔ Tamper-proof SHA-256 hash chain    │
+│ ❌ Depends on foreign cloud          │ ✔ On-Premise & Decree 13 ready       │
 └──────────────────────────────────────┴──────────────────────────────────────┘
 ```
 
 ---
 
-## 🚀 SLIDE 10: KẾ HOẠCH TRIỂN KHAI PILOT 30 NGÀY (PILOT PLAYBOOK)
+## 🚀 SLIDE 10: 30-DAY PILOT ROLLOUT PLAN (PILOT PLAYBOOK)
 
-### Lộ Trình Triển Khai Pilot 4 Tuần Cho Khách Hàng Mới:
-* **Tuần 1 — Khởi Tạo Master Data**: Đồng bộ danh mục SKU, bảng giá hợp đồng và phân quyền người dùng (`/users`).
-* **Tuần 2 — Chạy Thử Song Song (Shadow Run)**: Tải PO thật vào hệ thống, tinh chỉnh bộ từ vựng SKU Alias.
-* **Tuần 3 — Vận Hành & Duyệt Di Động**: Kích hoạt cổng duyệt Telegram/Zalo, bật Transactional Outbox đồng bộ ERP.
-* **Tuần 4 — Nghiệm Thu & Đánh Giá ROI**: Xuất báo cáo Pilot (`/reports`), đối soát số giờ tiết kiệm thực tế.
-
----
-
-### 🤝 BƯỚC TIẾP THEO (NEXT STEPS):
-* **Xem Báo Cáo Pilot Mẫu**: Truy cập giao diện trực quan tại `/reports` và xuất file CSV mẫu.
-* **Đăng Ký Tham Gia Chương Trình Pilot 30 Ngày**: Trải nghiệm miễn phí trong môi trường vận hành thực tế.
-* **Liên Hệ Đội Ngũ Triển Khai**: Nhật Minh Technology | Hotline: `090x-xxx-xxx` | Email: `contact@popreflight.vn`.
+### 4-Week Pilot Rollout Roadmap for New Customers:
+* **Week 1 — Master Data Setup**: Sync the SKU catalog and contract price lists, and assign user permissions (`/users`).
+* **Week 2 — Parallel Run (Shadow Run)**: Upload real POs into the system and fine-tune the SKU Alias vocabulary.
+* **Week 3 — Operations & Mobile Approval**: Activate the Telegram/Zalo approval gateway and turn on the Transactional Outbox for ERP sync.
+* **Week 4 — Acceptance & ROI Evaluation**: Export the Pilot report (`/reports`) and reconcile the actual hours saved.
 
 ---
-*Tài liệu thuyết trình được lưu hành nội bộ — PO Preflight 2026.*
+
+### 🤝 NEXT STEPS:
+* **View the Sample Pilot Report**: Open the visual interface at `/reports` and export a sample CSV file.
+* **Sign Up for the 30-Day Pilot Program**: Try it free in a real operating environment.
+* **Contact the Implementation Team**: Nhật Minh Technology | Hotline: `090x-xxx-xxx` | Email: `contact@popreflight.vn`.
+
+---
+*Presentation material for internal circulation — PO Preflight 2026.*

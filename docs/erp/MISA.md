@@ -1,7 +1,7 @@
 # MISA AMIS Open API Integration Contract & Pilot Readiness
 
 > **Status:** Paused pending sandbox credentials per Prompt C3 development protocol:  
-> *"Điều kiện trước: có tài khoản sandbox MISA AMIS (hoặc ERP pilot: Bravo/Fast/Odoo). Nếu chưa có → DỪNG, không viết code 'đoán' API. Ghi vào docs/erp/MISA.md những gì cần từ khách."*
+> *"Precondition: a MISA AMIS sandbox account is available (or a pilot ERP: Bravo/Fast/Odoo). If not → STOP; do not write code that 'guesses' the API. Record in docs/erp/MISA.md what is needed from the client."*
 
 ---
 
